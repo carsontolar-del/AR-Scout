@@ -1,0 +1,6 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    { "name": "ar-scout", "runtimeExecutable": ".venv/bin/ar-scout", "runtimeArgs": ["serve", "--port", "8787"], "port": 8787 }
+  ]
+}

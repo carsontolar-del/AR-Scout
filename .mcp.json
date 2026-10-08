@@ -1,0 +1,7 @@
+{
+  "mcpServers": {
+    "ar-scout": {
+      "command": "/Users/carsxn/code/ar-scout/.venv/bin/ar-scout-mcp"
+    }
+  }
+}

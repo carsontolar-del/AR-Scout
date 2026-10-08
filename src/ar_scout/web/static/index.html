@@ -1,0 +1,399 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AR Scout</title>
+<style>
+:root {
+  color-scheme: light;
+  --bg: #f6f5f2; --surface: #fcfcfb; --surface-2: #f0efec; --border: #e2e0da;
+  --text: #0b0b0b; --text-2: #52514e; --muted: #8a8984;
+  --accent: #2a78d6; --accent-soft: #cde2fb; --good: #008300; --bad: #e34948; --warn: #b07800;
+  --grid: #e9e7e2;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #121211; --surface: #1a1a19; --surface-2: #242422; --border: #33332f;
+    --text: #ffffff; --text-2: #c3c2b7; --muted: #8d8c85;
+    --accent: #3987e5; --accent-soft: #1c3b63; --good: #3fae3f; --bad: #e66767; --warn: #d9a531;
+    --grid: #2b2b28;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #121211; --surface: #1a1a19; --surface-2: #242422; --border: #33332f;
+  --text: #ffffff; --text-2: #c3c2b7; --muted: #8d8c85;
+  --accent: #3987e5; --accent-soft: #1c3b63; --good: #3fae3f; --bad: #e66767; --warn: #d9a531;
+  --grid: #2b2b28;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text);
+  font: 14px/1.45 ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+header { display: flex; align-items: center; gap: 24px; padding: 14px 24px; border-bottom: 1px solid var(--border);
+  background: var(--surface); position: sticky; top: 0; z-index: 5; flex-wrap: wrap; }
+header h1 { font-size: 16px; margin: 0; letter-spacing: -.01em; }
+nav { display: flex; gap: 4px; }
+nav button { background: none; border: 0; padding: 6px 12px; border-radius: 6px; color: var(--text-2); cursor: pointer; font: inherit; }
+nav button.active { background: var(--surface-2); color: var(--text); font-weight: 600; }
+.search { margin-left: auto; display: flex; gap: 6px; }
+main { max-width: 1280px; margin: 0 auto; padding: 24px; }
+input, select { font: inherit; color: var(--text); background: var(--surface); border: 1px solid var(--border);
+  border-radius: 6px; padding: 6px 10px; }
+button.btn { font: inherit; border: 1px solid var(--border); background: var(--surface); color: var(--text);
+  padding: 6px 12px; border-radius: 6px; cursor: pointer; }
+button.btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+button.btn:disabled { opacity: .5; cursor: progress; }
+.filters { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 16px; }
+.filters label { color: var(--text-2); font-size: 13px; display: flex; gap: 6px; align-items: center; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+th { text-align: left; font-weight: 600; color: var(--text-2); font-size: 12px; padding: 8px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+td { padding: 9px 10px; border-bottom: 1px solid var(--grid); white-space: nowrap; }
+td.num, th.num { text-align: right; }
+tr.row { cursor: pointer; }
+tr.row:hover td { background: var(--surface-2); }
+.name { font-weight: 600; }
+.sub { color: var(--muted); font-size: 12px; }
+.score { display: inline-flex; align-items: center; gap: 8px; }
+.score b { min-width: 24px; text-align: right; }
+.meter { width: 64px; height: 6px; background: var(--surface-2); border-radius: 3px; overflow: hidden; }
+.meter i { display: block; height: 100%; background: var(--accent); border-radius: 3px; }
+.low { color: var(--muted); }
+.up { color: var(--good); } .down { color: var(--bad); }
+.pill { display: inline-block; padding: 1px 8px; border-radius: 999px; background: var(--surface-2); color: var(--text-2); font-size: 12px; }
+.pill.diy { background: var(--accent-soft); color: var(--text); }
+.empty { color: var(--muted); padding: 40px; text-align: center; }
+.grid { display: grid; gap: 16px; }
+.tiles { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
+.tile .label { color: var(--text-2); font-size: 12px; }
+.tile .value { font-size: 26px; font-weight: 650; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.two { grid-template-columns: 2fr 1fr; }
+@media (max-width: 900px) { .two { grid-template-columns: 1fr; } main { padding: 16px; } }
+.charts { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+.chart h4, .card h3 { margin: 0 0 8px; font-size: 13px; font-weight: 600; color: var(--text-2); }
+.chart svg { width: 100%; height: 140px; display: block; overflow: visible; }
+.chart .na { height: 140px; display: grid; place-items: center; color: var(--muted); font-size: 12px; text-align: center; }
+.comp { display: grid; grid-template-columns: 100px 1fr 40px; gap: 8px; align-items: center; margin: 6px 0; font-size: 13px; }
+.comp .bar { height: 8px; background: var(--surface-2); border-radius: 4px; overflow: hidden; }
+.comp .bar i { display: block; height: 100%; background: var(--accent); border-radius: 4px; }
+.flags li { margin: 4px 0; }
+.artist-head { display: flex; gap: 16px; align-items: center; margin-bottom: 16px; flex-wrap: wrap; }
+.artist-head img { width: 72px; height: 72px; border-radius: 50%; object-fit: cover; background: var(--surface-2); }
+.artist-head h2 { margin: 0; font-size: 26px; letter-spacing: -.02em; }
+.links a { color: var(--accent); margin-right: 10px; font-size: 13px; text-decoration: none; }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.chips button { font: inherit; font-size: 12px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text);
+  border-radius: 999px; padding: 3px 10px; cursor: pointer; }
+.tooltip { position: fixed; pointer-events: none; background: var(--surface); border: 1px solid var(--border);
+  border-radius: 6px; padding: 6px 10px; font-size: 12px; box-shadow: 0 4px 16px rgba(0,0,0,.12); display: none; z-index: 20; }
+.tooltip strong { font-size: 14px; display: block; }
+.status { font-size: 12px; color: var(--muted); }
+.notes li { margin-bottom: 8px; }
+textarea { width: 100%; font: inherit; color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 8px; min-height: 60px; }
+.hidden { display: none !important; }
+</style>
+</head>
+<body>
+<header>
+  <h1>AR Scout</h1>
+  <nav>
+    <button data-view="leaderboard" class="active">Leaderboard</button>
+    <button data-view="watchlist">Watchlist</button>
+    <button data-view="discover">Discover</button>
+  </nav>
+  <form class="search" id="searchForm">
+    <input id="searchInput" placeholder="Look up an artist…" aria-label="Artist name">
+    <button class="btn primary">Report</button>
+  </form>
+</header>
+<main>
+  <section id="view-leaderboard">
+    <div class="filters">
+      <label>Genre <input id="fGenre" placeholder="any" size="12"></label>
+      <label>Max audience <select id="fMax"><option value="">any</option><option>10000</option><option>50000</option><option>250000</option><option>1000000</option></select></label>
+      <label>Growth window <select id="fWindow"><option value="7">7 days</option><option value="30" selected>30 days</option><option value="90">90 days</option></select></label>
+      <button class="btn" id="refreshAll">Refresh snapshots (all)</button>
+      <span class="status" id="srcStatus"></span>
+    </div>
+    <div class="card table-wrap"><table id="lbTable"></table></div>
+  </section>
+
+  <section id="view-watchlist" class="hidden">
+    <div class="filters">
+      <label>Status <select id="wStatus"><option value="">all</option><option>watching</option><option>contacted</option><option>meeting</option><option>passed</option><option>signed</option></select></label>
+      <button class="btn" id="refreshWatch">Refresh snapshots</button>
+    </div>
+    <div class="card table-wrap"><table id="wlTable"></table></div>
+  </section>
+
+  <section id="view-discover" class="hidden">
+    <form class="filters" id="discoverForm">
+      <select id="dMode">
+        <option value="similar">Similar to (comma-separated seeds)</option>
+        <option value="tag">Scene / tag (Last.fm)</option>
+        <option value="playlists">Playlist mining (Deezer)</option>
+        <option value="new">New releases (Deezer genre)</option>
+        <option value="country">Country (Last.fm)</option>
+      </select>
+      <input id="dQuery" placeholder="e.g. Fcukers, Magdalena Bay" size="32">
+      <label>Deezer fans <input id="dMin" type="number" value="300" style="width:90px"> – <input id="dMax" type="number" value="50000" style="width:100px"></label>
+      <label>Limit <input id="dLimit" type="number" value="20" style="width:64px"></label>
+      <button class="btn primary" id="dGo">Discover</button>
+      <span class="status" id="dStatus"></span>
+    </form>
+    <div class="card table-wrap"><table id="dTable"></table></div>
+  </section>
+
+  <section id="view-artist" class="hidden"></section>
+</main>
+<div class="tooltip" id="tip"></div>
+
+<script>
+const $ = (s, el = document) => el.querySelector(s);
+const el = (tag, attrs = {}, ...kids) => {
+  const n = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === "class") n.className = v;
+    else if (k.startsWith("on")) n.addEventListener(k.slice(2), v);
+    else if (v !== null && v !== undefined) n.setAttribute(k, v);
+  }
+  for (const k of kids.flat()) if (k !== null && k !== undefined) n.append(k instanceof Node ? k : document.createTextNode(String(k)));
+  return n;
+};
+const fmt = v => v == null ? "–" : Math.abs(v) >= 1e6 ? (v / 1e6).toFixed(1) + "M" : Math.abs(v) >= 1e3 ? (v / 1e3).toFixed(1) + "k" : Math.round(v).toString();
+const pct = v => v == null ? "–" : (v >= 0 ? "+" : "") + (v * 100).toFixed(1) + "%";
+const api = async (path, opts) => {
+  const r = await fetch(path, opts);
+  if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || r.statusText);
+  return r.json();
+};
+const DIY = /distrokid|tunecore|cd ?baby|amuse|routenote|ditto|united ?masters|emubands|awal|soundrop|symphonic|onerpm|spinnup|landr|too lost|vydia|independent|self.released|records dk/i;
+const METRIC_LABELS = {
+  "deezer.fans": "Deezer fans", "lastfm.listeners": "Last.fm listeners", "lastfm.playcount": "Last.fm plays",
+  "youtube.subscribers": "YouTube subscribers", "youtube.views": "YouTube views",
+  "wikipedia.pageviews_30d": "Wikipedia views (30d)", "deezer.top_track_rank": "Deezer top-track rank",
+  "spotify.followers": "Spotify followers",
+};
+
+// ---------- views
+let currentView = "leaderboard";
+function show(view) {
+  currentView = view;
+  for (const s of document.querySelectorAll("main > section")) s.classList.toggle("hidden", s.id !== "view-" + view);
+  for (const b of document.querySelectorAll("nav button")) b.classList.toggle("active", b.dataset.view === view);
+  if (view === "leaderboard") loadLeaderboard();
+  if (view === "watchlist") loadWatchlist();
+}
+document.querySelectorAll("nav button").forEach(b => b.onclick = () => show(b.dataset.view));
+
+function scoreCell(r) {
+  const low = r.confidence < 0.6;
+  return el("span", { class: "score" + (low ? " low" : ""), title: `confidence ${Math.round(r.confidence * 100)}%` },
+    el("b", {}, Math.round(r.score) + (low ? "*" : "")),
+    el("span", { class: "meter" }, Object.assign(el("i"), { style: `width:${r.score}%` })));
+}
+function growthCell(r) {
+  const vals = Object.values(r.monthly_growth || {});
+  if (!vals.length) return el("span", { class: "sub" }, "–");
+  const best = Math.max(...vals);
+  return el("span", { class: best > 0.005 ? "up" : best < -0.005 ? "down" : "" }, pct(best));
+}
+function renderTable(table, rows, emptyMsg) {
+  table.replaceChildren();
+  if (!rows.length) { table.append(el("tr", {}, el("td", { class: "empty" }, emptyMsg))); return; }
+  table.append(el("thead", {}, el("tr", {},
+    ["#", "Artist", "Breakout", "Deezer", "Last.fm", "YouTube", "Best growth / mo", "Latest release", "Label", "Status"]
+      .map((h, i) => el("th", { class: i >= 3 && i <= 6 ? "num" : "" }, h)))));
+  const tb = el("tbody");
+  rows.forEach((r, i) => {
+    const label = r.label || "";
+    tb.append(el("tr", { class: "row", onclick: () => openArtist(r.name) },
+      el("td", { class: "sub" }, i + 1),
+      el("td", {}, el("div", { class: "name" }, r.name), el("div", { class: "sub" }, [r.country, ...(r.genres || [])].filter(Boolean).join(" · "))),
+      el("td", {}, scoreCell(r)),
+      el("td", { class: "num" }, fmt(r.deezer_fans)),
+      el("td", { class: "num" }, fmt(r.lastfm_listeners)),
+      el("td", { class: "num" }, fmt(r.youtube_subscribers)),
+      el("td", { class: "num" }, growthCell(r)),
+      el("td", {}, r.latest_release || "–"),
+      el("td", {}, label ? el("span", { class: "pill" + (DIY.test(label) ? " diy" : ""), title: label }, label.length > 22 ? label.slice(0, 21) + "…" : label) : "–"),
+      el("td", {}, r.status ? el("span", { class: "pill" }, r.status) : "")));
+  });
+  table.append(tb);
+}
+
+async function loadLeaderboard() {
+  const p = new URLSearchParams({ limit: 100, window: $("#fWindow").value });
+  if ($("#fGenre").value) p.set("genre", $("#fGenre").value);
+  if ($("#fMax").value) p.set("max_audience", $("#fMax").value);
+  const rows = await api("/api/leaderboard?" + p);
+  renderTable($("#lbTable"), rows, "No artists tracked yet. Use Discover or look up an artist.");
+}
+async function loadWatchlist() {
+  const rows = (await api("/api/leaderboard?watchlist=true&limit=1000")).filter(r => !$("#wStatus").value || r.status === $("#wStatus").value);
+  renderTable($("#wlTable"), rows, "Watchlist is empty. Open an artist and click Watch.");
+}
+["#fGenre", "#fMax", "#fWindow"].forEach(s => $(s).addEventListener("change", loadLeaderboard));
+$("#wStatus").addEventListener("change", loadWatchlist);
+
+async function refresh(btn, scope, after) {
+  btn.disabled = true; const t = btn.textContent; btn.textContent = "Refreshing…";
+  try { const r = await api("/api/snapshot?scope=" + scope, { method: "POST" }); btn.textContent = `Done: ${r.snapshotted} updated`; }
+  catch (e) { btn.textContent = "Error: " + e.message; }
+  setTimeout(() => { btn.textContent = t; btn.disabled = false; }, 2500);
+  after();
+}
+$("#refreshAll").onclick = e => refresh(e.target, "all", loadLeaderboard);
+$("#refreshWatch").onclick = e => refresh(e.target, "watchlist", loadWatchlist);
+
+// ---------- discover
+const placeholders = { similar: "e.g. Fcukers, Magdalena Bay", tag: "e.g. uk drill, hyperpop, alt-country",
+  playlists: "e.g. new rap, fresh indie, amapiano", new: "Deezer genre, e.g. Rap/Hip Hop (blank = all)", country: "e.g. United Kingdom, Nigeria" };
+$("#dMode").onchange = () => $("#dQuery").placeholder = placeholders[$("#dMode").value];
+$("#discoverForm").onsubmit = async e => {
+  e.preventDefault();
+  const btn = $("#dGo"); btn.disabled = true; $("#dStatus").textContent = "Searching and evaluating candidates… this can take a minute.";
+  $("#dTable").style.opacity = .5;
+  try {
+    const rows = await api("/api/discover", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mode: $("#dMode").value, query: $("#dQuery").value, min_fans: +$("#dMin").value, max_fans: +$("#dMax").value, limit: +$("#dLimit").value }) });
+    renderTable($("#dTable"), rows, "No candidates in that fan range. Widen the bounds or try another query.");
+    $("#dStatus").textContent = `${rows.length} candidates saved to the database.`;
+  } catch (err) { $("#dStatus").textContent = "Error: " + err.message; }
+  btn.disabled = false; $("#dTable").style.opacity = 1;
+};
+
+// ---------- artist detail
+$("#searchForm").onsubmit = e => { e.preventDefault(); const n = $("#searchInput").value.trim(); if (n) openArtist(n); };
+
+function lineChart(points, label) {
+  const wrap = el("div", { class: "card chart" }, el("h4", {}, label));
+  if (points.length < 2) {
+    wrap.append(el("div", { class: "na" }, points.length ? `${fmt(points[0].value)} now. A trend appears after the next daily snapshot.` : "No data"));
+    return wrap;
+  }
+  const W = 300, H = 140, P = { l: 40, r: 8, t: 8, b: 20 };
+  const xs = points.map(p => new Date(p.taken_at).getTime()), ys = points.map(p => p.value);
+  const x0 = Math.min(...xs), x1 = Math.max(...xs);
+  let y0 = Math.min(...ys), y1 = Math.max(...ys);
+  if (y0 === y1) { y0 *= 0.98; y1 = y1 * 1.02 || 1; }
+  const pad = (y1 - y0) * 0.1; y0 = Math.max(0, y0 - pad); y1 += pad;
+  const sx = x => P.l + (x - x0) / (x1 - x0 || 1) * (W - P.l - P.r);
+  const sy = y => H - P.b - (y - y0) / (y1 - y0) * (H - P.t - P.b);
+  const ns = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(ns, "svg");
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`); svg.setAttribute("preserveAspectRatio", "none");
+  svg.setAttribute("role", "img"); svg.setAttribute("aria-label", `${label}: ${fmt(ys[0])} to ${fmt(ys.at(-1))}`);
+  const add = (tag, attrs) => { const n = document.createElementNS(ns, tag); for (const k in attrs) n.setAttribute(k, attrs[k]); svg.append(n); return n; };
+  for (let i = 0; i <= 2; i++) {
+    const v = y0 + (y1 - y0) * i / 2, y = sy(v);
+    add("line", { x1: P.l, x2: W - P.r, y1: y, y2: y, stroke: "var(--grid)", "stroke-width": 1, "vector-effect": "non-scaling-stroke" });
+    add("text", { x: P.l - 6, y: y + 3, "text-anchor": "end", "font-size": 10, fill: "var(--muted)" }).textContent = fmt(v);
+  }
+  const d0 = new Date(x0), d1 = new Date(x1);
+  add("text", { x: P.l, y: H - 4, "font-size": 10, fill: "var(--muted)" }).textContent = d0.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  add("text", { x: W - P.r, y: H - 4, "font-size": 10, fill: "var(--muted)", "text-anchor": "end" }).textContent = d1.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  add("path", { d: points.map((p, i) => (i ? "L" : "M") + sx(xs[i]) + " " + sy(p.value)).join(""), fill: "none",
+    stroke: "var(--accent)", "stroke-width": 2, "stroke-linejoin": "round", "vector-effect": "non-scaling-stroke" });
+  const hair = add("line", { y1: P.t, y2: H - P.b, stroke: "var(--muted)", "stroke-width": 1, "vector-effect": "non-scaling-stroke", visibility: "hidden" });
+  const dot = add("circle", { r: 4, fill: "var(--accent)", stroke: "var(--surface)", "stroke-width": 2, visibility: "hidden" });
+  const hit = add("rect", { x: P.l, y: 0, width: W - P.l - P.r, height: H, fill: "transparent" });
+  const tip = $("#tip");
+  hit.addEventListener("pointermove", ev => {
+    const rect = svg.getBoundingClientRect();
+    const mx = (ev.clientX - rect.left) / rect.width * W;
+    let best = 0; xs.forEach((x, i) => { if (Math.abs(sx(x) - mx) < Math.abs(sx(xs[best]) - mx)) best = i; });
+    const cx = sx(xs[best]), cy = sy(ys[best]);
+    for (const n of [hair, dot]) n.setAttribute("visibility", "visible");
+    hair.setAttribute("x1", cx); hair.setAttribute("x2", cx); dot.setAttribute("cx", cx); dot.setAttribute("cy", cy);
+    tip.replaceChildren(el("strong", {}, Math.round(ys[best]).toLocaleString()), el("span", { class: "sub" }, new Date(xs[best]).toLocaleString()));
+    tip.style.display = "block"; tip.style.left = ev.clientX + 12 + "px"; tip.style.top = ev.clientY - 40 + "px";
+  });
+  hit.addEventListener("pointerleave", () => { tip.style.display = "none"; hair.setAttribute("visibility", "hidden"); dot.setAttribute("visibility", "hidden"); });
+  wrap.append(svg);
+  return wrap;
+}
+
+async function openArtist(name) {
+  show("artist");
+  const v = $("#view-artist");
+  v.replaceChildren(el("div", { class: "empty" }, `Researching ${name} across Deezer, Last.fm, YouTube, MusicBrainz, Wikipedia…`));
+  let r;
+  try { r = await api("/api/artist/" + encodeURIComponent(name)); }
+  catch (e) { v.replaceChildren(el("div", { class: "empty" }, "Not found: " + e.message)); return; }
+  const a = r.artist, s = r.score, m = s.metrics, rel = r.releases || {};
+  const watched = r.watchlist;
+
+  const statusSel = el("select", {}, ...["watching", "contacted", "meeting", "passed", "signed"].map(o => {
+    const opt = el("option", {}, o); if (watched && watched.status === o) opt.selected = true; return opt; }));
+  const watchBtn = el("button", { class: "btn primary" }, watched ? "Update status" : "Watch");
+  watchBtn.onclick = async () => {
+    await api("/api/watch", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: a.name, status: statusSel.value }) });
+    watchBtn.textContent = "Saved ✓";
+  };
+  const unwatchBtn = watched ? el("button", { class: "btn", onclick: async () => { await api("/api/watch/" + a.id, { method: "DELETE" }); openArtist(a.name); } }, "Unwatch") : null;
+
+  const links = el("div", { class: "links" }, ...Object.entries(a.links || {}).map(([k, u]) => el("a", { href: u, target: "_blank", rel: "noopener" }, k)));
+  const head = el("div", { class: "artist-head" },
+    a.image_url ? el("img", { src: a.image_url, alt: "" }) : null,
+    el("div", { style: "flex:1;min-width:240px" },
+      el("h2", {}, a.name),
+      el("div", { class: "sub" }, [a.country, (a.genres || []).join(", "), a.career_start && "since " + a.career_start].filter(Boolean).join(" · ")),
+      links),
+    el("div", { class: "filters", style: "margin:0" }, statusSel, watchBtn, unwatchBtn));
+
+  const g = s.growth || {};
+  const tile = (label, key) => el("div", { class: "card tile" },
+    el("div", { class: "label" }, label),
+    el("div", { class: "value" }, fmt(m[key])),
+    g[key] ? el("div", { class: g[key].delta >= 0 ? "up" : "down" }, `${g[key].delta >= 0 ? "+" : ""}${fmt(g[key].delta)} (${pct(g[key].monthly_rate)}/mo)`) : el("div", { class: "sub" }, "no trend yet"));
+  const tiles = el("div", { class: "grid tiles" },
+    el("div", { class: "card tile" }, el("div", { class: "label" }, "Breakout score"),
+      el("div", { class: "value" }, Math.round(s.score)), el("div", { class: "sub" }, `confidence ${Math.round(s.confidence * 100)}%`)),
+    tile("Deezer fans", "deezer.fans"), tile("Last.fm listeners", "lastfm.listeners"),
+    tile("YouTube subscribers", "youtube.subscribers"), tile("Wikipedia views (30d)", "wikipedia.pageviews_30d"));
+
+  const comps = el("div", { class: "card" }, el("h3", {}, "Score breakdown"),
+    ...Object.entries(s.components).map(([k, val]) => el("div", { class: "comp" },
+      el("span", {}, k), el("span", { class: "bar" }, Object.assign(el("i"), { style: `width:${(val || 0) * 100}%` })),
+      el("span", { class: "sub", style: "text-align:right" }, val == null ? "n/a" : Math.round(val * 100)))),
+    s.flags.length ? el("ul", { class: "flags" }, ...s.flags.map(f => el("li", {}, f))) : null);
+
+  const byMetric = {};
+  for (const h of r.history) (byMetric[h.metric] ||= []).push(h);
+  const charts = el("div", { class: "grid charts" },
+    ...Object.keys(METRIC_LABELS).filter(k => byMetric[k]).map(k => lineChart(byMetric[k], METRIC_LABELS[k])));
+
+  const releases = el("div", { class: "card" }, el("h3", {}, "Releases"),
+    rel.latest_release ? el("p", {}, `Latest on `, el("span", { class: "pill" + (DIY.test(rel.latest_label || "") ? " diy" : "") }, rel.latest_label || "unknown label"),
+      ` · ${rel.releases_last_year ?? 0} releases in last 12 months`) : null,
+    el("table", {}, el("tbody", {}, ...(rel.recent || []).map(x => el("tr", {}, el("td", {}, x.title), el("td", { class: "sub" }, x.type), el("td", { class: "sub" }, x.date))))));
+
+  const similar = el("div", { class: "card" }, el("h3", {}, "Similar artists"),
+    el("div", { class: "chips" }, ...r.similar_artists.map(x => el("button", { onclick: () => openArtist(x.name) }, `${x.name} · ${fmt(x.deezer_fans)}`))));
+
+  const noteBox = el("textarea", { placeholder: "Scouting note: show report, contact, gut feel…" });
+  const notes = el("div", { class: "card" }, el("h3", {}, "Notes"),
+    el("ul", { class: "notes" }, ...r.notes.map(n => el("li", {}, el("span", { class: "sub" }, n.created_at.slice(0, 10) + " "), n.body))),
+    noteBox, el("button", { class: "btn", style: "margin-top:8px", onclick: async () => {
+      if (!noteBox.value.trim()) return;
+      await api("/api/note", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: a.name, body: noteBox.value }) });
+      openArtist(a.name);
+    } }, "Add note"));
+
+  v.replaceChildren(head, tiles, el("div", { style: "height:16px" }),
+    el("div", { class: "grid two" }, el("div", { class: "grid" }, charts, releases), el("div", { class: "grid", style: "align-content:start" }, comps, similar, notes)),
+    r.errors.length ? el("p", { class: "sub" }, "Source issues: " + r.errors.join("; ")) : null);
+}
+
+api("/api/status").then(st => {
+  const missing = Object.entries(st).filter(([, ok]) => !ok).map(([k]) => k);
+  $("#srcStatus").textContent = missing.length ? `Not configured: ${missing.join(", ")} (add keys to .env)` : "All sources configured";
+});
+loadLeaderboard();
+</script>
+</body>
+</html>

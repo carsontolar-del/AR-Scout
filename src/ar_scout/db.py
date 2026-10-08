@@ -1,0 +1,187 @@
+"""SQLite storage: artist identities, time-series metric snapshots, watchlist, notes."""
+
+from __future__ import annotations
+
+import json
+import sqlite3
+from contextlib import contextmanager
+from datetime import datetime, timezone
+from typing import Any, Iterator
+
+from .config import settings
+
+SCHEMA = """
+CREATE TABLE IF NOT EXISTS artists (
+    id              INTEGER PRIMARY KEY,
+    name            TEXT NOT NULL,
+    deezer_id       INTEGER UNIQUE,
+    lastfm_name     TEXT,
+    mbid            TEXT,
+    spotify_id      TEXT,
+    youtube_channel TEXT,
+    wiki_title      TEXT,
+    country         TEXT,
+    career_start    TEXT,
+    genres          TEXT DEFAULT '[]',
+    links           TEXT DEFAULT '{}',
+    image_url       TEXT,
+    latest_label    TEXT,
+    latest_release  TEXT,
+    discovered_via  TEXT,
+    created_at      TEXT NOT NULL,
+    updated_at      TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_artists_name ON artists(lower(name));
+
+CREATE TABLE IF NOT EXISTS snapshots (
+    artist_id  INTEGER NOT NULL REFERENCES artists(id) ON DELETE CASCADE,
+    taken_at   TEXT NOT NULL,
+    metric     TEXT NOT NULL,
+    value      REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_snap ON snapshots(artist_id, metric, taken_at);
+
+CREATE TABLE IF NOT EXISTS watchlist (
+    artist_id  INTEGER PRIMARY KEY REFERENCES artists(id) ON DELETE CASCADE,
+    status     TEXT NOT NULL DEFAULT 'watching',  -- watching | contacted | meeting | passed | signed
+    tags       TEXT DEFAULT '[]',
+    added_at   TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS notes (
+    id         INTEGER PRIMARY KEY,
+    artist_id  INTEGER NOT NULL REFERENCES artists(id) ON DELETE CASCADE,
+    body       TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+"""
+
+JSON_FIELDS = ("genres", "links")
+
+
+def now() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+@contextmanager
+def connect() -> Iterator[sqlite3.Connection]:
+    settings.db_path.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(settings.db_path)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA foreign_keys = ON")
+    conn.executescript(SCHEMA)
+    try:
+        yield conn
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def _row(row: sqlite3.Row | None) -> dict | None:
+    if row is None:
+        return None
+    d = dict(row)
+    for f in JSON_FIELDS:
+        if f in d and isinstance(d[f], str):
+            d[f] = json.loads(d[f] or ("[]" if f == "genres" else "{}"))
+    return d
+
+
+def get_artist(artist_id: int) -> dict | None:
+    with connect() as c:
+        return _row(c.execute("SELECT * FROM artists WHERE id = ?", (artist_id,)).fetchone())
+
+
+def find_artist(name: str) -> dict | None:
+    with connect() as c:
+        return _row(c.execute(
+            "SELECT * FROM artists WHERE lower(name) = lower(?) OR lower(lastfm_name) = lower(?) "
+            "ORDER BY id LIMIT 1", (name, name)).fetchone())
+
+
+def find_by_deezer(deezer_id: int) -> dict | None:
+    with connect() as c:
+        return _row(c.execute("SELECT * FROM artists WHERE deezer_id = ?", (deezer_id,)).fetchone())
+
+
+def upsert_artist(fields: dict[str, Any], artist_id: int | None = None) -> int:
+    fields = {k: (json.dumps(v) if k in JSON_FIELDS else v) for k, v in fields.items() if v is not None}
+    fields["updated_at"] = now()
+    with connect() as c:
+        if artist_id is None:
+            fields.setdefault("created_at", fields["updated_at"])
+            cols = ", ".join(fields)
+            cur = c.execute(f"INSERT INTO artists ({cols}) VALUES ({', '.join('?' * len(fields))})",
+                            list(fields.values()))
+            return cur.lastrowid
+        sets = ", ".join(f"{k} = ?" for k in fields)
+        c.execute(f"UPDATE artists SET {sets} WHERE id = ?", [*fields.values(), artist_id])
+        return artist_id
+
+
+def add_snapshot(artist_id: int, metrics: dict[str, float | None], taken_at: str | None = None) -> None:
+    taken_at = taken_at or now()
+    rows = [(artist_id, taken_at, m, float(v)) for m, v in metrics.items() if v is not None]
+    with connect() as c:
+        c.executemany("INSERT INTO snapshots VALUES (?, ?, ?, ?)", rows)
+
+
+def history(artist_id: int, metric: str | None = None) -> list[dict]:
+    q = "SELECT taken_at, metric, value FROM snapshots WHERE artist_id = ?"
+    args: list[Any] = [artist_id]
+    if metric:
+        q += " AND metric = ?"
+        args.append(metric)
+    with connect() as c:
+        return [dict(r) for r in c.execute(q + " ORDER BY taken_at", args)]
+
+
+def latest_metrics(artist_id: int) -> dict[str, float]:
+    with connect() as c:
+        rows = c.execute(
+            "SELECT metric, value FROM snapshots s WHERE artist_id = ? AND taken_at = "
+            "(SELECT max(taken_at) FROM snapshots WHERE artist_id = s.artist_id AND metric = s.metric)",
+            (artist_id,)).fetchall()
+    return {r["metric"]: r["value"] for r in rows}
+
+
+def all_artists(watchlist_only: bool = False) -> list[dict]:
+    q = ("SELECT a.*, w.status, w.tags AS watch_tags FROM artists a "
+         + ("JOIN" if watchlist_only else "LEFT JOIN") + " watchlist w ON w.artist_id = a.id")
+    with connect() as c:
+        return [_row(r) for r in c.execute(q)]
+
+
+def watch(artist_id: int, status: str = "watching", tags: list[str] | None = None) -> None:
+    with connect() as c:
+        c.execute(
+            "INSERT INTO watchlist (artist_id, status, tags, added_at) VALUES (?, ?, ?, ?) "
+            "ON CONFLICT(artist_id) DO UPDATE SET status = excluded.status, "
+            "tags = CASE WHEN excluded.tags = '[]' THEN watchlist.tags ELSE excluded.tags END",
+            (artist_id, status, json.dumps(tags or []), now()))
+
+
+def unwatch(artist_id: int) -> None:
+    with connect() as c:
+        c.execute("DELETE FROM watchlist WHERE artist_id = ?", (artist_id,))
+
+
+def watch_entry(artist_id: int) -> dict | None:
+    with connect() as c:
+        row = c.execute("SELECT * FROM watchlist WHERE artist_id = ?", (artist_id,)).fetchone()
+    if not row:
+        return None
+    d = dict(row)
+    d["tags"] = json.loads(d["tags"] or "[]")
+    return d
+
+
+def add_note(artist_id: int, body: str) -> None:
+    with connect() as c:
+        c.execute("INSERT INTO notes (artist_id, body, created_at) VALUES (?, ?, ?)", (artist_id, body, now()))
+
+
+def notes(artist_id: int) -> list[dict]:
+    with connect() as c:
+        return [dict(r) for r in c.execute(
+            "SELECT body, created_at FROM notes WHERE artist_id = ? ORDER BY created_at DESC", (artist_id,))]
