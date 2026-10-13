@@ -123,6 +123,26 @@ def relink():
         console.print(f"[yellow]{e}[/]")
 
 
+@app.command("recheck-youtube")
+def recheck_youtube():
+    """Re-search YouTube for artists whose linked channel looks wrong (100 quota units each)."""
+    res = service.recheck_youtube(progress=_progress)
+    for c in res["changed"]:
+        console.print(f"{c['name']}: {_n(c['subscribers_before'])} -> {_n(c['subscribers_after'])} subscribers")
+    if res["unchanged"]:
+        console.print(f"[yellow]No better channel found for: {', '.join(res['unchanged'])}[/]")
+    for e in res["errors"]:
+        console.print(f"[red]{e}[/]")
+
+
+@app.command("set-youtube")
+def set_youtube(name: str, url: str):
+    """Set an artist's YouTube channel by hand (channel URL, @handle URL or UC… ID)."""
+    a = service.resolve(name, deep=True)
+    res = service.set_youtube_channel(a["id"], url)
+    console.print(f"{res['artist']} -> {res['title']} ({_n(res['subscribers'])} subscribers, {res['videos']} videos)")
+
+
 @discover_app.command("similar")
 def d_similar(seeds: list[str], min_fans: int = 300, max_fans: int = 50_000, hops: int = 1, limit: int = 20):
     """Smaller artists in the orbit of one or more seed artists."""

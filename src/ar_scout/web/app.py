@@ -27,6 +27,10 @@ class NoteIn(BaseModel):
     body: str
 
 
+class YouTubeIn(BaseModel):
+    url: str
+
+
 class DiscoverIn(BaseModel):
     mode: str  # similar | tag | country | new | playlists
     query: str = ""
@@ -67,6 +71,14 @@ def artist(name: str, refresh: bool = True):
         raise HTTPException(404, str(exc)) from exc
     r["history"] = db.history(r["artist"]["id"])
     return r
+
+
+@app.post("/api/artist/{artist_id}/youtube")
+def set_youtube(artist_id: int, body: YouTubeIn):
+    try:
+        return service.set_youtube_channel(artist_id, body.url)
+    except SourceError as exc:
+        raise HTTPException(400, str(exc)) from exc
 
 
 @app.post("/api/watch")

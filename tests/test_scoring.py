@@ -75,3 +75,8 @@ def test_flags_youtube_channel_too_small_for_audience():
     assert suspect in flags({"lastfm.listeners": 87_000, "lastfm.playcount": 500_000, "youtube.subscribers": 0})
     assert suspect not in flags({"lastfm.listeners": 87_000, "lastfm.playcount": 500_000, "youtube.subscribers": 11_800})
     assert suspect not in flags({"lastfm.listeners": 5_000, "lastfm.playcount": 50_000, "youtube.subscribers": 10})
+
+
+def test_channel_with_no_videos_is_suspect():
+    assert scoring.youtube_suspect({"youtube.subscribers": 627, "youtube.videos": 0, "lastfm.listeners": 3_000})
+    assert not scoring.youtube_suspect({"lastfm.listeners": 80_000})  # no channel at all isn't "wrong"

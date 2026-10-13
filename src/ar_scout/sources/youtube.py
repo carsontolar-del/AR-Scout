@@ -35,12 +35,36 @@ def channel_by_handle(handle: str) -> str | None:
     return items[0]["id"] if items else None
 
 
+def channel_from_url(url: str) -> str | None:
+    """Channel ID from a /channel/ URL, an @handle URL (1 quota unit) or a bare UC... ID."""
+    url = url.strip()
+    if re.fullmatch(r"UC[\w-]{22}", url):
+        return url
+    if channel := channel_id_from_url(url):
+        return channel
+    if handle := handle_from_url(url):
+        return channel_by_handle(handle)
+    return None
+
+
+def _key(s: str) -> str:
+    return re.sub(r"[\W_]", "", s.casefold())
+
+
+def title_matches(title: str, artist: str) -> bool:
+    """Channel title names the artist, ignoring case, spaces and punctuation ('Of The Trees' ~ 'ofthetrees'),
+    with suffixes allowed ('Of The Trees Official', 'OfTheTreesVEVO'). Topic channels never match."""
+    if title.rstrip().casefold().endswith("- topic"):
+        return False
+    t, a = _key(title), _key(artist)
+    return bool(a) and t.startswith(a)
+
+
 def search_channel(name: str) -> str | None:
-    """Costs 100 quota units. Prefers official artist channels over Topic channels."""
+    """Costs 100 quota units. Takes the first result whose title names the artist, skipping Topic channels."""
     items = _get("search", part="snippet", type="channel", q=name, maxResults=5).get("items", [])
     for item in items:
-        title = item["snippet"]["channelTitle"]
-        if title.lower().startswith(name.lower()) and not title.endswith("- Topic"):
+        if title_matches(item["snippet"]["channelTitle"], name):
             return item["snippet"]["channelId"]
     return None
 

@@ -109,6 +109,22 @@ def relink_artists() -> dict:
 
 
 @mcp.tool()
+def recheck_youtube() -> dict:
+    """Re-search YouTube for artists whose linked channel looks wrong (no videos, or under 1% as many
+    subscribers as Last.fm listeners) and switch to a better name match. Old YouTube snapshots for a
+    switched channel are deleted. Skips channels set by hand. Costs 100 quota units per suspect artist."""
+    return service.recheck_youtube()
+
+
+@mcp.tool()
+def set_youtube_channel(name: str, url: str) -> dict:
+    """Fix an artist's YouTube channel by hand (youtube.com/@handle, youtube.com/channel/UC… or a UC… ID).
+    Deletes the old channel's snapshots and takes a fresh one."""
+    a = service.resolve(name, deep=True)
+    return service.set_youtube_channel(a["id"], url)
+
+
+@mcp.tool()
 def metric_history(name: str, metric: str | None = None) -> list[dict]:
     """Raw time series for an artist (e.g. metric='deezer.fans', 'lastfm.listeners', 'youtube.subscribers')."""
     a = db.find_artist(name)

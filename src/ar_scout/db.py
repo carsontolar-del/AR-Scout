@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS artists (
     latest_release  TEXT,
     discovered_via  TEXT,
     resolved_at     TEXT,           -- set once the deep cross-source lookup (MusicBrainz, YouTube...) has run
+    youtube_source  TEXT,           -- musicbrainz | search | manual
     created_at      TEXT NOT NULL,
     updated_at      TEXT NOT NULL
 );
@@ -83,6 +84,8 @@ def _migrate(conn: sqlite3.Connection) -> None:
     cols = {r["name"] for r in conn.execute("PRAGMA table_info(artists)")}
     if "resolved_at" not in cols:
         conn.execute("ALTER TABLE artists ADD COLUMN resolved_at TEXT")
+    if "youtube_source" not in cols:
+        conn.execute("ALTER TABLE artists ADD COLUMN youtube_source TEXT")
 
 
 def _row(row: sqlite3.Row | None) -> dict | None:
@@ -142,6 +145,13 @@ def history(artist_id: int, metric: str | None = None) -> list[dict]:
         args.append(metric)
     with connect() as c:
         return [dict(r) for r in c.execute(q + " ORDER BY taken_at", args)]
+
+
+def delete_metrics(artist_id: int, prefix: str) -> None:
+    """Drop an artist's snapshots for metrics starting with `prefix` (e.g. 'youtube.' after a channel change)."""
+    with connect() as c:
+        c.execute("DELETE FROM snapshots WHERE artist_id = ? AND substr(metric, 1, ?) = ?",
+                  (artist_id, len(prefix), prefix))
 
 
 def latest_metrics(artist_id: int) -> dict[str, float]:

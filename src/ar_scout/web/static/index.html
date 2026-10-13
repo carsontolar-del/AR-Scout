@@ -207,6 +207,10 @@ tr.row:hover td { background: var(--surface-2); }
 .kpi .l { font-size: 12px; color: var(--text-2); font-weight: 500; }
 .kpi .v { font-size: 22px; font-weight: 650; letter-spacing: -.02em; margin: 2px 0; font-variant-numeric: tabular-nums; }
 .kpi .d { font-size: 12px; color: var(--muted); }
+.linkish { border: 0; background: none; padding: 0; color: var(--accent-text); cursor: pointer; font-size: inherit; }
+.linkish:hover { text-decoration: underline; }
+.yt-src { margin-top: 4px; }
+.yt-src a { color: var(--text-2); text-decoration: none; } .yt-src a:hover { color: var(--text); }
 .kpi .d.up { color: var(--good); } .kpi .d.down { color: var(--bad); }
 
 .score-card { display: flex; gap: 18px; align-items: center; margin-bottom: 16px; }
@@ -717,6 +721,23 @@ function ring(score, conf) {
   return r;
 }
 
+const YT_SOURCE = { musicbrainz: "via MusicBrainz", search: "via search", manual: "set by you" };
+function ytChannelLine(a) {
+  const change = el("button", { class: "linkish" }, a.youtube_channel ? "Change" : "Set channel");
+  change.onclick = async () => {
+    const url = prompt(`YouTube channel for ${a.name}\n\nPaste a youtube.com/@handle or youtube.com/channel/UC… link. Old YouTube history for this artist is deleted so the switch doesn't read as growth.`);
+    if (!url || !url.trim()) return;
+    change.disabled = true; change.textContent = "Saving…";
+    try {
+      const r = await post(`/api/artist/${a.id}/youtube`, { url: url.trim() });
+      toast(`${r.title}: ${fmt(r.subscribers)} subscribers`); renderArtist(a.name);
+    } catch (e) { toast("Couldn't set channel: " + e.message); change.disabled = false; change.textContent = "Change"; }
+  };
+  return el("div", { class: "d yt-src" },
+    a.youtube_channel ? el("a", { href: "https://www.youtube.com/channel/" + a.youtube_channel, target: "_blank", rel: "noopener" }, "Channel ↗") : null,
+    a.youtube_channel && YT_SOURCE[a.youtube_source] ? " " + YT_SOURCE[a.youtube_source] + " · " : a.youtube_channel ? " · " : null, change);
+}
+
 const parseTags = v => [...new Set(v.split(",").map(t => t.trim()).filter(Boolean))];
 
 function flagClass(f) {
@@ -770,7 +791,8 @@ async function renderArtist(name) {
   const depth = m["lastfm.listeners"] ? m["lastfm.playcount"] / m["lastfm.listeners"] : null;
   const ytOff = s.flags.some(f => /^YouTube count looks off/.test(f));
   const ytKpi = kpi("YouTube subscribers", "youtube.subscribers", a.resolved_at ? "no channel found" : "not looked up yet");
-  if (ytOff) ytKpi.append(el("div", { class: "d down" }, "Too small for this audience: check the channel link"));
+  if (ytOff) ytKpi.append(el("div", { class: "d down" }, "Doesn't look like their main channel"));
+  ytKpi.append(ytChannelLine(a));
   const kpis = el("div", { class: "kpis" },
     ytKpi,
     kpi("YouTube views", "youtube.views", a.resolved_at ? "no channel found" : "not looked up yet"),

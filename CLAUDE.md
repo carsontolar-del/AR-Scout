@@ -29,6 +29,8 @@ artists show lower confidence until `refresh_snapshots` / the daily job has run 
   scene, `discover_playlists` for curator support, then `leaderboard` filtered by `max_audience`.
 - When you shortlist someone, offer to `watchlist_add` them with tags so they're tracked daily.
 - Name thin or missing data plainly (e.g. "no YouTube channel linked", "only 1 snapshot").
+- MusicBrainz YouTube links are community-edited and sometimes wrong. On a "YouTube count looks off" flag, run
+  `recheck_youtube`, or `set_youtube_channel` with the right URL; both delete the old channel's YouTube history.
 
 ## Dev
 - `uv sync` installs; `uv run pytest` runs the tests; `uv run ar-scout --help` lists the CLI commands;

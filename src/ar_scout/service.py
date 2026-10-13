@@ -84,6 +84,75 @@ def track_light(dz: dict, via: str | None = None) -> int:
     return artist_id
 
 
+def _youtube_from_link(errors: list[str], url: str, name: str) -> tuple[str | None, str | None]:
+    """Use the MusicBrainz YouTube link only if it looks like the artist's channel (has videos, title names
+    the artist). Those links are community-edited and sometimes point at someone else entirely; otherwise
+    search by name (100 units) and fall back to the link if the search finds nothing better."""
+    channel = _try(errors, "youtube", lambda: youtube.channel_from_url(url))
+    if not channel:
+        return None, None
+    stats = _try(errors, "youtube", lambda: youtube.channel_stats(channel))
+    if stats and stats["videos"] and youtube.title_matches(stats["title"] or "", name):
+        return channel, "musicbrainz"
+    found = _try(errors, "youtube", lambda: youtube.search_channel(name))
+    if found and found != channel:
+        title = stats["title"] if stats else "an unavailable channel"
+        errors.append(f"youtube: MusicBrainz links '{title}', which doesn't look like {name}'s channel; "
+                      "used the search match instead")
+        return found, "search"
+    return channel, "musicbrainz"
+
+
+def _switch_youtube(artist: dict, channel: str, source: str) -> None:
+    """Point an artist at a different channel. Old YouTube snapshots belong to the old channel, so they're
+    dropped; keeping them would read as a huge jump in growth."""
+    if artist.get("youtube_channel") != channel:
+        db.delete_metrics(artist["id"], "youtube.")
+    db.upsert_artist({"youtube_channel": channel, "youtube_source": source}, artist["id"])
+
+
+def set_youtube_channel(artist_id: int, url: str) -> dict:
+    """Manually set an artist's YouTube channel from a channel URL, @handle URL or channel ID, then snapshot.
+    Manual choices are never overwritten by recheck_youtube()."""
+    artist = db.get_artist(artist_id)
+    if not artist:
+        raise SourceError(f"No artist with id {artist_id}")
+    channel = youtube.channel_from_url(url)
+    if not channel:
+        raise SourceError("Not a YouTube channel link. Use youtube.com/@handle, youtube.com/channel/UC… or a UC… ID")
+    stats = youtube.channel_stats(channel)
+    if not stats:
+        raise SourceError(f"YouTube has no channel {channel}")
+    _switch_youtube(artist, channel, "manual")
+    snapshot(artist_id)
+    return {"artist": artist["name"], "channel": channel, "title": stats["title"],
+            "subscribers": stats["subscribers"], "videos": stats["videos"]}
+
+
+def recheck_youtube(progress: Callable[[str], None] | None = None) -> dict:
+    """Search again (100 quota units each) for artists whose linked channel looks wrong: no videos, or far
+    fewer subscribers than their Last.fm audience. Channels set by hand are left alone."""
+    changed, unchanged, errors = [], [], []
+    for a in db.all_artists():
+        if not a.get("youtube_channel") or a.get("youtube_source") == "manual":
+            continue
+        before = db.latest_metrics(a["id"])
+        if not scoring.youtube_suspect(before):
+            continue
+        if progress:
+            progress(a["name"])
+        found = _try(errors, f"{a['name']}: youtube", lambda: youtube.search_channel(a["name"]))
+        if not found or found == a["youtube_channel"]:
+            unchanged.append(a["name"])
+            continue
+        _switch_youtube(a, found, "search")
+        errors += [f"{a['name']}: {e}" for e in snapshot(a["id"])["errors"]]
+        changed.append({"name": a["name"], "channel": found,
+                        "subscribers_before": before.get("youtube.subscribers"),
+                        "subscribers_after": db.latest_metrics(a["id"]).get("youtube.subscribers")})
+    return {"changed": changed, "unchanged": unchanged, "errors": errors}
+
+
 def resolve(name: str, deep: bool = True) -> dict:
     """Find or create an artist and link IDs across every configured source."""
     errors: list[str] = []
@@ -124,12 +193,13 @@ def resolve(name: str, deep: bool = True) -> dict:
 
         if youtube.available():
             yt_url = (mb or {}).get("links", {}).get("youtube", "")
-            channel = youtube.channel_id_from_url(yt_url)
-            if not channel and (handle := youtube.handle_from_url(yt_url)):
-                channel = _try(errors, "youtube", lambda: youtube.channel_by_handle(handle))
+            channel, source = _youtube_from_link(errors, yt_url, display) if yt_url else (None, None)
             if not channel:
                 channel = _try(errors, "youtube", lambda: youtube.search_channel(display))
-            fields["youtube_channel"] = channel
+                source = "search" if channel else None
+            if artist and artist.get("youtube_channel") and channel and channel != artist["youtube_channel"]:
+                db.delete_metrics(artist["id"], "youtube.")
+            fields.update(youtube_channel=channel, youtube_source=source)
         fields["resolved_at"] = db.now()
 
         if spotify.available():

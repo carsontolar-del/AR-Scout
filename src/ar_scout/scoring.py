@@ -88,6 +88,16 @@ SUSPECT_YT_MIN_LISTENERS = 20_000
 SUSPECT_YT_RATIO = 0.01
 
 
+def youtube_suspect(metrics: dict[str, float]) -> bool:
+    """The linked channel probably isn't the artist's main one: no videos, or far too few subscribers."""
+    subs, listeners = metrics.get("youtube.subscribers"), metrics.get("lastfm.listeners")
+    if subs is None:
+        return False
+    if metrics.get("youtube.videos") == 0:
+        return True
+    return bool(listeners and listeners >= SUSPECT_YT_MIN_LISTENERS and subs < listeners * SUSPECT_YT_RATIO)
+
+
 def _traction(value: float, lo: float, full_from: float) -> float:
     """0 below `lo`, ramping (log scale) to 1 at `full_from`."""
     if value < lo:
@@ -158,7 +168,7 @@ def score(metrics: dict[str, float], history: dict[str, list[tuple[str, float]]]
     subs, views = metrics.get("youtube.subscribers"), metrics.get("youtube.views")
     if subs and views and subs >= 100:
         eng.append(_clamp(math.log10(max(views / subs, 1)) / 3))  # 1000 views/sub = 1.0
-    if subs is not None and listeners and listeners >= SUSPECT_YT_MIN_LISTENERS and subs < listeners * SUSPECT_YT_RATIO:
+    if youtube_suspect(metrics):
         flags.append("YouTube count looks off: check the linked channel")
     components["engagement"] = sum(eng) / len(eng) if eng else None
 
