@@ -67,31 +67,52 @@ def growth(points: list[tuple[str, float]], window_days: int = 30) -> dict | Non
 # ~10-20x smaller than Last.fm listeners / YouTube subs for most Western acts, so they get their own scale.
 HEADROOM_BANDS = {
     "deezer.fans": (50, 500, 25_000, 500_000),
-    "lastfm.listeners": (200, 2_000, 100_000, 2_000_000),
-    "youtube.subscribers": (200, 2_000, 100_000, 2_000_000),
-    "spotify.followers": (200, 2_000, 100_000, 2_000_000),
+    "lastfm.listeners": (200, 2_000, 100_000, 1_000_000),
+    "youtube.subscribers": (200, 2_000, 100_000, 1_000_000),
+    "spotify.followers": (200, 2_000, 100_000, 1_000_000),
 }
 
+# Fame signals that only count against an artist: having no Wikipedia article is normal for an emerging act,
+# but heavy traffic means mainstream crossover. (full_to, fade_to_zero)
+HEADROOM_CEILINGS = {
+    "wikipedia.pageviews_30d": (15_000, 300_000),
+}
 
-def _band(value: float, band: tuple[float, float, float, float]) -> float:
-    lo, full_from, full_to, hi = (math.log10(b) for b in band)
-    if value <= 0:
+# Headroom also caps the whole score, so a famous act can't ride engagement and activity to the top:
+# total *= SIZE_GATE_FLOOR + (1 - SIZE_GATE_FLOOR) * headroom. Headroom 0 keeps 30% of the score.
+SIZE_GATE_FLOOR = 0.3
+
+# A real main channel almost never has under 1% as many subscribers as the act has Last.fm listeners; when it
+# does, the link is usually a Topic/YouTube Music channel or a different artist with the same name.
+SUSPECT_YT_MIN_LISTENERS = 20_000
+SUSPECT_YT_RATIO = 0.01
+
+
+def _traction(value: float, lo: float, full_from: float) -> float:
+    """0 below `lo`, ramping (log scale) to 1 at `full_from`."""
+    if value < lo:
         return 0.0
-    x = math.log10(value)
-    if x < lo:
-        return 0.0
-    if x < full_from:
-        return (x - lo) / (full_from - lo)
-    if x <= full_to:
+    return _clamp((math.log10(value) - math.log10(lo)) / (math.log10(full_from) - math.log10(lo)))
+
+
+def _size_room(value: float, full_to: float, hi: float) -> float:
+    """1 up to `full_to`, fading (log scale) to 0 at `hi`."""
+    if value <= full_to:
         return 1.0
-    return _clamp(1 - (x - full_to) / (hi - full_to))
+    return _clamp(1 - (math.log10(value) - math.log10(full_to)) / (math.log10(hi) - math.log10(full_to)))
 
 
 def headroom_score(metrics: dict[str, float]) -> float | None:
-    """Sweet spot = real traction but not big yet. Takes the most conservative platform, so being
-    large anywhere counts as large."""
-    scores = [_band(metrics[m], b) for m, b in HEADROOM_BANDS.items() if metrics.get(m) is not None]
-    return min(scores) if scores else None
+    """Sweet spot = real traction but not big yet. Traction counts from the strongest platform (a tiny
+    or mismatched YouTube channel shouldn't erase real Last.fm numbers); size counts from the largest,
+    so being big anywhere counts as big."""
+    present = {m: b for m, b in HEADROOM_BANDS.items() if metrics.get(m) is not None}
+    if not present:
+        return None
+    traction = max(_traction(metrics[m], lo, full_from) for m, (lo, full_from, _, _) in present.items())
+    room = [_size_room(metrics[m], full_to, hi) for m, (_, _, full_to, hi) in present.items()]
+    room += [_size_room(metrics[m], full_to, hi) for m, (full_to, hi) in HEADROOM_CEILINGS.items() if metrics.get(m)]
+    return min(traction, *room)
 
 
 def activity_score(latest_release: str | None, releases_last_year: int | None) -> float | None:
@@ -137,11 +158,14 @@ def score(metrics: dict[str, float], history: dict[str, list[tuple[str, float]]]
     subs, views = metrics.get("youtube.subscribers"), metrics.get("youtube.views")
     if subs and views and subs >= 100:
         eng.append(_clamp(math.log10(max(views / subs, 1)) / 3))  # 1000 views/sub = 1.0
+    if subs is not None and listeners and listeners >= SUSPECT_YT_MIN_LISTENERS and subs < listeners * SUSPECT_YT_RATIO:
+        flags.append("YouTube count looks off: check the linked channel")
     components["engagement"] = sum(eng) / len(eng) if eng else None
 
     components["headroom"] = headroom_score(metrics)
     if (metrics.get("deezer.fans") or 0) > 250_000 or any(
-            (metrics.get(m) or 0) > 1_000_000 for m in ("lastfm.listeners", "youtube.subscribers")):
+            (metrics.get(m) or 0) > 1_000_000 for m in ("lastfm.listeners", "youtube.subscribers")) or (
+            metrics.get("wikipedia.pageviews_30d") or 0) > 100_000:
         flags.append("already established")
 
     components["activity"] = activity_score(latest_release, releases_last_year)
@@ -156,6 +180,11 @@ def score(metrics: dict[str, float], history: dict[str, list[tuple[str, float]]]
     usable = {k: v for k, v in components.items() if v is not None}
     w_sum = sum(WEIGHTS[k] for k in usable)
     total = 100 * sum(WEIGHTS[k] * v for k, v in usable.items()) / w_sum if w_sum else 0.0
+    headroom = components["headroom"]
+    if headroom is not None and headroom < 1:
+        total *= SIZE_GATE_FLOOR + (1 - SIZE_GATE_FLOOR) * headroom
+        if headroom < 0.5:
+            flags.append("score capped: audience already large")
 
     return {
         "score": round(total, 1),

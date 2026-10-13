@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS artists (
     latest_label    TEXT,
     latest_release  TEXT,
     discovered_via  TEXT,
+    resolved_at     TEXT,           -- set once the deep cross-source lookup (MusicBrainz, YouTube...) has run
     created_at      TEXT NOT NULL,
     updated_at      TEXT NOT NULL
 );
@@ -70,11 +71,18 @@ def connect() -> Iterator[sqlite3.Connection]:
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
     conn.executescript(SCHEMA)
+    _migrate(conn)
     try:
         yield conn
         conn.commit()
     finally:
         conn.close()
+
+
+def _migrate(conn: sqlite3.Connection) -> None:
+    cols = {r["name"] for r in conn.execute("PRAGMA table_info(artists)")}
+    if "resolved_at" not in cols:
+        conn.execute("ALTER TABLE artists ADD COLUMN resolved_at TEXT")
 
 
 def _row(row: sqlite3.Row | None) -> dict | None:
@@ -143,6 +151,14 @@ def latest_metrics(artist_id: int) -> dict[str, float]:
             "(SELECT max(taken_at) FROM snapshots WHERE artist_id = s.artist_id AND metric = s.metric)",
             (artist_id,)).fetchall()
     return {r["metric"]: r["value"] for r in rows}
+
+
+def snapshot_summary() -> dict[int, dict]:
+    """artist_id -> {days: distinct UTC days with snapshots, last: latest taken_at}."""
+    with connect() as c:
+        rows = c.execute("SELECT artist_id, count(DISTINCT substr(taken_at, 1, 10)) AS days, max(taken_at) AS last "
+                         "FROM snapshots GROUP BY artist_id").fetchall()
+    return {r["artist_id"]: {"days": r["days"], "last": r["last"]} for r in rows}
 
 
 def all_artists(watchlist_only: bool = False) -> list[dict]:

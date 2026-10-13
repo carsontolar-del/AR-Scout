@@ -66,3 +66,4 @@ def geo_top_artists(country: str, page: int = 1, limit: int = 50) -> list[dict]:
     data = _call("geo.gettopartists", country=country, page=page, limit=limit)
     return [{"name": a["name"], "mbid": a.get("mbid") or None, "listeners": int(a.get("listeners", 0))}
             for a in _as_list(data.get("topartists", {}).get("artist"))]
+

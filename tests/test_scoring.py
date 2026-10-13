@@ -45,3 +45,33 @@ def test_missing_components_renormalise():
     s = scoring.score({"deezer.fans": 5_000}, {})
     assert s["components"]["momentum"] is None
     assert s["score"] == 100.0 and s["confidence"] == 0.2
+
+
+def test_famous_artist_is_capped_despite_strong_engagement():
+    recent = (date.today() - timedelta(days=10)).isoformat()
+    common = dict(history={}, latest_release=recent, releases_last_year=8, diy_label=False)
+    star = scoring.score({"lastfm.listeners": 3_000_000, "lastfm.playcount": 150_000_000}, **common)
+    rising = scoring.score({"lastfm.listeners": 40_000, "lastfm.playcount": 600_000}, **common)
+    assert star["components"]["headroom"] == 0.0
+    assert star["score"] < 30 < rising["score"]
+    assert "score capped: audience already large" in star["flags"]
+
+
+def test_wikipedia_traffic_counts_against_headroom_only():
+    small = {"lastfm.listeners": 20_000}
+    assert scoring.headroom_score(small) == 1.0
+    assert scoring.headroom_score({**small, "wikipedia.pageviews_30d": 2_000}) == 1.0
+    assert scoring.headroom_score({**small, "wikipedia.pageviews_30d": 400_000}) == 0.0
+
+
+def test_tiny_channel_on_one_platform_does_not_erase_traction():
+    assert scoring.headroom_score({"lastfm.listeners": 140_000, "youtube.subscribers": 100}) > 0.8
+    assert scoring.headroom_score({"lastfm.listeners": 100, "youtube.subscribers": 50}) == 0.0
+
+
+def test_flags_youtube_channel_too_small_for_audience():
+    flags = lambda m: scoring.score(m, {})["flags"]
+    suspect = "YouTube count looks off: check the linked channel"
+    assert suspect in flags({"lastfm.listeners": 87_000, "lastfm.playcount": 500_000, "youtube.subscribers": 0})
+    assert suspect not in flags({"lastfm.listeners": 87_000, "lastfm.playcount": 500_000, "youtube.subscribers": 11_800})
+    assert suspect not in flags({"lastfm.listeners": 5_000, "lastfm.playcount": 50_000, "youtube.subscribers": 10})

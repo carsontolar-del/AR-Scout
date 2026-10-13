@@ -45,10 +45,18 @@ def status():
     return service.source_status()
 
 
+@app.get("/api/health")
+def health():
+    return service.data_health()
+
+
 @app.get("/api/leaderboard")
 def leaderboard(limit: int = 50, watchlist: bool = False, genre: str | None = None,
-                max_audience: int | None = None, window: int = 30):
-    return service.leaderboard(limit, watchlist, window, max_audience, genre or None)
+                max_audience: int | None = None, window: int = 30, platform: str = "any"):
+    try:
+        return service.leaderboard(limit, watchlist, window, max_audience, genre or None, platform)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
 
 
 @app.get("/api/artist/{name}")
@@ -104,3 +112,8 @@ def discover(body: DiscoverIn):
 @app.post("/api/snapshot")
 def snapshot(scope: str = "watchlist"):
     return service.snapshot_many(scope)
+
+
+@app.post("/api/relink")
+def relink():
+    return service.relink_all()

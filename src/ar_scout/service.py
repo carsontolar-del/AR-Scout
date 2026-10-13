@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import json
 from collections import Counter
 from datetime import date, datetime, timedelta, timezone
+from pathlib import Path
 from typing import Any, Callable
 
 from . import db, scoring
@@ -12,6 +14,9 @@ from .http import SourceError
 from .sources import deezer, lastfm, musicbrainz, spotify, wikipedia, youtube
 
 SNAPSHOT_FRESH_HOURS = 12
+# Written by scripts/install-daily-snapshot.sh
+DAILY_JOB_PLIST = Path.home() / "Library/LaunchAgents/com.ar-scout.snapshot.plist"
+AUDIENCE_METRICS = {"deezer": "deezer.fans", "lastfm": "lastfm.listeners", "youtube": "youtube.subscribers"}
 
 
 def _try(errors: list[str], label: str, fn: Callable[[], Any]) -> Any:
@@ -83,7 +88,8 @@ def resolve(name: str, deep: bool = True) -> dict:
     """Find or create an artist and link IDs across every configured source."""
     errors: list[str] = []
     artist = db.find_artist(name)
-    if artist and (not deep or artist.get("mbid") or artist.get("youtube_channel")):
+    # Discovery (track_light) already stores a Last.fm mbid, so only a completed deep lookup counts as resolved.
+    if artist and (not deep or artist.get("resolved_at")):
         return artist
 
     fields: dict[str, Any] = {}
@@ -103,7 +109,7 @@ def resolve(name: str, deep: bool = True) -> dict:
         fields.update(lastfm_name=lf["name"], mbid=lf["mbid"], genres=lf["tags"][:6])
 
     if deep:
-        mbid = fields.get("mbid")
+        mbid = fields.get("mbid") or (artist or {}).get("mbid")
         if not mbid:
             hits = _try(errors, "musicbrainz", lambda: musicbrainz.search(display)) or []
             hit = next((h for h in hits if h.get("score", 0) >= 95 and h["name"].lower() == display.lower()), None)
@@ -124,6 +130,7 @@ def resolve(name: str, deep: bool = True) -> dict:
             if not channel:
                 channel = _try(errors, "youtube", lambda: youtube.search_channel(display))
             fields["youtube_channel"] = channel
+        fields["resolved_at"] = db.now()
 
         if spotify.available():
             sp = _try(errors, "spotify", lambda: spotify.search_artist(display))
@@ -139,6 +146,7 @@ def resolve(name: str, deep: bool = True) -> dict:
     artist_id = db.upsert_artist(fields, artist["id"] if artist else None)
     result = db.get_artist(artist_id)
     result["_errors"] = errors
+    result["_deep_resolved"] = deep
     return result
 
 
@@ -186,6 +194,38 @@ def snapshot(artist_id: int) -> dict:
     db.add_snapshot(artist_id, m)
     return {"artist_id": artist_id, "metrics": {k: v for k, v in m.items() if v is not None},
             "releases": rel, "errors": errors}
+
+
+def relink_all(progress: Callable[[str], None] | None = None) -> dict:
+    """Run the deep cross-source lookup for artists that never had it, then re-snapshot them.
+    YouTube channel search costs 100 quota units per artist without a MusicBrainz YouTube link."""
+    done, errors = 0, []
+    for a in db.all_artists():
+        if a.get("resolved_at"):
+            continue
+        if progress:
+            progress(a["name"])
+        try:
+            r = resolve(a["name"], deep=True)
+            errors += [f"{a['name']}: {e}" for e in r.get("_errors", [])]
+            errors += [f"{a['name']}: {e}" for e in snapshot(r["id"])["errors"]]
+            done += 1
+        except SourceError as exc:
+            errors.append(f"{a['name']}: {exc}")
+    return {"relinked": done, "errors": errors}
+
+
+def data_health() -> dict:
+    """How complete the tracked data is: unlinked artists, growth coverage, last snapshot, daily job."""
+    coverage = db.snapshot_summary()
+    artists = db.all_artists()
+    return {
+        "artists": len(artists),
+        "unlinked": sum(1 for a in artists if not a.get("resolved_at")),
+        "with_growth": sum(1 for c in coverage.values() if c["days"] >= 2),
+        "last_snapshot": max((c["last"] for c in coverage.values()), default=None),
+        "daily_job": DAILY_JOB_PLIST.exists(),
+    }
 
 
 def _last_snapshot_age_hours(artist_id: int) -> float | None:
@@ -239,9 +279,10 @@ def score_artist(artist: dict, window_days: int = 30) -> dict:
 def report(name: str, refresh: bool = True) -> dict:
     artist = resolve(name, deep=True)
     errors = artist.pop("_errors", [])
+    just_linked = artist.pop("_deep_resolved", False)  # new IDs (e.g. YouTube) aren't in the last snapshot yet
     snap = None
     age = _last_snapshot_age_hours(artist["id"])
-    if refresh and (age is None or age > SNAPSHOT_FRESH_HOURS):
+    if refresh and (age is None or age > SNAPSHOT_FRESH_HOURS or just_linked):
         snap = snapshot(artist["id"])
         errors += snap["errors"]
     artist = db.get_artist(artist["id"])
@@ -265,24 +306,42 @@ def report(name: str, refresh: bool = True) -> dict:
 
 
 def leaderboard(limit: int = 25, watchlist_only: bool = False, window_days: int = 30,
-                max_audience: float | None = None, genre: str | None = None) -> list[dict]:
+                max_audience: float | None = None, genre: str | None = None,
+                audience_platform: str = "any") -> list[dict]:
+    """audience_platform: 'any' applies max_audience to the largest of Deezer fans, Last.fm listeners and
+    YouTube subscribers; 'youtube' / 'lastfm' / 'deezer' apply it to that platform only and drop artists
+    with no data there (unknown size isn't 'under')."""
+    if audience_platform != "any" and audience_platform not in AUDIENCE_METRICS:
+        raise ValueError(f"audience_platform must be 'any' or one of {', '.join(AUDIENCE_METRICS)}")
+    coverage = db.snapshot_summary()
     rows = []
     for a in db.all_artists(watchlist_only=watchlist_only):
         if genre and not any(genre.lower() in g.lower() for g in a.get("genres") or []):
             continue
         s = score_artist(a, window_days)
-        audience = max((s["metrics"].get(k) or 0) for k in ("deezer.fans", "lastfm.listeners", "youtube.subscribers"))
-        if max_audience and audience > max_audience:
-            continue
+        if max_audience:
+            if audience_platform == "any":
+                audience = max((s["metrics"].get(k) or 0) for k in AUDIENCE_METRICS.values())
+            else:
+                audience = s["metrics"].get(AUDIENCE_METRICS[audience_platform])
+            if audience is None or audience > max_audience:
+                continue
+        cov = coverage.get(a["id"], {})
         rows.append({
             "id": a["id"], "name": a["name"], "status": a.get("status"), "genres": (a.get("genres") or [])[:3],
             "country": a.get("country"), "score": s["score"], "confidence": s["confidence"],
             "components": s["components"], "deezer_fans": s["metrics"].get("deezer.fans"),
             "lastfm_listeners": s["metrics"].get("lastfm.listeners"),
             "youtube_subscribers": s["metrics"].get("youtube.subscribers"),
+            "youtube_views": s["metrics"].get("youtube.views"),
+            "lastfm_playcount": s["metrics"].get("lastfm.playcount"),
+            "image_url": a.get("image_url"),
             "monthly_growth": {k: round(g["monthly_rate"], 3) for k, g in s["growth"].items() if g["monthly_rate"] is not None},
             "latest_release": a.get("latest_release"), "label": a.get("latest_label"),
             "flags": s["flags"], "discovered_via": a.get("discovered_via"),
+            "tags": json.loads(a.get("watch_tags") or "[]"),
+            "linked": bool(a.get("resolved_at")), "youtube_linked": bool(a.get("youtube_channel")),
+            "snapshot_days": cov.get("days", 0), "last_snapshot": cov.get("last"),
         })
     rows.sort(key=lambda r: r["score"], reverse=True)
     return rows[:limit]

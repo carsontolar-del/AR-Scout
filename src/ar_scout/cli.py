@@ -99,9 +99,10 @@ def report(name: str, as_json: bool = typer.Option(False, "--json")):
 
 @app.command()
 def top(limit: int = 25, watchlist: bool = False, window: int = 30,
-        max_audience: Optional[int] = None, genre: Optional[str] = None):
+        max_audience: Optional[int] = None, genre: Optional[str] = None,
+        platform: str = typer.Option("any", help="Apply --max-audience to: any | youtube | lastfm | deezer")):
     """Leaderboard of tracked artists by breakout score."""
-    _table(service.leaderboard(limit, watchlist, window, max_audience, genre), "Breakout leaderboard")
+    _table(service.leaderboard(limit, watchlist, window, max_audience, genre, platform), "Breakout leaderboard")
 
 
 @app.command()
@@ -111,6 +112,15 @@ def snapshot(scope: str = typer.Argument("watchlist", help="watchlist | all"), s
     console.print(f"Snapshotted {res['snapshotted']}, skipped {res['skipped_fresh']} fresh.")
     for name, errs in res["errors"].items():
         console.print(f"  [red]{name}[/]: {'; '.join(errs)}")
+
+
+@app.command()
+def relink():
+    """Link YouTube/Wikipedia/MusicBrainz for artists added by discovery that never had a full lookup."""
+    res = service.relink_all(progress=_progress)
+    console.print(f"Relinked {res['relinked']} artists")
+    for e in res["errors"]:
+        console.print(f"[yellow]{e}[/]")
 
 
 @discover_app.command("similar")

@@ -17,6 +17,8 @@ free music data APIs and a local SQLite history in `data/ar_scout.db`.
 
 ## Breakout score (0–100)
 momentum 40% · engagement 20% · headroom 20% · activity 10% · signability 10% (see `src/ar_scout/scoring.py`).
+The total is then multiplied by `0.3 + 0.7 × headroom`, so an act that's already big (on any platform, or with
+heavy Wikipedia traffic) is capped low. Free sources undercount mainstream US acts, so missing YouTube data can hide size.
 `confidence` = share of weights that had data. Momentum needs snapshots on different days, so newly found
 artists show lower confidence until `refresh_snapshots` / the daily job has run a few times.
 

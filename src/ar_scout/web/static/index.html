@@ -4,396 +4,865 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>AR Scout</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root {
   color-scheme: light;
-  --bg: #f6f5f2; --surface: #fcfcfb; --surface-2: #f0efec; --border: #e2e0da;
-  --text: #0b0b0b; --text-2: #52514e; --muted: #8a8984;
-  --accent: #2a78d6; --accent-soft: #cde2fb; --good: #008300; --bad: #e34948; --warn: #b07800;
-  --grid: #e9e7e2;
+  --bg: #f7f7f5; --surface: #ffffff; --surface-2: #f2f2ef; --surface-3: #e9e9e5;
+  --border: #e4e4df; --border-strong: #d4d4cd;
+  --text: #16161a; --text-2: #55555c; --muted: #8e8e95;
+  --accent: #3b5bdb; --accent-hover: #2f4bc4; --accent-soft: #e8edfd; --accent-text: #2a46b8;
+  --good: #1f8a4c; --good-soft: #e3f4ea; --bad: #c9372c; --bad-soft: #fbe9e7; --warn: #a86a00; --warn-soft: #fbf1dc;
+  --grid: #efefeb; --shadow: 0 1px 2px rgba(16,16,20,.04), 0 1px 1px rgba(16,16,20,.03);
+  --shadow-lg: 0 12px 32px rgba(16,16,20,.10), 0 2px 6px rgba(16,16,20,.06);
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
-    --bg: #121211; --surface: #1a1a19; --surface-2: #242422; --border: #33332f;
-    --text: #ffffff; --text-2: #c3c2b7; --muted: #8d8c85;
-    --accent: #3987e5; --accent-soft: #1c3b63; --good: #3fae3f; --bad: #e66767; --warn: #d9a531;
-    --grid: #2b2b28;
+    --bg: #0f0f11; --surface: #17171a; --surface-2: #1e1e22; --surface-3: #27272c;
+    --border: #2a2a2f; --border-strong: #37373d;
+    --text: #f2f2f4; --text-2: #b4b4bb; --muted: #7c7c84;
+    --accent: #6b8afd; --accent-hover: #8099ff; --accent-soft: #1d2547; --accent-text: #a9baff;
+    --good: #4cc27e; --good-soft: #15301f; --bad: #f07067; --bad-soft: #3a1a17; --warn: #e0a83a; --warn-soft: #33270f;
+    --grid: #222226; --shadow: 0 1px 2px rgba(0,0,0,.3); --shadow-lg: 0 12px 32px rgba(0,0,0,.5);
   }
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --bg: #121211; --surface: #1a1a19; --surface-2: #242422; --border: #33332f;
-  --text: #ffffff; --text-2: #c3c2b7; --muted: #8d8c85;
-  --accent: #3987e5; --accent-soft: #1c3b63; --good: #3fae3f; --bad: #e66767; --warn: #d9a531;
-  --grid: #2b2b28;
+  --bg: #0f0f11; --surface: #17171a; --surface-2: #1e1e22; --surface-3: #27272c;
+  --border: #2a2a2f; --border-strong: #37373d;
+  --text: #f2f2f4; --text-2: #b4b4bb; --muted: #7c7c84;
+  --accent: #6b8afd; --accent-hover: #8099ff; --accent-soft: #1d2547; --accent-text: #a9baff;
+  --good: #4cc27e; --good-soft: #15301f; --bad: #f07067; --bad-soft: #3a1a17; --warn: #e0a83a; --warn-soft: #33270f;
+  --grid: #222226; --shadow: 0 1px 2px rgba(0,0,0,.3); --shadow-lg: 0 12px 32px rgba(0,0,0,.5);
 }
+
 * { box-sizing: border-box; }
+html, body { height: 100%; }
 body { margin: 0; background: var(--bg); color: var(--text);
-  font: 14px/1.45 ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
-header { display: flex; align-items: center; gap: 24px; padding: 14px 24px; border-bottom: 1px solid var(--border);
-  background: var(--surface); position: sticky; top: 0; z-index: 5; flex-wrap: wrap; }
-header h1 { font-size: 16px; margin: 0; letter-spacing: -.01em; }
-nav { display: flex; gap: 4px; }
-nav button { background: none; border: 0; padding: 6px 12px; border-radius: 6px; color: var(--text-2); cursor: pointer; font: inherit; }
-nav button.active { background: var(--surface-2); color: var(--text); font-weight: 600; }
-.search { margin-left: auto; display: flex; gap: 6px; }
-main { max-width: 1280px; margin: 0 auto; padding: 24px; }
-input, select { font: inherit; color: var(--text); background: var(--surface); border: 1px solid var(--border);
-  border-radius: 6px; padding: 6px 10px; }
-button.btn { font: inherit; border: 1px solid var(--border); background: var(--surface); color: var(--text);
-  padding: 6px 12px; border-radius: 6px; cursor: pointer; }
-button.btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
-button.btn:disabled { opacity: .5; cursor: progress; }
-.filters { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 16px; }
-.filters label { color: var(--text-2); font-size: 13px; display: flex; gap: 6px; align-items: center; }
-.card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
-.table-wrap { overflow-x: auto; }
-table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
-th { text-align: left; font-weight: 600; color: var(--text-2); font-size: 12px; padding: 8px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; }
-td { padding: 9px 10px; border-bottom: 1px solid var(--grid); white-space: nowrap; }
-td.num, th.num { text-align: right; }
-tr.row { cursor: pointer; }
-tr.row:hover td { background: var(--surface-2); }
-.name { font-weight: 600; }
-.sub { color: var(--muted); font-size: 12px; }
-.score { display: inline-flex; align-items: center; gap: 8px; }
-.score b { min-width: 24px; text-align: right; }
-.meter { width: 64px; height: 6px; background: var(--surface-2); border-radius: 3px; overflow: hidden; }
-.meter i { display: block; height: 100%; background: var(--accent); border-radius: 3px; }
-.low { color: var(--muted); }
-.up { color: var(--good); } .down { color: var(--bad); }
-.pill { display: inline-block; padding: 1px 8px; border-radius: 999px; background: var(--surface-2); color: var(--text-2); font-size: 12px; }
-.pill.diy { background: var(--accent-soft); color: var(--text); }
-.empty { color: var(--muted); padding: 40px; text-align: center; }
-.grid { display: grid; gap: 16px; }
-.tiles { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
-.tile .label { color: var(--text-2); font-size: 12px; }
-.tile .value { font-size: 26px; font-weight: 650; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
-.two { grid-template-columns: 2fr 1fr; }
-@media (max-width: 900px) { .two { grid-template-columns: 1fr; } main { padding: 16px; } }
-.charts { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
-.chart h4, .card h3 { margin: 0 0 8px; font-size: 13px; font-weight: 600; color: var(--text-2); }
-.chart svg { width: 100%; height: 140px; display: block; overflow: visible; }
-.chart .na { height: 140px; display: grid; place-items: center; color: var(--muted); font-size: 12px; text-align: center; }
-.comp { display: grid; grid-template-columns: 100px 1fr 40px; gap: 8px; align-items: center; margin: 6px 0; font-size: 13px; }
-.comp .bar { height: 8px; background: var(--surface-2); border-radius: 4px; overflow: hidden; }
-.comp .bar i { display: block; height: 100%; background: var(--accent); border-radius: 4px; }
-.flags li { margin: 4px 0; }
-.artist-head { display: flex; gap: 16px; align-items: center; margin-bottom: 16px; flex-wrap: wrap; }
-.artist-head img { width: 72px; height: 72px; border-radius: 50%; object-fit: cover; background: var(--surface-2); }
-.artist-head h2 { margin: 0; font-size: 26px; letter-spacing: -.02em; }
-.links a { color: var(--accent); margin-right: 10px; font-size: 13px; text-decoration: none; }
-.chips { display: flex; gap: 6px; flex-wrap: wrap; }
-.chips button { font: inherit; font-size: 12px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text);
-  border-radius: 999px; padding: 3px 10px; cursor: pointer; }
-.tooltip { position: fixed; pointer-events: none; background: var(--surface); border: 1px solid var(--border);
-  border-radius: 6px; padding: 6px 10px; font-size: 12px; box-shadow: 0 4px 16px rgba(0,0,0,.12); display: none; z-index: 20; }
-.tooltip strong { font-size: 14px; display: block; }
-.status { font-size: 12px; color: var(--muted); }
-.notes li { margin-bottom: 8px; }
-textarea { width: 100%; font: inherit; color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 8px; min-height: 60px; }
+  font: 14px/1.5 Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased; font-feature-settings: "cv11", "ss01"; }
+a { color: inherit; }
+button, input, select, textarea { font: inherit; color: inherit; }
 .hidden { display: none !important; }
+.num { font-variant-numeric: tabular-nums; }
+
+/* ---------- shell */
+.app { display: grid; grid-template-columns: 232px 1fr; min-height: 100vh; }
+.sidebar { position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column; gap: 4px;
+  padding: 20px 14px; border-right: 1px solid var(--border); background: var(--surface); }
+.brand { display: flex; align-items: center; gap: 10px; padding: 4px 8px 20px; }
+.brand-mark { width: 28px; height: 28px; border-radius: 8px; background: var(--text); color: var(--bg);
+  display: grid; place-items: center; font-weight: 700; font-size: 13px; letter-spacing: -.02em; }
+.brand-name { font-weight: 650; letter-spacing: -.01em; }
+.brand-sub { font-size: 11px; color: var(--muted); margin-top: -2px; }
+.nav-label { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; padding: 12px 10px 6px; }
+.nav a { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 7px; color: var(--text-2);
+  text-decoration: none; font-weight: 500; }
+.nav a:hover { background: var(--surface-2); color: var(--text); }
+.nav a.active { background: var(--surface-2); color: var(--text); }
+.nav svg { width: 16px; height: 16px; flex: none; opacity: .8; }
+.nav .count { margin-left: auto; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.sources { margin-top: auto; padding: 12px 10px 0; border-top: 1px solid var(--border); }
+.sources h5 { margin: 0 0 8px; font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.src { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text-2); padding: 2px 0; }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--good); flex: none; }
+.dot.off { background: var(--border-strong); }
+.theme-toggle { margin-top: 12px; display: flex; gap: 2px; background: var(--surface-2); border-radius: 7px; padding: 2px; }
+.theme-toggle button { flex: 1; border: 0; background: none; padding: 4px 0; border-radius: 5px; font-size: 12px; color: var(--text-2); cursor: pointer; }
+.theme-toggle button.on { background: var(--surface); color: var(--text); box-shadow: var(--shadow); }
+
+.main { min-width: 0; display: flex; flex-direction: column; }
+.topbar { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 12px; padding: 12px 32px;
+  background: color-mix(in srgb, var(--bg) 85%, transparent); backdrop-filter: blur(10px); border-bottom: 1px solid var(--border); }
+.menu-btn { display: none; }
+.search { position: relative; flex: 1; max-width: 460px; }
+.search svg { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); width: 15px; height: 15px; color: var(--muted); }
+.search input { width: 100%; padding: 8px 52px 8px 34px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface);
+  outline: none; transition: border-color .15s, box-shadow .15s; }
+.search input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.kbd { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); font-size: 11px; color: var(--muted);
+  border: 1px solid var(--border); border-radius: 4px; padding: 0 5px; background: var(--surface-2); }
+.content { padding: 28px 32px 64px; max-width: 1360px; width: 100%; }
+
+/* ---------- page header */
+.page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
+.page-head h1 { margin: 0; font-size: 22px; font-weight: 650; letter-spacing: -.02em; }
+.page-head p { margin: 4px 0 0; color: var(--text-2); }
+
+/* ---------- controls */
+.btn { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--border); background: var(--surface); color: var(--text);
+  padding: 7px 12px; border-radius: 8px; cursor: pointer; font-weight: 500; box-shadow: var(--shadow); white-space: nowrap;
+  transition: background .12s, border-color .12s; }
+.btn:hover { background: var(--surface-2); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn.primary:hover { background: var(--accent-hover); }
+.btn.ghost { box-shadow: none; border-color: transparent; background: none; color: var(--text-2); }
+.btn.ghost:hover { background: var(--surface-2); color: var(--text); }
+.btn:disabled { opacity: .55; cursor: progress; }
+.btn svg { width: 15px; height: 15px; }
+.field { display: flex; flex-direction: column; gap: 5px; }
+.field > span { font-size: 12px; font-weight: 500; color: var(--text-2); }
+.input, select.input { border: 1px solid var(--border); background: var(--surface); border-radius: 8px; padding: 7px 10px; outline: none; min-width: 0; }
+.input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.toolbar { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 16px; }
+.segmented { display: inline-flex; background: var(--surface-2); border-radius: 8px; padding: 3px; gap: 2px; flex-wrap: wrap; }
+.segmented button { border: 0; background: none; padding: 5px 12px; border-radius: 6px; cursor: pointer; color: var(--text-2); font-weight: 500; font-size: 13px; }
+.segmented button.on { background: var(--surface); color: var(--text); box-shadow: var(--shadow); }
+.segmented .c { color: var(--muted); margin-left: 4px; font-variant-numeric: tabular-nums; }
+
+/* ---------- cards & tables */
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow); }
+.card-pad { padding: 18px 20px; }
+.card h3 { margin: 0 0 14px; font-size: 13px; font-weight: 600; color: var(--text); display: flex; align-items: center; justify-content: space-between; }
+.card h3 .aside { font-weight: 400; color: var(--muted); font-size: 12px; }
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; }
+th { text-align: left; font-weight: 500; color: var(--muted); font-size: 12px; padding: 10px 14px; border-bottom: 1px solid var(--border);
+  white-space: nowrap; background: var(--surface); position: sticky; top: 0; }
+th.sortable { cursor: pointer; user-select: none; }
+th.sortable:hover { color: var(--text); }
+th.sorted { color: var(--text); }
+td { padding: 11px 14px; border-bottom: 1px solid var(--grid); white-space: nowrap; vertical-align: middle; }
+tbody tr:last-child td { border-bottom: 0; }
+td.r, th.r { text-align: right; }
+tr.row { cursor: pointer; transition: background .1s; }
+tr.row:hover td { background: var(--surface-2); }
+.who { display: flex; align-items: center; gap: 12px; min-width: 220px; }
+.avatar { width: 34px; height: 34px; border-radius: 50%; object-fit: cover; background: var(--surface-3); flex: none;
+  display: grid; place-items: center; font-size: 12px; font-weight: 600; color: var(--text-2); }
+.who .n { font-weight: 600; }
+.who .g { font-size: 12px; color: var(--muted); max-width: 260px; overflow: hidden; text-overflow: ellipsis; }
+.rank { color: var(--muted); font-variant-numeric: tabular-nums; width: 36px; }
+.dim { color: var(--muted); }
+.score { display: inline-flex; align-items: center; gap: 10px; }
+.score b { font-weight: 650; font-variant-numeric: tabular-nums; min-width: 22px; text-align: right; }
+.meter { width: 56px; height: 5px; background: var(--surface-3); border-radius: 3px; overflow: hidden; }
+.meter i { display: block; height: 100%; background: var(--accent); border-radius: 3px; }
+.score.low b { color: var(--text-2); }
+.score.low .meter i { background: var(--muted); }
+.up { color: var(--good); font-weight: 500; } .down { color: var(--bad); font-weight: 500; }
+.pill { display: inline-flex; align-items: center; gap: 5px; padding: 2px 9px; border-radius: 999px; background: var(--surface-2);
+  color: var(--text-2); font-size: 12px; font-weight: 500; max-width: 200px; overflow: hidden; text-overflow: ellipsis; }
+.pill.diy { background: var(--accent-soft); color: var(--accent-text); }
+.pill.st-watching { background: var(--surface-2); color: var(--text); }
+.pill.st-contacted { background: var(--warn-soft); color: var(--warn); }
+.pill.st-meeting { background: var(--accent-soft); color: var(--accent-text); }
+.pill.st-signed { background: var(--good-soft); color: var(--good); }
+.pill.st-passed { background: var(--surface-2); color: var(--muted); }
+.empty { padding: 56px 24px; text-align: center; color: var(--text-2); }
+.empty h4 { margin: 0 0 4px; color: var(--text); font-size: 15px; font-weight: 600; }
+.foot { padding: 10px 14px; font-size: 12px; color: var(--muted); border-top: 1px solid var(--border); display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+
+.pill.tag { background: none; border: 1px solid var(--border); color: var(--text-2); padding: 1px 8px; font-size: 11.5px; }
+.mini { display: inline-flex; padding: 0 6px; border-radius: 4px; font-size: 10.5px; font-weight: 600; letter-spacing: .01em;
+  background: var(--surface-2); color: var(--text-2); margin-left: 6px; vertical-align: 1px; }
+.mini.pos { background: var(--good-soft); color: var(--good); }
+.mini.warn { background: var(--warn-soft); color: var(--warn); }
+.who .t { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 3px; }
+.yt-note { font-size: 11.5px; font-style: italic; }
+.star { border: 0; background: none; cursor: pointer; color: var(--border-strong); padding: 4px; border-radius: 6px; line-height: 0; }
+.star:hover { color: var(--text-2); background: var(--surface-3); }
+.star.on { color: var(--warn); }
+.star svg { width: 16px; height: 16px; }
+.star:disabled { opacity: .5; cursor: progress; }
+.banner { display: flex; align-items: center; gap: 14px; padding: 12px 16px; margin-bottom: 16px; border-radius: 10px;
+  background: var(--warn-soft); color: var(--warn); font-size: 13px; flex-wrap: wrap; }
+.banner b { font-weight: 600; }
+.banner .btn { margin-left: auto; }
+.health { display: grid; gap: 3px; margin: 14px 0 0; font-size: 12px; color: var(--text-2); }
+.health .row { display: flex; justify-content: space-between; gap: 8px; }
+.health .row span:last-child { color: var(--text); font-variant-numeric: tabular-nums; }
+.health .warn { color: var(--warn) !important; }
+.tag-edit { display: flex; gap: 8px; margin-top: 12px; align-items: center; flex-wrap: wrap; }
+.tag-edit .input { flex: 1; min-width: 200px; }
+
+/* ---------- stats */
+.stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
+.stat { padding: 16px 18px; }
+.stat .l { font-size: 12px; color: var(--text-2); font-weight: 500; }
+.stat .v { font-size: 26px; font-weight: 650; letter-spacing: -.025em; margin-top: 2px; font-variant-numeric: tabular-nums; }
+.stat .d { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+/* ---------- artist page */
+.back { display: inline-flex; align-items: center; gap: 6px; color: var(--text-2); text-decoration: none; font-size: 13px; margin-bottom: 18px; }
+.back:hover { color: var(--text); }
+.hero { display: flex; gap: 22px; align-items: center; margin-bottom: 24px; flex-wrap: wrap; }
+.hero img, .hero .avatar { width: 96px; height: 96px; border-radius: 50%; object-fit: cover; font-size: 28px; box-shadow: var(--shadow-lg); }
+.hero-main { flex: 1; min-width: 260px; }
+.hero h1 { margin: 0; font-size: 30px; font-weight: 700; letter-spacing: -.03em; line-height: 1.15; }
+.meta { display: flex; gap: 6px 14px; flex-wrap: wrap; color: var(--text-2); margin-top: 6px; font-size: 13px; }
+.meta span + span::before { content: "·"; margin-right: 14px; color: var(--muted); }
+.links { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 12px; }
+.links a { font-size: 12px; font-weight: 500; text-decoration: none; padding: 3px 10px; border: 1px solid var(--border); border-radius: 999px; color: var(--text-2); background: var(--surface); }
+.links a:hover { color: var(--text); border-color: var(--border-strong); }
+.hero-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+.layout { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 16px; align-items: start; }
+.stack { display: grid; gap: 16px; }
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.kpi { padding: 14px 16px; }
+.kpi .l { font-size: 12px; color: var(--text-2); font-weight: 500; }
+.kpi .v { font-size: 22px; font-weight: 650; letter-spacing: -.02em; margin: 2px 0; font-variant-numeric: tabular-nums; }
+.kpi .d { font-size: 12px; color: var(--muted); }
+.kpi .d.up { color: var(--good); } .kpi .d.down { color: var(--bad); }
+
+.score-card { display: flex; gap: 18px; align-items: center; margin-bottom: 16px; }
+.ring { position: relative; width: 84px; height: 84px; flex: none; }
+.ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+.ring .val { position: absolute; inset: 0; display: grid; place-items: center; font-size: 24px; font-weight: 700; letter-spacing: -.03em; }
+.comp { display: grid; grid-template-columns: 96px 1fr 34px; gap: 10px; align-items: center; margin: 9px 0; font-size: 13px; }
+.comp .k { color: var(--text-2); }
+.comp .k small { color: var(--muted); }
+.comp .bar { height: 6px; background: var(--surface-3); border-radius: 3px; overflow: hidden; }
+.comp .bar i { display: block; height: 100%; background: var(--accent); border-radius: 3px; }
+.comp .bar.na { background: repeating-linear-gradient(45deg, var(--surface-3) 0 4px, transparent 4px 8px); }
+.comp .x { text-align: right; font-variant-numeric: tabular-nums; color: var(--text-2); }
+.flags { display: grid; gap: 6px; margin-top: 14px; }
+.flag { display: flex; gap: 8px; align-items: flex-start; padding: 8px 10px; border-radius: 8px; font-size: 12.5px; background: var(--surface-2); color: var(--text-2); }
+.flag.pos { background: var(--good-soft); color: var(--good); }
+.flag.warn { background: var(--warn-soft); color: var(--warn); }
+.flag::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; margin-top: 6px; flex: none; }
+
+.charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+.chart { padding: 14px 16px 10px; }
+.chart .h { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+.chart .h b { font-size: 12px; font-weight: 500; color: var(--text-2); }
+.chart .h span { font-size: 15px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.chart svg { width: 100%; height: 110px; display: block; overflow: visible; }
+.chart .na { height: 110px; display: grid; place-items: center; color: var(--muted); font-size: 12px; text-align: center; padding: 0 12px;
+  background: var(--surface-2); border-radius: 8px; }
+
+.rel { display: grid; grid-template-columns: 1fr auto auto; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--grid); font-size: 13px; align-items: center; }
+.rel:last-child { border-bottom: 0; }
+.rel .t { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rel .ty { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.rel .dt { color: var(--muted); font-variant-numeric: tabular-nums; }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip { border: 1px solid var(--border); background: var(--surface); border-radius: 999px; padding: 4px 11px; cursor: pointer; font-size: 12.5px; }
+.chip:hover { border-color: var(--border-strong); background: var(--surface-2); }
+.chip small { color: var(--muted); margin-left: 4px; }
+.note { padding: 10px 0; border-bottom: 1px solid var(--grid); font-size: 13px; }
+.note:last-of-type { border-bottom: 0; }
+.note time { display: block; font-size: 11px; color: var(--muted); margin-bottom: 2px; }
+textarea.input { width: 100%; min-height: 72px; resize: vertical; margin-top: 10px; }
+.errors { margin-top: 16px; font-size: 12px; color: var(--muted); }
+
+/* ---------- discover */
+.disc-form { display: grid; grid-template-columns: 220px 1fr 110px 110px 80px auto; gap: 12px; align-items: end; padding: 16px; margin-bottom: 16px; }
+.progress { height: 2px; background: var(--surface-3); overflow: hidden; border-radius: 2px; margin: -16px 0 14px; }
+.progress i { display: block; height: 100%; width: 30%; background: var(--accent); animation: slide 1.2s ease-in-out infinite; }
+@keyframes slide { from { transform: translateX(-100%); } to { transform: translateX(400%); } }
+
+/* ---------- misc */
+.skeleton { background: linear-gradient(90deg, var(--surface-2), var(--surface-3), var(--surface-2)); background-size: 200% 100%;
+  animation: shimmer 1.4s infinite; border-radius: 6px; }
+@keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+.tooltip { position: fixed; pointer-events: none; background: var(--surface); border: 1px solid var(--border);
+  border-radius: 8px; padding: 7px 10px; font-size: 12px; box-shadow: var(--shadow-lg); display: none; z-index: 50; }
+.tooltip strong { font-size: 14px; display: block; font-variant-numeric: tabular-nums; }
+.toast { position: fixed; bottom: 24px; left: 50%; transform: translate(-50%, 20px); opacity: 0; background: var(--text); color: var(--bg);
+  padding: 9px 16px; border-radius: 8px; font-size: 13px; font-weight: 500; transition: .2s; z-index: 60; pointer-events: none; }
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+@media (max-width: 1100px) {
+  .layout { grid-template-columns: 1fr; }
+  .stats { grid-template-columns: repeat(2, 1fr); }
+  .disc-form { grid-template-columns: 1fr 1fr; }
+  .disc-form .q { grid-column: 1 / -1; }
+}
+@media (max-width: 760px) {
+  .app { grid-template-columns: 1fr; }
+  .sidebar { position: fixed; z-index: 40; width: 260px; transform: translateX(-100%); transition: transform .2s; box-shadow: var(--shadow-lg); }
+  .sidebar.open { transform: none; }
+  .menu-btn { display: inline-flex; }
+  .topbar { padding: 10px 16px; }
+  .content { padding: 20px 16px 48px; }
+  .kbd { display: none; }
+  .hero img, .hero .avatar { width: 72px; height: 72px; }
+  .hero h1 { font-size: 24px; }
+}
 </style>
 </head>
 <body>
-<header>
-  <h1>AR Scout</h1>
-  <nav>
-    <button data-view="leaderboard" class="active">Leaderboard</button>
-    <button data-view="watchlist">Watchlist</button>
-    <button data-view="discover">Discover</button>
-  </nav>
-  <form class="search" id="searchForm">
-    <input id="searchInput" placeholder="Look up an artist…" aria-label="Artist name">
-    <button class="btn primary">Report</button>
-  </form>
-</header>
-<main>
-  <section id="view-leaderboard">
-    <div class="filters">
-      <label>Genre <input id="fGenre" placeholder="any" size="12"></label>
-      <label>Max audience <select id="fMax"><option value="">any</option><option>10000</option><option>50000</option><option>250000</option><option>1000000</option></select></label>
-      <label>Growth window <select id="fWindow"><option value="7">7 days</option><option value="30" selected>30 days</option><option value="90">90 days</option></select></label>
-      <button class="btn" id="refreshAll">Refresh snapshots (all)</button>
-      <span class="status" id="srcStatus"></span>
+<div class="app">
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <div class="brand-mark">AR</div>
+      <div><div class="brand-name">AR Scout</div><div class="brand-sub">A&amp;R research</div></div>
     </div>
-    <div class="card table-wrap"><table id="lbTable"></table></div>
-  </section>
-
-  <section id="view-watchlist" class="hidden">
-    <div class="filters">
-      <label>Status <select id="wStatus"><option value="">all</option><option>watching</option><option>contacted</option><option>meeting</option><option>passed</option><option>signed</option></select></label>
-      <button class="btn" id="refreshWatch">Refresh snapshots</button>
+    <nav class="nav">
+      <a href="#/" data-nav="leaderboard">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 13.5h12M4 11V7M8 11V3M12 11V5.5"/></svg>
+        Leaderboard <span class="count" id="cntAll"></span></a>
+      <a href="#/watchlist" data-nav="watchlist">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1.5 8s2.4-4.5 6.5-4.5S14.5 8 14.5 8s-2.4 4.5-6.5 4.5S1.5 8 1.5 8Z"/><circle cx="8" cy="8" r="2"/></svg>
+        Watchlist <span class="count" id="cntWatch"></span></a>
+      <a href="#/discover" data-nav="discover">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6.5"/><path d="m10.5 5.5-1.6 3.4-3.4 1.6 1.6-3.4z"/></svg>
+        Discover</a>
+    </nav>
+    <div class="sources">
+      <h5>Data sources</h5>
+      <div id="srcList"></div>
+      <div class="health" id="health"></div>
+      <div class="theme-toggle" role="group" aria-label="Theme">
+        <button data-theme-set="light">Light</button><button data-theme-set="auto">Auto</button><button data-theme-set="dark">Dark</button>
+      </div>
     </div>
-    <div class="card table-wrap"><table id="wlTable"></table></div>
-  </section>
+  </aside>
 
-  <section id="view-discover" class="hidden">
-    <form class="filters" id="discoverForm">
-      <select id="dMode">
-        <option value="similar">Similar to (comma-separated seeds)</option>
-        <option value="tag">Scene / tag (Last.fm)</option>
-        <option value="playlists">Playlist mining (Deezer)</option>
-        <option value="new">New releases (Deezer genre)</option>
-        <option value="country">Country (Last.fm)</option>
-      </select>
-      <input id="dQuery" placeholder="e.g. Fcukers, Magdalena Bay" size="32">
-      <label>Deezer fans <input id="dMin" type="number" value="300" style="width:90px"> – <input id="dMax" type="number" value="50000" style="width:100px"></label>
-      <label>Limit <input id="dLimit" type="number" value="20" style="width:64px"></label>
-      <button class="btn primary" id="dGo">Discover</button>
-      <span class="status" id="dStatus"></span>
-    </form>
-    <div class="card table-wrap"><table id="dTable"></table></div>
-  </section>
-
-  <section id="view-artist" class="hidden"></section>
-</main>
+  <div class="main">
+    <header class="topbar">
+      <button class="btn ghost menu-btn" id="menuBtn" aria-label="Menu">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 4h12M2 8h12M2 12h12"/></svg></button>
+      <form class="search" id="searchForm">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="5"/><path d="m11 11 3.5 3.5"/></svg>
+        <input id="searchInput" placeholder="Look up any artist…" aria-label="Look up artist" autocomplete="off">
+        <span class="kbd">⌘K</span>
+      </form>
+    </header>
+    <main class="content" id="view"></main>
+  </div>
+</div>
 <div class="tooltip" id="tip"></div>
+<div class="toast" id="toast"></div>
 
 <script>
-const $ = (s, el = document) => el.querySelector(s);
+// ============================================================ helpers
+const $ = (s, root = document) => root.querySelector(s);
 const el = (tag, attrs = {}, ...kids) => {
   const n = document.createElement(tag);
   for (const [k, v] of Object.entries(attrs)) {
     if (k === "class") n.className = v;
+    else if (k === "style") n.style.cssText = v;
     else if (k.startsWith("on")) n.addEventListener(k.slice(2), v);
-    else if (v !== null && v !== undefined) n.setAttribute(k, v);
+    else if (v !== null && v !== undefined && v !== false) n.setAttribute(k, v);
   }
-  for (const k of kids.flat()) if (k !== null && k !== undefined) n.append(k instanceof Node ? k : document.createTextNode(String(k)));
+  for (const k of kids.flat()) if (k !== null && k !== undefined && k !== false) n.append(k instanceof Node ? k : document.createTextNode(String(k)));
   return n;
 };
-const fmt = v => v == null ? "–" : Math.abs(v) >= 1e6 ? (v / 1e6).toFixed(1) + "M" : Math.abs(v) >= 1e3 ? (v / 1e3).toFixed(1) + "k" : Math.round(v).toString();
+const svgEl = (html) => { const t = document.createElement("template"); t.innerHTML = html.trim(); return t.content.firstChild; };
+const fmt = v => v == null ? "–" : Math.abs(v) >= 1e9 ? (v / 1e9).toFixed(1) + "B" : Math.abs(v) >= 1e6 ? (v / 1e6).toFixed(1) + "M"
+  : Math.abs(v) >= 1e4 ? Math.round(v / 1e3) + "k" : Math.abs(v) >= 1e3 ? (v / 1e3).toFixed(1) + "k" : Math.round(v).toString();
 const pct = v => v == null ? "–" : (v >= 0 ? "+" : "") + (v * 100).toFixed(1) + "%";
+const ago = iso => {
+  if (!iso) return "–";
+  const days = Math.round((Date.now() - new Date(iso)) / 864e5);
+  if (days < 0) return "upcoming";
+  if (days < 1) return "today";
+  if (days < 14) return days + "d ago";
+  if (days < 60) return Math.round(days / 7) + "w ago";
+  if (days < 730) return Math.round(days / 30) + "mo ago";
+  return Math.round(days / 365) + "y ago";
+};
+const initials = n => n.replace(/^the\s+/i, "").split(/\s+/).slice(0, 2).map(w => w[0] || "").join("").toUpperCase();
+const avatar = (url, name, cls = "avatar") => url ? el("img", { class: cls, src: url, alt: "", loading: "lazy" }) : el("div", { class: cls }, initials(name));
 const api = async (path, opts) => {
   const r = await fetch(path, opts);
   if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || r.statusText);
   return r.json();
 };
+const post = (path, body) => api(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+const toast = msg => { const t = $("#toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("show"), 2400); };
 const DIY = /distrokid|tunecore|cd ?baby|amuse|routenote|ditto|united ?masters|emubands|awal|soundrop|symphonic|onerpm|spinnup|landr|too lost|vydia|independent|self.released|records dk/i;
-const METRIC_LABELS = {
-  "deezer.fans": "Deezer fans", "lastfm.listeners": "Last.fm listeners", "lastfm.playcount": "Last.fm plays",
-  "youtube.subscribers": "YouTube subscribers", "youtube.views": "YouTube views",
-  "wikipedia.pageviews_30d": "Wikipedia views (30d)", "deezer.top_track_rank": "Deezer top-track rank",
-  "spotify.followers": "Spotify followers",
+const STATUSES = ["watching", "contacted", "meeting", "passed", "signed"];
+const METRICS = {
+  "youtube.views": "YouTube views", "youtube.subscribers": "YouTube subscribers",
+  "lastfm.listeners": "Last.fm listeners", "lastfm.playcount": "Last.fm plays",
+  "deezer.fans": "Deezer fans", "wikipedia.pageviews_30d": "Wikipedia views (30d)", "spotify.followers": "Spotify followers",
 };
+// Short labels for score flags shown inline in tables; anything unlisted only appears on the artist page.
+const FLAG_SHORT = [
+  [/^deep fandom/, "Deep fandom", "pos"], [/DIY distributor/, "Likely unsigned", "pos"],
+  [/^YouTube count looks off/, "Check YT", "warn"], [/^score capped/, "Capped", ""], [/^already established/, "Established", ""],
+];
+const PLATFORMS = [["any", "any platform"], ["youtube", "YouTube subs"], ["lastfm", "Last.fm listeners"], ["deezer", "Deezer fans"]];
+const STAR = '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 1.3l2 4.3 4.6.5-3.4 3.2.9 4.6L8 11.6l-4.1 2.3.9-4.6L1.4 6.1 6 5.6z"/></svg>';
+const COMP = { momentum: ["Momentum", 40], engagement: ["Engagement", 20], headroom: ["Headroom", 20], activity: ["Activity", 10], signability: ["Signability", 10] };
 
-// ---------- views
-let currentView = "leaderboard";
-function show(view) {
-  currentView = view;
-  for (const s of document.querySelectorAll("main > section")) s.classList.toggle("hidden", s.id !== "view-" + view);
-  for (const b of document.querySelectorAll("nav button")) b.classList.toggle("active", b.dataset.view === view);
-  if (view === "leaderboard") loadLeaderboard();
-  if (view === "watchlist") loadWatchlist();
+// ============================================================ theme
+function applyTheme(t) {
+  if (t === "auto") document.documentElement.removeAttribute("data-theme"); else document.documentElement.dataset.theme = t;
+  document.querySelectorAll("[data-theme-set]").forEach(b => b.classList.toggle("on", b.dataset.themeSet === t));
+  try { localStorage.setItem("ars-theme", t); } catch {}
 }
-document.querySelectorAll("nav button").forEach(b => b.onclick = () => show(b.dataset.view));
+let savedTheme = "auto"; try { savedTheme = localStorage.getItem("ars-theme") || "auto"; } catch {}
+applyTheme(savedTheme);
+document.querySelectorAll("[data-theme-set]").forEach(b => b.onclick = () => applyTheme(b.dataset.themeSet));
+
+// ============================================================ routing
+const view = $("#view");
+function route() {
+  const h = decodeURIComponent(location.hash.slice(1) || "/");
+  $("#sidebar").classList.remove("open");
+  const [, page, arg] = h.split("/");
+  document.querySelectorAll("[data-nav]").forEach(a => a.classList.toggle("active",
+    a.dataset.nav === (page || "leaderboard") || (page === "artist" && a.dataset.nav === lastList)));
+  window.scrollTo(0, 0);
+  if (page === "artist" && arg) return renderArtist(arg);
+  if (page === "watchlist") { lastList = "watchlist"; return renderWatchlist(); }
+  if (page === "discover") { lastList = "discover"; return renderDiscover(); }
+  lastList = "leaderboard"; return renderLeaderboard();
+}
+let lastList = "leaderboard";
+window.addEventListener("hashchange", route);
+const go = name => location.hash = "/artist/" + encodeURIComponent(name);
+
+$("#searchForm").onsubmit = e => { e.preventDefault(); const n = $("#searchInput").value.trim(); if (n) { go(n); $("#searchInput").blur(); } };
+document.addEventListener("keydown", e => { if ((e.metaKey || e.ctrlKey) && e.key === "k") { e.preventDefault(); $("#searchInput").focus(); $("#searchInput").select(); } });
+$("#menuBtn").onclick = () => $("#sidebar").classList.toggle("open");
+
+// ============================================================ shared table
+const COLS = [
+  { key: "score", label: "Breakout", r: false, get: r => r.score },
+  { key: "deezer_fans", label: "Deezer fans", r: true, get: r => r.deezer_fans },
+  { key: "lastfm_listeners", label: "Last.fm listeners", r: true, get: r => r.lastfm_listeners },
+  { key: "depth", label: "Plays / listener", r: true, get: r => r.lastfm_listeners ? r.lastfm_playcount / r.lastfm_listeners : null },
+  { key: "youtube_subscribers", label: "YT subs", r: true, get: r => r.youtube_subscribers },
+  { key: "youtube_views", label: "YT views", r: true, get: r => r.youtube_views },
+  { key: "growth", label: "Growth / mo", r: true, get: r => { const v = Object.values(r.monthly_growth || {}); return v.length ? Math.max(...v) : null; } },
+  { key: "snapshot_days", label: "Days tracked", r: true, get: r => r.snapshot_days },
+  { key: "latest_release", label: "Last release", r: false, get: r => r.latest_release },
+];
 
 function scoreCell(r) {
-  const low = r.confidence < 0.6;
-  return el("span", { class: "score" + (low ? " low" : ""), title: `confidence ${Math.round(r.confidence * 100)}%` },
-    el("b", {}, Math.round(r.score) + (low ? "*" : "")),
-    el("span", { class: "meter" }, Object.assign(el("i"), { style: `width:${r.score}%` })));
+  const low = r.confidence < 0.7;
+  return el("span", { class: "score" + (low ? " low" : ""), title: `Confidence ${Math.round(r.confidence * 100)}% — share of the model that had data` },
+    el("b", {}, Math.round(r.score)), el("span", { class: "meter" }, el("i", { style: `width:${r.score}%` })));
 }
-function growthCell(r) {
-  const vals = Object.values(r.monthly_growth || {});
-  if (!vals.length) return el("span", { class: "sub" }, "–");
-  const best = Math.max(...vals);
-  return el("span", { class: best > 0.005 ? "up" : best < -0.005 ? "down" : "" }, pct(best));
-}
-function renderTable(table, rows, emptyMsg) {
-  table.replaceChildren();
-  if (!rows.length) { table.append(el("tr", {}, el("td", { class: "empty" }, emptyMsg))); return; }
-  table.append(el("thead", {}, el("tr", {},
-    ["#", "Artist", "Breakout", "Deezer", "Last.fm", "YouTube", "Best growth / mo", "Latest release", "Label", "Status"]
-      .map((h, i) => el("th", { class: i >= 3 && i <= 6 ? "num" : "" }, h)))));
-  const tb = el("tbody");
-  rows.forEach((r, i) => {
-    const label = r.label || "";
-    tb.append(el("tr", { class: "row", onclick: () => openArtist(r.name) },
-      el("td", { class: "sub" }, i + 1),
-      el("td", {}, el("div", { class: "name" }, r.name), el("div", { class: "sub" }, [r.country, ...(r.genres || [])].filter(Boolean).join(" · "))),
-      el("td", {}, scoreCell(r)),
-      el("td", { class: "num" }, fmt(r.deezer_fans)),
-      el("td", { class: "num" }, fmt(r.lastfm_listeners)),
-      el("td", { class: "num" }, fmt(r.youtube_subscribers)),
-      el("td", { class: "num" }, growthCell(r)),
-      el("td", {}, r.latest_release || "–"),
-      el("td", {}, label ? el("span", { class: "pill" + (DIY.test(label) ? " diy" : ""), title: label }, label.length > 22 ? label.slice(0, 21) + "…" : label) : "–"),
-      el("td", {}, r.status ? el("span", { class: "pill" }, r.status) : "")));
+
+function dataTable(rows, { empty, showStatus = true, sort = { key: "score", dir: -1 }, onSort } = {}) {
+  if (!rows.length) return el("div", { class: "card" }, el("div", { class: "empty" }, el("h4", {}, empty[0]), empty[1]));
+  const col = COLS.find(c => c.key === sort.key) || COLS[0];
+  rows = [...rows].sort((a, b) => {
+    const x = col.get(a), y = col.get(b);
+    if (x == null && y == null) return 0; if (x == null) return 1; if (y == null) return -1;
+    return (x > y ? 1 : x < y ? -1 : 0) * sort.dir;
   });
-  table.append(tb);
+  const head = el("tr", {}, el("th", {}, "#"), el("th", {}, "Artist"),
+    ...COLS.map(c => el("th", { class: "sortable" + (c.r ? " r" : "") + (c.key === sort.key ? " sorted" : ""),
+      onclick: () => onSort && onSort({ key: c.key, dir: c.key === sort.key ? -sort.dir : -1 }) },
+      c.label + (c.key === sort.key ? (sort.dir < 0 ? " ↓" : " ↑") : ""))),
+    el("th", {}, "Label"), showStatus ? el("th", {}, "Status") : null, el("th", {}, ""));
+  const body = el("tbody", {}, rows.map((r, i) => {
+    const depth = COLS[3].get(r), growth = COLS[6].get(r), label = r.label || "";
+    const minis = FLAG_SHORT.filter(([re]) => r.flags.some(f => re.test(f)))
+      .map(([re, t, c]) => el("span", { class: "mini " + c, title: r.flags.find(f => re.test(f)) }, t));
+    return el("tr", { class: "row", onclick: () => go(r.name) },
+      el("td", { class: "rank" }, i + 1),
+      el("td", {}, el("div", { class: "who" }, avatar(r.image_url, r.name),
+        el("div", {}, el("div", { class: "n" }, r.name, minis), el("div", { class: "g" }, [r.country, ...(r.genres || [])].filter(Boolean).join(" · ") || "—"),
+          r.tags?.length ? el("div", { class: "t" }, r.tags.map(t => el("span", { class: "pill tag" }, t))) : null))),
+      el("td", {}, scoreCell(r)),
+      el("td", { class: "r num" }, fmt(r.deezer_fans)),
+      el("td", { class: "r num" }, fmt(r.lastfm_listeners)),
+      el("td", { class: "r num" + (depth > 30 ? " up" : "") }, depth == null ? "–" : depth.toFixed(1)),
+      ytCell(r),
+      el("td", { class: "r num" + (r.youtube_views == null ? " dim" : "") }, fmt(r.youtube_views)),
+      el("td", { class: "r num " + (growth == null ? "dim" : growth > 0.005 ? "up" : growth < -0.005 ? "down" : ""),
+        title: growth == null ? "Growth needs snapshots on 2+ different days" : "" }, growth == null ? "–" : pct(growth)),
+      el("td", { class: "r num" + (r.snapshot_days < 2 ? " dim" : ""), title: r.last_snapshot ? "Last snapshot " + new Date(r.last_snapshot).toLocaleString() : "" }, r.snapshot_days || "–"),
+      el("td", { class: "dim", title: r.latest_release || "" }, ago(r.latest_release)),
+      el("td", {}, label ? el("span", { class: "pill" + (DIY.test(label) ? " diy" : ""), title: label }, label) : el("span", { class: "dim" }, "–")),
+      showStatus ? el("td", {}, r.status ? el("span", { class: "pill st-" + r.status }, r.status) : "") : null,
+      el("td", {}, starBtn(r)));
+  }));
+  return el("div", { class: "card" }, el("div", { class: "table-wrap" }, el("table", {}, el("thead", {}, head), body)),
+    el("div", { class: "foot" }, el("span", {}, `${rows.length} artist${rows.length === 1 ? "" : "s"}`),
+      el("span", {}, "Scores in grey have under 70% confidence · Plays / listener over 30 = deep fandom · Growth needs 2+ days tracked")));
 }
 
-async function loadLeaderboard() {
-  const p = new URLSearchParams({ limit: 100, window: $("#fWindow").value });
-  if ($("#fGenre").value) p.set("genre", $("#fGenre").value);
-  if ($("#fMax").value) p.set("max_audience", $("#fMax").value);
-  const rows = await api("/api/leaderboard?" + p);
-  renderTable($("#lbTable"), rows, "No artists tracked yet. Use Discover or look up an artist.");
+// YouTube: tell "never looked up" apart from "looked up, no channel" and "channel numbers don't add up".
+function ytCell(r) {
+  if (r.youtube_subscribers == null)
+    return el("td", { class: "r dim yt-note", title: r.linked ? "Full lookup found no YouTube channel" : "Added by discovery, which skips YouTube. Use Link missing data." },
+      r.linked ? "none" : "not linked");
+  const off = r.flags.some(f => /^YouTube count looks off/.test(f));
+  return el("td", { class: "r num" + (off ? " down" : ""), title: off ? "Too small for this act's Last.fm audience: probably a Topic channel or a different artist" : "" },
+    fmt(r.youtube_subscribers) + (off ? " ?" : ""));
 }
-async function loadWatchlist() {
-  const rows = (await api("/api/leaderboard?watchlist=true&limit=1000")).filter(r => !$("#wStatus").value || r.status === $("#wStatus").value);
-  renderTable($("#wlTable"), rows, "Watchlist is empty. Open an artist and click Watch.");
-}
-["#fGenre", "#fMax", "#fWindow"].forEach(s => $(s).addEventListener("change", loadLeaderboard));
-$("#wStatus").addEventListener("change", loadWatchlist);
 
-async function refresh(btn, scope, after) {
-  btn.disabled = true; const t = btn.textContent; btn.textContent = "Refreshing…";
-  try { const r = await api("/api/snapshot?scope=" + scope, { method: "POST" }); btn.textContent = `Done: ${r.snapshotted} updated`; }
-  catch (e) { btn.textContent = "Error: " + e.message; }
-  setTimeout(() => { btn.textContent = t; btn.disabled = false; }, 2500);
-  after();
+function starBtn(r) {
+  const b = el("button", { class: "star" + (r.status ? " on" : ""), title: r.status ? "On watchlist (click to remove)" : "Add to watchlist", "aria-label": r.status ? "Remove from watchlist" : "Add to watchlist" });
+  b.innerHTML = STAR;
+  b.onclick = async e => {
+    e.stopPropagation(); b.disabled = true;
+    try {
+      if (r.status) { await api("/api/watch/" + r.id, { method: "DELETE" }); r.status = null; toast(`Removed ${r.name}`); }
+      else { const w = await post("/api/watch", { name: r.name }); r.status = w.status; toast(`Watching ${r.name}`); }
+      b.classList.toggle("on", !!r.status); loadCounts();
+    } catch (err) { toast("Error: " + err.message); }
+    b.disabled = false;
+  };
+  return b;
 }
-$("#refreshAll").onclick = e => refresh(e.target, "all", loadLeaderboard);
-$("#refreshWatch").onclick = e => refresh(e.target, "watchlist", loadWatchlist);
 
-// ---------- discover
-const placeholders = { similar: "e.g. Fcukers, Magdalena Bay", tag: "e.g. uk drill, hyperpop, alt-country",
-  playlists: "e.g. new rap, fresh indie, amapiano", new: "Deezer genre, e.g. Rap/Hip Hop (blank = all)", country: "e.g. United Kingdom, Nigeria" };
-$("#dMode").onchange = () => $("#dQuery").placeholder = placeholders[$("#dMode").value];
-$("#discoverForm").onsubmit = async e => {
-  e.preventDefault();
-  const btn = $("#dGo"); btn.disabled = true; $("#dStatus").textContent = "Searching and evaluating candidates… this can take a minute.";
-  $("#dTable").style.opacity = .5;
-  try {
-    const rows = await api("/api/discover", { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ mode: $("#dMode").value, query: $("#dQuery").value, min_fans: +$("#dMin").value, max_fans: +$("#dMax").value, limit: +$("#dLimit").value }) });
-    renderTable($("#dTable"), rows, "No candidates in that fan range. Widen the bounds or try another query.");
-    $("#dStatus").textContent = `${rows.length} candidates saved to the database.`;
-  } catch (err) { $("#dStatus").textContent = "Error: " + err.message; }
-  btn.disabled = false; $("#dTable").style.opacity = 1;
+function loadingCard(n = 6) {
+  return el("div", { class: "card", style: "padding:8px 14px" },
+    Array.from({ length: n }, () => el("div", { style: "display:flex;gap:12px;align-items:center;padding:10px 0" },
+      el("div", { class: "skeleton", style: "width:34px;height:34px;border-radius:50%" }),
+      el("div", { class: "skeleton", style: "height:12px;width:30%" }), el("div", { class: "skeleton", style: "height:12px;flex:1" }))));
+}
+
+async function refreshBtn(scope, after) {
+  const b = el("button", { class: "btn" }, svgEl('<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9M13.5 2.5v3h-3"/></svg>'), "Refresh data");
+  b.onclick = async () => {
+    b.disabled = true; b.lastChild.textContent = "Refreshing…";
+    try {
+      const r = await api("/api/snapshot?scope=" + scope, { method: "POST" });
+      toast(`Updated ${r.snapshotted ?? 0}` + (r.skipped_fresh ? ` · skipped ${r.skipped_fresh} snapshotted in the last 20h` : ""));
+      after(); loadHealth();
+    }
+    catch (e) { toast("Refresh failed: " + e.message); }
+    b.disabled = false; b.lastChild.textContent = "Refresh data";
+  };
+  return b;
+}
+
+// ============================================================ leaderboard
+const lb = { genre: "", max: "", platform: "any", window: "30", sort: { key: "score", dir: -1 } };
+async function renderLeaderboard() {
+  const tableSlot = el("div", {}, loadingCard());
+  const statsSlot = el("div", { class: "stats" });
+  const genre = el("input", { class: "input", placeholder: "Any genre", value: lb.genre, style: "width:160px" });
+  const max = el("select", { class: "input" }, [["", "Any size"], ["10000", "Under 10k"], ["20000", "Under 20k"], ["50000", "Under 50k"], ["250000", "Under 250k"], ["1000000", "Under 1M"]]
+    .map(([v, t]) => el("option", { value: v, selected: v === lb.max }, t)));
+  const win = el("div", { class: "segmented" }, ["7", "30", "90"].map(w =>
+    el("button", { class: w === lb.window ? "on" : "", onclick: () => { lb.window = w; load(); win.querySelectorAll("button").forEach(b => b.classList.toggle("on", b.textContent === w + "d")); } }, w + "d")));
+  const plat = el("select", { class: "input" }, PLATFORMS.map(([v, t]) => el("option", { value: v, selected: v === lb.platform }, t)));
+  const bannerSlot = el("div");
+  genre.onchange = () => { lb.genre = genre.value.trim(); load(); };
+  max.onchange = () => { lb.max = max.value; load(); };
+  plat.onchange = () => { lb.platform = plat.value; load(); };
+
+  view.replaceChildren(
+    el("div", { class: "page-head" },
+      el("div", {}, el("h1", {}, "Leaderboard"), el("p", {}, "Every tracked artist, ranked by breakout score.")),
+      await refreshBtn("all", () => load())),
+    bannerSlot, statsSlot,
+    el("div", { class: "toolbar" },
+      el("label", { class: "field" }, el("span", {}, "Genre"), genre),
+      el("label", { class: "field" }, el("span", {}, "Audience"), max),
+      el("label", { class: "field" }, el("span", {}, "Measured on"), plat),
+      el("div", { class: "field" }, el("span", {}, "Growth window"), win)),
+    tableSlot);
+
+  async function load() {
+    const p = new URLSearchParams({ limit: 200, window: lb.window });
+    if (lb.genre) p.set("genre", lb.genre);
+    if (lb.max) { p.set("max_audience", lb.max); p.set("platform", lb.platform); }
+    let rows, h;
+    try { [rows, h] = await Promise.all([api("/api/leaderboard?" + p), api("/api/health")]); } catch (e) { tableSlot.replaceChildren(errorCard(e)); return; }
+    const withGrowth = rows.filter(r => Object.keys(r.monthly_growth || {}).length).length;
+    const watched = rows.filter(r => r.status).length;
+    const top = rows[0];
+    const filtered = lb.genre || lb.max;
+    statsSlot.replaceChildren(
+      stat("Artists", rows.length, filtered ? `matching filters, of ${h.artists}` : "in the database"),
+      stat("On watchlist", watched, filtered ? "in this view" : "snapshotted daily"),
+      stat("With growth data", withGrowth, withGrowth ? `${Math.round(withGrowth / Math.max(rows.length, 1) * 100)}% · rest need 2+ days tracked` : "needs snapshots on 2+ different days"),
+      stat("Top score", top ? Math.round(top.score) : "–", top ? top.name : "—"));
+    const ytFilter = lb.max && lb.platform === "youtube";
+    bannerSlot.replaceChildren(h.unlinked ? relinkBanner(h.unlinked, ytFilter, load) : "");
+    const draw = () => tableSlot.replaceChildren(dataTable(rows, {
+      empty: ["No artists yet", "Look up an artist above or run a search in Discover."], sort: lb.sort, onSort: s => { lb.sort = s; draw(); } }));
+    draw();
+  }
+  load();
+}
+function relinkBanner(n, ytFilter, after) {
+  const b = el("button", { class: "btn" }, "Link missing data");
+  b.onclick = async () => {
+    if (!confirm(`Look up MusicBrainz, YouTube and Wikipedia for ${n} artist${n === 1 ? "" : "s"}?\n\nArtists without a MusicBrainz YouTube link cost 100 YouTube quota units each (10,000/day), so this can use up to ${(n * 100).toLocaleString()} units. It takes a few seconds per artist.`)) return;
+    b.disabled = true; b.textContent = `Linking ${n}…`;
+    try { const r = await post("/api/relink", {}); toast(`Linked ${r.relinked} artist${r.relinked === 1 ? "" : "s"}` + (r.errors.length ? ` · ${r.errors.length} source issues` : "")); after(); loadHealth(); }
+    catch (e) { toast("Linking failed: " + e.message); b.disabled = false; b.textContent = "Link missing data"; }
+  };
+  return el("div", { class: "banner" },
+    el("span", {}, el("b", {}, `${n} artist${n === 1 ? "" : "s"} added by discovery ${n === 1 ? "has" : "have"} no YouTube or MusicBrainz lookup yet. `,),
+      ytFilter ? "They're left out of this YouTube filter until they're linked." : "Their YouTube columns read “not linked”."), b);
+}
+const stat = (l, v, d) => el("div", { class: "card stat" }, el("div", { class: "l" }, l), el("div", { class: "v" }, v), el("div", { class: "d" }, d));
+const errorCard = e => el("div", { class: "card" }, el("div", { class: "empty" }, el("h4", {}, "Something went wrong"), e.message));
+
+// ============================================================ watchlist
+const wl = { status: "", tag: "", sort: { key: "score", dir: -1 } };
+async function renderWatchlist() {
+  const tableSlot = el("div", {}, loadingCard(4));
+  const seg = el("div", { class: "segmented" });
+  const tagSel = el("select", { class: "input" });
+  view.replaceChildren(
+    el("div", { class: "page-head" },
+      el("div", {}, el("h1", {}, "Watchlist"), el("p", {}, "Artists you're tracking. Each one gets a fresh snapshot every day.")),
+      await refreshBtn("watchlist", () => renderWatchlist())),
+    el("div", { class: "toolbar" }, el("div", { class: "field" }, el("span", {}, "Status"), seg), el("label", { class: "field" }, el("span", {}, "Tag"), tagSel)), tableSlot);
+  let rows;
+  try { rows = await api("/api/leaderboard?watchlist=true&limit=1000"); } catch (e) { tableSlot.replaceChildren(errorCard(e)); return; }
+  const counts = Object.fromEntries(STATUSES.map(s => [s, rows.filter(r => r.status === s).length]));
+  const tags = [...new Set(rows.flatMap(r => r.tags || []))].sort();
+  if (wl.tag && !tags.includes(wl.tag)) wl.tag = "";
+  tagSel.replaceChildren(el("option", { value: "" }, tags.length ? "All tags" : "No tags yet"), ...tags.map(t => el("option", { value: t, selected: t === wl.tag }, t)));
+  tagSel.onchange = () => { wl.tag = tagSel.value; draw(); };
+  const draw = () => {
+    seg.replaceChildren(...[["", "All", rows.length], ...STATUSES.filter(s => counts[s]).map(s => [s, s[0].toUpperCase() + s.slice(1), counts[s]])]
+      .map(([v, t, c]) => el("button", { class: v === wl.status ? "on" : "", onclick: () => { wl.status = v; draw(); } }, t, el("span", { class: "c" }, c))));
+    tableSlot.replaceChildren(dataTable(rows.filter(r => (!wl.status || r.status === wl.status) && (!wl.tag || (r.tags || []).includes(wl.tag))), {
+      empty: ["Nothing here", "Star an artist in any table, or open one and click Watch, to start tracking them."], sort: wl.sort, onSort: s => { wl.sort = s; draw(); } }));
+  };
+  draw();
+}
+
+// ============================================================ discover
+const MODES = {
+  tag: ["Scene / genre tag", "e.g. indie rock, uk drill, hyperpop", "Last.fm tag charts — deeper pages surface smaller acts."],
+  similar: ["Similar to artists", "e.g. Fcukers, Magdalena Bay", "Comma-separated reference artists. Finds their neighbours."],
+  playlists: ["Curated playlists", "e.g. fresh indie, new rap, amapiano", "Artists appearing on several matching Deezer playlists."],
+  new: ["New releases", "Deezer genre, e.g. Rap/Hip Hop (blank = all)", "Recent releases from small artists."],
+  country: ["Country", "e.g. United Kingdom, Nigeria", "Last.fm country charts, filtered to emerging acts."],
 };
+const disc = { mode: "tag", query: "", min: 300, max: 50000, limit: 20, rows: null, sort: { key: "score", dir: -1 } };
+function renderDiscover() {
+  const mode = el("select", { class: "input" }, Object.entries(MODES).map(([k, [t]]) => el("option", { value: k, selected: k === disc.mode }, t)));
+  const q = el("input", { class: "input", placeholder: MODES[disc.mode][1], value: disc.query });
+  const mn = el("input", { class: "input num", type: "number", value: disc.min });
+  const mx = el("input", { class: "input num", type: "number", value: disc.max });
+  const lim = el("input", { class: "input num", type: "number", value: disc.limit });
+  const hint = el("p", {}, MODES[disc.mode][2]);
+  const goBtn = el("button", { class: "btn primary", type: "submit" }, "Search");
+  const slot = el("div", {});
+  mode.onchange = () => { disc.mode = mode.value; q.placeholder = MODES[disc.mode][1]; hint.textContent = MODES[disc.mode][2]; };
+  const draw = () => slot.replaceChildren(disc.rows ? dataTable(disc.rows, {
+    empty: ["No candidates in that range", "Widen the Deezer fan bounds or try a different query."], showStatus: false, sort: disc.sort, onSort: s => { disc.sort = s; draw(); } })
+    : el("div", { class: "card" }, el("div", { class: "empty" }, el("h4", {}, "Find new artists"), "Pick a method, enter a query and search. Every candidate is saved so you can track it.")));
+  const form = el("form", { class: "card disc-form" },
+    el("label", { class: "field" }, el("span", {}, "Method"), mode),
+    el("label", { class: "field q" }, el("span", {}, "Query"), q),
+    el("label", { class: "field" }, el("span", {}, "Min Deezer fans"), mn),
+    el("label", { class: "field" }, el("span", {}, "Max Deezer fans"), mx),
+    el("label", { class: "field" }, el("span", {}, "Limit"), lim),
+    goBtn);
+  form.onsubmit = async e => {
+    e.preventDefault();
+    Object.assign(disc, { query: q.value.trim(), min: +mn.value, max: +mx.value, limit: +lim.value });
+    goBtn.disabled = true; goBtn.textContent = "Searching…";
+    slot.replaceChildren(el("div", { class: "progress" }, el("i")), loadingCard(5));
+    try { disc.rows = await post("/api/discover", { mode: disc.mode, query: disc.query, min_fans: disc.min, max_fans: disc.max, limit: disc.limit }); draw(); toast(`${disc.rows.length} candidates saved`); loadCounts(); }
+    catch (err) { slot.replaceChildren(errorCard(err)); }
+    goBtn.disabled = false; goBtn.textContent = "Search";
+  };
+  view.replaceChildren(
+    el("div", { class: "page-head" }, el("div", {}, el("h1", {}, "Discover"), hint)),
+    form, slot);
+  draw();
+}
 
-// ---------- artist detail
-$("#searchForm").onsubmit = e => { e.preventDefault(); const n = $("#searchInput").value.trim(); if (n) openArtist(n); };
-
+// ============================================================ artist
 function lineChart(points, label) {
-  const wrap = el("div", { class: "card chart" }, el("h4", {}, label));
-  if (points.length < 2) {
-    wrap.append(el("div", { class: "na" }, points.length ? `${fmt(points[0].value)} now. A trend appears after the next daily snapshot.` : "No data"));
+  const last = points.at(-1)?.value;
+  const wrap = el("div", { class: "card chart" }, el("div", { class: "h" }, el("b", {}, label), el("span", {}, fmt(last))));
+  const days = new Set(points.map(p => p.taken_at.slice(0, 10))).size;
+  if (days < 2) {
+    wrap.append(el("div", { class: "na" }, "Trend line appears after snapshots on two different days."));
     return wrap;
   }
-  const W = 300, H = 140, P = { l: 40, r: 8, t: 8, b: 20 };
+  const W = 300, H = 110, P = { l: 4, r: 4, t: 8, b: 18 };
   const xs = points.map(p => new Date(p.taken_at).getTime()), ys = points.map(p => p.value);
   const x0 = Math.min(...xs), x1 = Math.max(...xs);
   let y0 = Math.min(...ys), y1 = Math.max(...ys);
   if (y0 === y1) { y0 *= 0.98; y1 = y1 * 1.02 || 1; }
-  const pad = (y1 - y0) * 0.1; y0 = Math.max(0, y0 - pad); y1 += pad;
+  const pad = (y1 - y0) * 0.15; y0 -= pad; y1 += pad;
   const sx = x => P.l + (x - x0) / (x1 - x0 || 1) * (W - P.l - P.r);
   const sy = y => H - P.b - (y - y0) / (y1 - y0) * (H - P.t - P.b);
-  const ns = "http://www.w3.org/2000/svg";
-  const svg = document.createElementNS(ns, "svg");
+  const ns = "http://www.w3.org/2000/svg", svg = document.createElementNS(ns, "svg");
   svg.setAttribute("viewBox", `0 0 ${W} ${H}`); svg.setAttribute("preserveAspectRatio", "none");
   svg.setAttribute("role", "img"); svg.setAttribute("aria-label", `${label}: ${fmt(ys[0])} to ${fmt(ys.at(-1))}`);
   const add = (tag, attrs) => { const n = document.createElementNS(ns, tag); for (const k in attrs) n.setAttribute(k, attrs[k]); svg.append(n); return n; };
-  for (let i = 0; i <= 2; i++) {
-    const v = y0 + (y1 - y0) * i / 2, y = sy(v);
-    add("line", { x1: P.l, x2: W - P.r, y1: y, y2: y, stroke: "var(--grid)", "stroke-width": 1, "vector-effect": "non-scaling-stroke" });
-    add("text", { x: P.l - 6, y: y + 3, "text-anchor": "end", "font-size": 10, fill: "var(--muted)" }).textContent = fmt(v);
-  }
-  const d0 = new Date(x0), d1 = new Date(x1);
-  add("text", { x: P.l, y: H - 4, "font-size": 10, fill: "var(--muted)" }).textContent = d0.toLocaleDateString(undefined, { month: "short", day: "numeric" });
-  add("text", { x: W - P.r, y: H - 4, "font-size": 10, fill: "var(--muted)", "text-anchor": "end" }).textContent = d1.toLocaleDateString(undefined, { month: "short", day: "numeric" });
-  add("path", { d: points.map((p, i) => (i ? "L" : "M") + sx(xs[i]) + " " + sy(p.value)).join(""), fill: "none",
-    stroke: "var(--accent)", "stroke-width": 2, "stroke-linejoin": "round", "vector-effect": "non-scaling-stroke" });
-  const hair = add("line", { y1: P.t, y2: H - P.b, stroke: "var(--muted)", "stroke-width": 1, "vector-effect": "non-scaling-stroke", visibility: "hidden" });
-  const dot = add("circle", { r: 4, fill: "var(--accent)", stroke: "var(--surface)", "stroke-width": 2, visibility: "hidden" });
-  const hit = add("rect", { x: P.l, y: 0, width: W - P.l - P.r, height: H, fill: "transparent" });
+  const line = points.map((p, i) => (i ? "L" : "M") + sx(xs[i]) + " " + sy(p.value)).join("");
+  const id = "g" + Math.random().toString(36).slice(2);
+  const defs = add("defs", {});
+  defs.innerHTML = `<linearGradient id="${id}" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="var(--accent)" stop-opacity=".18"/><stop offset="1" stop-color="var(--accent)" stop-opacity="0"/></linearGradient>`;
+  add("path", { d: `${line}L${sx(x1)} ${H - P.b}L${sx(x0)} ${H - P.b}Z`, fill: `url(#${id})` });
+  add("path", { d: line, fill: "none", stroke: "var(--accent)", "stroke-width": 2, "stroke-linejoin": "round", "vector-effect": "non-scaling-stroke" });
+  const fmtD = t => new Date(t).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  add("text", { x: P.l, y: H - 3, "font-size": 10, fill: "var(--muted)" }).textContent = fmtD(x0);
+  add("text", { x: W - P.r, y: H - 3, "font-size": 10, fill: "var(--muted)", "text-anchor": "end" }).textContent = fmtD(x1);
+  const hair = add("line", { y1: P.t, y2: H - P.b, stroke: "var(--border-strong)", "stroke-width": 1, "vector-effect": "non-scaling-stroke", visibility: "hidden" });
+  const dot = add("circle", { r: 3.5, fill: "var(--accent)", stroke: "var(--surface)", "stroke-width": 2, visibility: "hidden" });
+  const hit = add("rect", { x: 0, y: 0, width: W, height: H, fill: "transparent" });
   const tip = $("#tip");
   hit.addEventListener("pointermove", ev => {
-    const rect = svg.getBoundingClientRect();
-    const mx = (ev.clientX - rect.left) / rect.width * W;
-    let best = 0; xs.forEach((x, i) => { if (Math.abs(sx(x) - mx) < Math.abs(sx(xs[best]) - mx)) best = i; });
-    const cx = sx(xs[best]), cy = sy(ys[best]);
-    for (const n of [hair, dot]) n.setAttribute("visibility", "visible");
+    const rect = svg.getBoundingClientRect(), mx = (ev.clientX - rect.left) / rect.width * W;
+    let b = 0; xs.forEach((x, i) => { if (Math.abs(sx(x) - mx) < Math.abs(sx(xs[b]) - mx)) b = i; });
+    const cx = sx(xs[b]), cy = sy(ys[b]);
+    hair.setAttribute("visibility", "visible"); dot.setAttribute("visibility", "visible");
     hair.setAttribute("x1", cx); hair.setAttribute("x2", cx); dot.setAttribute("cx", cx); dot.setAttribute("cy", cy);
-    tip.replaceChildren(el("strong", {}, Math.round(ys[best]).toLocaleString()), el("span", { class: "sub" }, new Date(xs[best]).toLocaleString()));
-    tip.style.display = "block"; tip.style.left = ev.clientX + 12 + "px"; tip.style.top = ev.clientY - 40 + "px";
+    tip.replaceChildren(el("strong", {}, Math.round(ys[b]).toLocaleString()), el("span", { class: "dim" }, new Date(xs[b]).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })));
+    tip.style.display = "block"; tip.style.left = Math.min(ev.clientX + 12, innerWidth - 180) + "px"; tip.style.top = ev.clientY - 48 + "px";
   });
   hit.addEventListener("pointerleave", () => { tip.style.display = "none"; hair.setAttribute("visibility", "hidden"); dot.setAttribute("visibility", "hidden"); });
   wrap.append(svg);
   return wrap;
 }
 
-async function openArtist(name) {
-  show("artist");
-  const v = $("#view-artist");
-  v.replaceChildren(el("div", { class: "empty" }, `Researching ${name} across Deezer, Last.fm, YouTube, MusicBrainz, Wikipedia…`));
-  let r;
-  try { r = await api("/api/artist/" + encodeURIComponent(name)); }
-  catch (e) { v.replaceChildren(el("div", { class: "empty" }, "Not found: " + e.message)); return; }
-  const a = r.artist, s = r.score, m = s.metrics, rel = r.releases || {};
-  const watched = r.watchlist;
-
-  const statusSel = el("select", {}, ...["watching", "contacted", "meeting", "passed", "signed"].map(o => {
-    const opt = el("option", {}, o); if (watched && watched.status === o) opt.selected = true; return opt; }));
-  const watchBtn = el("button", { class: "btn primary" }, watched ? "Update status" : "Watch");
-  watchBtn.onclick = async () => {
-    await api("/api/watch", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: a.name, status: statusSel.value }) });
-    watchBtn.textContent = "Saved ✓";
-  };
-  const unwatchBtn = watched ? el("button", { class: "btn", onclick: async () => { await api("/api/watch/" + a.id, { method: "DELETE" }); openArtist(a.name); } }, "Unwatch") : null;
-
-  const links = el("div", { class: "links" }, ...Object.entries(a.links || {}).map(([k, u]) => el("a", { href: u, target: "_blank", rel: "noopener" }, k)));
-  const head = el("div", { class: "artist-head" },
-    a.image_url ? el("img", { src: a.image_url, alt: "" }) : null,
-    el("div", { style: "flex:1;min-width:240px" },
-      el("h2", {}, a.name),
-      el("div", { class: "sub" }, [a.country, (a.genres || []).join(", "), a.career_start && "since " + a.career_start].filter(Boolean).join(" · ")),
-      links),
-    el("div", { class: "filters", style: "margin:0" }, statusSel, watchBtn, unwatchBtn));
-
-  const g = s.growth || {};
-  const tile = (label, key) => el("div", { class: "card tile" },
-    el("div", { class: "label" }, label),
-    el("div", { class: "value" }, fmt(m[key])),
-    g[key] ? el("div", { class: g[key].delta >= 0 ? "up" : "down" }, `${g[key].delta >= 0 ? "+" : ""}${fmt(g[key].delta)} (${pct(g[key].monthly_rate)}/mo)`) : el("div", { class: "sub" }, "no trend yet"));
-  const tiles = el("div", { class: "grid tiles" },
-    el("div", { class: "card tile" }, el("div", { class: "label" }, "Breakout score"),
-      el("div", { class: "value" }, Math.round(s.score)), el("div", { class: "sub" }, `confidence ${Math.round(s.confidence * 100)}%`)),
-    tile("Deezer fans", "deezer.fans"), tile("Last.fm listeners", "lastfm.listeners"),
-    tile("YouTube subscribers", "youtube.subscribers"), tile("Wikipedia views (30d)", "wikipedia.pageviews_30d"));
-
-  const comps = el("div", { class: "card" }, el("h3", {}, "Score breakdown"),
-    ...Object.entries(s.components).map(([k, val]) => el("div", { class: "comp" },
-      el("span", {}, k), el("span", { class: "bar" }, Object.assign(el("i"), { style: `width:${(val || 0) * 100}%` })),
-      el("span", { class: "sub", style: "text-align:right" }, val == null ? "n/a" : Math.round(val * 100)))),
-    s.flags.length ? el("ul", { class: "flags" }, ...s.flags.map(f => el("li", {}, f))) : null);
-
-  const byMetric = {};
-  for (const h of r.history) (byMetric[h.metric] ||= []).push(h);
-  const charts = el("div", { class: "grid charts" },
-    ...Object.keys(METRIC_LABELS).filter(k => byMetric[k]).map(k => lineChart(byMetric[k], METRIC_LABELS[k])));
-
-  const releases = el("div", { class: "card" }, el("h3", {}, "Releases"),
-    rel.latest_release ? el("p", {}, `Latest on `, el("span", { class: "pill" + (DIY.test(rel.latest_label || "") ? " diy" : "") }, rel.latest_label || "unknown label"),
-      ` · ${rel.releases_last_year ?? 0} releases in last 12 months`) : null,
-    el("table", {}, el("tbody", {}, ...(rel.recent || []).map(x => el("tr", {}, el("td", {}, x.title), el("td", { class: "sub" }, x.type), el("td", { class: "sub" }, x.date))))));
-
-  const similar = el("div", { class: "card" }, el("h3", {}, "Similar artists"),
-    el("div", { class: "chips" }, ...r.similar_artists.map(x => el("button", { onclick: () => openArtist(x.name) }, `${x.name} · ${fmt(x.deezer_fans)}`))));
-
-  const noteBox = el("textarea", { placeholder: "Scouting note: show report, contact, gut feel…" });
-  const notes = el("div", { class: "card" }, el("h3", {}, "Notes"),
-    el("ul", { class: "notes" }, ...r.notes.map(n => el("li", {}, el("span", { class: "sub" }, n.created_at.slice(0, 10) + " "), n.body))),
-    noteBox, el("button", { class: "btn", style: "margin-top:8px", onclick: async () => {
-      if (!noteBox.value.trim()) return;
-      await api("/api/note", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: a.name, body: noteBox.value }) });
-      openArtist(a.name);
-    } }, "Add note"));
-
-  v.replaceChildren(head, tiles, el("div", { style: "height:16px" }),
-    el("div", { class: "grid two" }, el("div", { class: "grid" }, charts, releases), el("div", { class: "grid", style: "align-content:start" }, comps, similar, notes)),
-    r.errors.length ? el("p", { class: "sub" }, "Source issues: " + r.errors.join("; ")) : null);
+function ring(score, conf) {
+  const C = 2 * Math.PI * 36, low = conf < 0.7;
+  const r = el("div", { class: "ring", title: `Confidence ${Math.round(conf * 100)}%` });
+  r.innerHTML = `<svg viewBox="0 0 84 84"><circle cx="42" cy="42" r="36" fill="none" stroke="var(--surface-3)" stroke-width="7"/>
+    <circle cx="42" cy="42" r="36" fill="none" stroke="${low ? "var(--muted)" : "var(--accent)"}" stroke-width="7" stroke-linecap="round"
+    stroke-dasharray="${C * score / 100} ${C}"/></svg>`;
+  r.append(el("div", { class: "val" }, Math.round(score)));
+  return r;
 }
 
+const parseTags = v => [...new Set(v.split(",").map(t => t.trim()).filter(Boolean))];
+
+function flagClass(f) {
+  if (/deep fandom|DIY|unsigned|growing|surging/i.test(f)) return "flag pos";
+  if (/no growth|only|missing|established|stale|no youtube|looks off|capped/i.test(f)) return "flag warn";
+  return "flag";
+}
+
+async function renderArtist(name) {
+  const back = el("a", { class: "back", href: lastList === "leaderboard" ? "#/" : "#/" + lastList }, "← Back");
+  view.replaceChildren(back,
+    el("div", { class: "hero" }, el("div", { class: "skeleton", style: "width:96px;height:96px;border-radius:50%" }),
+      el("div", { class: "hero-main" }, el("div", { class: "skeleton", style: "height:28px;width:260px" }),
+        el("div", { class: "skeleton", style: "height:14px;width:340px;margin-top:10px" }))),
+    el("p", { class: "dim" }, `Pulling ${name} from Deezer, Last.fm, YouTube, MusicBrainz and Wikipedia…`));
+  let r;
+  try { r = await api("/api/artist/" + encodeURIComponent(name)); }
+  catch (e) { view.replaceChildren(back, el("div", { class: "card" }, el("div", { class: "empty" }, el("h4", {}, `Couldn't find “${name}”`), e.message))); return; }
+  const a = r.artist, s = r.score, m = s.metrics, rel = r.releases || {}, g = s.growth || {};
+  document.title = `${a.name} · AR Scout`;
+
+  // actions
+  const watched = r.watchlist;
+  const tagInput = el("input", { class: "input", placeholder: "Tags, comma-separated (e.g. uk indie, similar:The K's)", value: (watched?.tags || []).join(", ") });
+  tagInput.addEventListener("keydown", e => { if (e.key === "Enter") watchBtn.click(); });
+  const statusSel = el("select", { class: "input" }, STATUSES.map(o => el("option", { value: o, selected: watched?.status === o }, o[0].toUpperCase() + o.slice(1))));
+  const watchBtn = el("button", { class: "btn primary" }, watched ? "Update" : "Watch");
+  watchBtn.onclick = async () => {
+    watchBtn.disabled = true;
+    try { await post("/api/watch", { name: a.name, status: statusSel.value, tags: parseTags(tagInput.value) }); toast(watched ? "Watchlist updated" : `Now watching ${a.name}`); loadCounts(); renderArtist(a.name); }
+    catch (e) { toast("Error: " + e.message); watchBtn.disabled = false; }
+  };
+  const unwatch = watched ? el("button", { class: "btn ghost", onclick: async () => {
+    await api("/api/watch/" + a.id, { method: "DELETE" }); toast("Removed from watchlist"); loadCounts(); renderArtist(a.name); } }, "Unwatch") : null;
+
+  const meta = [a.country, (a.genres || []).slice(0, 4).join(", "), rel.first_release && `releasing since ${rel.first_release.slice(0, 4)}`].filter(Boolean);
+  const hero = el("div", { class: "hero" }, avatar(a.image_url, a.name),
+    el("div", { class: "hero-main" },
+      el("h1", {}, a.name),
+      el("div", { class: "meta" }, meta.map(x => el("span", {}, x))),
+      Object.keys(a.links || {}).length ? el("div", { class: "links" },
+        Object.entries(a.links).filter(([k]) => k !== "wikidata").map(([k, u]) => el("a", { href: u, target: "_blank", rel: "noopener" }, k[0].toUpperCase() + k.slice(1) + " ↗"))) : null),
+    el("div", { class: "hero-actions" }, watched ? el("span", { class: "pill st-" + watched.status }, "On watchlist") : null, statusSel, watchBtn, unwatch),
+    el("div", { class: "tag-edit", style: "flex-basis:100%" }, el("span", { class: "dim", style: "font-size:12px" }, "Tags"), tagInput));
+
+  // KPIs
+  const kpi = (label, key, sub) => el("div", { class: "card kpi" },
+    el("div", { class: "l" }, label), el("div", { class: "v" }, fmt(m[key])),
+    g[key] ? el("div", { class: "d " + (g[key].delta >= 0 ? "up" : "down") }, `${pct(g[key].monthly_rate)} / mo`)
+      : el("div", { class: "d" }, m[key] == null ? (sub || "not linked") : "no trend yet"));
+  const depth = m["lastfm.listeners"] ? m["lastfm.playcount"] / m["lastfm.listeners"] : null;
+  const ytOff = s.flags.some(f => /^YouTube count looks off/.test(f));
+  const ytKpi = kpi("YouTube subscribers", "youtube.subscribers", a.resolved_at ? "no channel found" : "not looked up yet");
+  if (ytOff) ytKpi.append(el("div", { class: "d down" }, "Too small for this audience: check the channel link"));
+  const kpis = el("div", { class: "kpis" },
+    ytKpi,
+    kpi("YouTube views", "youtube.views", a.resolved_at ? "no channel found" : "not looked up yet"),
+    kpi("Last.fm listeners", "lastfm.listeners"),
+    el("div", { class: "card kpi" }, el("div", { class: "l" }, "Plays per listener"),
+      el("div", { class: "v" }, depth == null ? "–" : depth.toFixed(1)), el("div", { class: "d" }, depth > 30 ? "deep fandom" : "fandom depth")),
+    kpi("Deezer fans", "deezer.fans"),
+    kpi("Wikipedia views (30d)", "wikipedia.pageviews_30d", "no article"));
+
+  // charts
+  const byMetric = {};
+  for (const h of r.history) (byMetric[h.metric] ||= []).push(h);
+  const charts = el("div", { class: "charts" }, Object.keys(METRICS).filter(k => byMetric[k]).map(k => lineChart(byMetric[k], METRICS[k])));
+  const snapDays = new Set(r.history.map(h => h.taken_at.slice(0, 10))).size;
+
+  // score card
+  const scoreCard = el("div", { class: "card card-pad" },
+    el("h3", {}, "Breakout score", el("span", { class: "aside" }, `${Math.round(s.confidence * 100)}% confidence`)),
+    el("div", { class: "score-card" }, ring(s.score, s.confidence),
+      el("div", { class: "dim", style: "font-size:12.5px" },
+        s.confidence < 0.7 ? "Provisional. Some inputs are missing, so the score uses only the parts that have data." : "Built from all five inputs.",
+        s.components.headroom != null && s.components.headroom < 1
+          ? el("div", { style: "margin-top:6px" }, `Size cap: total × ${(0.3 + 0.7 * s.components.headroom).toFixed(2)} because the audience is already ${s.components.headroom < 0.5 ? "large" : "growing past the sweet spot"}.`) : null)),
+    Object.entries(COMP).map(([k, [label, w]]) => {
+      const v = s.components[k];
+      return el("div", { class: "comp" },
+        el("span", { class: "k" }, label, " ", el("small", {}, w + "%")),
+        el("span", { class: "bar" + (v == null ? " na" : "") }, v == null ? null : el("i", { style: `width:${v * 100}%` })),
+        el("span", { class: "x" }, v == null ? "n/a" : Math.round(v * 100)));
+    }),
+    s.flags.length ? el("div", { class: "flags" }, s.flags.map(f => el("div", { class: flagClass(f) }, f))) : null);
+
+  // releases
+  const releases = el("div", { class: "card card-pad" },
+    el("h3", {}, "Releases", el("span", { class: "aside" }, `${rel.releases_last_year ?? 0} in the last 12 months`)),
+    rel.latest_label ? el("div", { style: "margin-bottom:8px;font-size:13px;color:var(--text-2)" }, "Latest label ",
+      el("span", { class: "pill" + (DIY.test(rel.latest_label) ? " diy" : "") }, rel.latest_label)) : null,
+    (rel.recent || []).length ? (rel.recent || []).map(x => el("div", { class: "rel" },
+      el("span", { class: "t", title: x.title }, x.title), el("span", { class: "ty" }, x.type), el("span", { class: "dt" }, x.date)))
+      : el("div", { class: "dim" }, "No releases found on Deezer."));
+
+  const similar = el("div", { class: "card card-pad" }, el("h3", {}, "Similar artists", el("span", { class: "aside" }, "Deezer fans")),
+    r.similar_artists.length ? el("div", { class: "chips" }, r.similar_artists.map(x => el("button", { class: "chip", onclick: () => go(x.name) }, x.name, el("small", {}, fmt(x.deezer_fans)))))
+      : el("div", { class: "dim" }, "None found."));
+
+  const noteBox = el("textarea", { class: "input", placeholder: "Add a scouting note — show report, contact, gut feel…" });
+  const notes = el("div", { class: "card card-pad" }, el("h3", {}, "Notes", el("span", { class: "aside" }, r.notes.length || "")),
+    r.notes.length ? r.notes.map(n => el("div", { class: "note" }, el("time", {}, n.created_at.slice(0, 10)), n.body)) : el("div", { class: "dim", style: "font-size:13px" }, "No notes yet."),
+    noteBox, el("div", { style: "display:flex;justify-content:flex-end;margin-top:8px" }, el("button", { class: "btn", onclick: async () => {
+      if (!noteBox.value.trim()) return;
+      await post("/api/note", { name: a.name, body: noteBox.value.trim() }); toast("Note saved"); renderArtist(a.name);
+    } }, "Save note")));
+
+  view.replaceChildren(back, hero,
+    el("div", { class: "layout" },
+      el("div", { class: "stack" }, kpis,
+        el("div", {}, el("div", { class: "page-head", style: "margin:8px 0 10px" },
+          el("h3", { style: "margin:0;font-size:13px;font-weight:600" }, "Trends"),
+          el("span", { class: "dim", style: "font-size:12px" }, `${snapDays} day${snapDays === 1 ? "" : "s"} of snapshots`)), charts),
+        releases),
+      el("div", { class: "stack" }, scoreCard, similar, notes)),
+    r.errors.length ? el("div", { class: "errors" }, "Source issues: " + r.errors.join("; ")) : null);
+}
+
+// ============================================================ boot
+async function loadHealth() {
+  try {
+    const h = await api("/api/health");
+    const row = (k, v, warn) => el("div", { class: "row" }, el("span", {}, k), el("span", { class: warn ? "warn" : "" }, v));
+    $("#health").replaceChildren(
+      row("Last snapshot", h.last_snapshot ? ago(h.last_snapshot) === "today" ? new Date(h.last_snapshot).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : ago(h.last_snapshot) : "never", !h.last_snapshot),
+      row("Daily job", h.daily_job ? "on · 09:00" : "off", !h.daily_job),
+      row("With growth data", `${h.with_growth} / ${h.artists}`),
+      h.unlinked ? row("Not linked", h.unlinked, true) : null);
+    $("#health").title = h.daily_job ? "" : "Run scripts/install-daily-snapshot.sh to snapshot every day";
+  } catch {}
+}
+async function loadCounts() {
+  try {
+    const [all, watch] = await Promise.all([api("/api/leaderboard?limit=10000"), api("/api/leaderboard?watchlist=true&limit=10000")]);
+    $("#cntAll").textContent = all.length || ""; $("#cntWatch").textContent = watch.length || "";
+  } catch {}
+}
 api("/api/status").then(st => {
-  const missing = Object.entries(st).filter(([, ok]) => !ok).map(([k]) => k);
-  $("#srcStatus").textContent = missing.length ? `Not configured: ${missing.join(", ")} (add keys to .env)` : "All sources configured";
-});
-loadLeaderboard();
+  const names = { deezer: "Deezer", lastfm: "Last.fm", youtube: "YouTube", musicbrainz: "MusicBrainz", wikipedia: "Wikipedia", spotify: "Spotify" };
+  $("#srcList").replaceChildren(...Object.entries(names).map(([k, n]) =>
+    el("div", { class: "src", title: st[k] ? "Connected" : "Not configured — add a key to .env" }, el("span", { class: "dot" + (st[k] ? "" : " off") }), n,
+      st[k] ? null : el("span", { class: "dim", style: "margin-left:auto;font-size:11px" }, "off"))));
+}).catch(() => {});
+loadCounts();
+loadHealth();
+route();
 </script>
 </body>
 </html>

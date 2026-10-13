@@ -11,7 +11,8 @@ mcp = MCPServer(
     instructions=(
         "A&R research tools. Audience numbers: Deezer fans, Last.fm listeners/plays, YouTube subscribers/views, "
         "Wikipedia pageviews. Breakout score (0-100) = momentum 40% + engagement 20% + headroom 20% + "
-        "activity 10% + signability 10%; 'confidence' is the share of the model that had data. Momentum needs "
+        "activity 10% + signability 10%, then scaled down by audience size (headroom 0 keeps 30%), so famous "
+        "acts can't rank high; 'confidence' is the share of the model that had data. Momentum needs "
         "snapshots taken on different days, so new artists score on the other components only. Always cite the "
         "underlying numbers and flags, not just the score."
     ),
@@ -90,10 +91,21 @@ def discover_playlists(query: str, playlists: int = 5, min_fans: int = 300, max_
 
 @mcp.tool()
 def leaderboard(limit: int = 25, watchlist_only: bool = False, window_days: int = 30,
-                max_audience: int | None = None, genre: str | None = None) -> list[dict]:
+                max_audience: int | None = None, genre: str | None = None,
+                audience_platform: str = "any") -> list[dict]:
     """Rank every tracked artist (or just the watchlist) by breakout score using stored snapshots.
-    max_audience filters out artists already bigger than that; genre filters by tag substring."""
-    return service.leaderboard(limit, watchlist_only, window_days, max_audience, genre)
+    max_audience filters out artists already bigger than that: on any platform by default, or only on
+    audience_platform='youtube' | 'lastfm' | 'deezer' (artists with no data there are dropped).
+    genre filters by tag substring."""
+    return service.leaderboard(limit, watchlist_only, window_days, max_audience, genre, audience_platform)
+
+
+@mcp.tool()
+def relink_artists() -> dict:
+    """Run the full cross-source lookup (MusicBrainz, YouTube, Wikipedia) for artists that discovery added
+    without one, then re-snapshot them. Discovery skips YouTube to save quota, so run this before filtering
+    by YouTube size. Costs up to 100 YouTube quota units per artist (of 10k/day)."""
+    return service.relink_all()
 
 
 @mcp.tool()
