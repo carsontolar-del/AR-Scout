@@ -840,11 +840,11 @@ async function loadHealth() {
   try {
     const h = await api("/api/health");
     const row = (k, v, warn) => el("div", { class: "row" }, el("span", {}, k), el("span", { class: warn ? "warn" : "" }, v));
-    $("#health").replaceChildren(
+    $("#health").replaceChildren(...[
       row("Last snapshot", h.last_snapshot ? ago(h.last_snapshot) === "today" ? new Date(h.last_snapshot).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : ago(h.last_snapshot) : "never", !h.last_snapshot),
       row("Daily job", h.daily_job ? "on · 09:00" : "off", !h.daily_job),
       row("With growth data", `${h.with_growth} / ${h.artists}`),
-      h.unlinked ? row("Not linked", h.unlinked, true) : null);
+      h.unlinked ? row("Not linked", h.unlinked, true) : null].filter(Boolean));
     $("#health").title = h.daily_job ? "" : "Run scripts/install-daily-snapshot.sh to snapshot every day";
   } catch {}
 }
