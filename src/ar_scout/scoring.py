@@ -24,11 +24,15 @@ MOMENTUM_METRICS = {
     "youtube.subscribers": 1.0,
     "lastfm.playcount": 0.7,
     "youtube.views": 0.7,
+    "instagram.followers": 1.0,
     "spotify.followers": 1.0,
     "wikipedia.pageviews_30d": 0.3,
 }
 
 GROWTH_FOR_FULL_SCORE = 0.30  # +30% per month = momentum 1.0
+# Shortest span projected to a monthly rate. Over a day, ordinary noise (+40 subs, a Wikipedia blip, API
+# rounding) compounds to hundreds of percent a month and swamps the score.
+MIN_GROWTH_DAYS = 7
 
 
 def _clamp(x: float) -> float:
@@ -43,7 +47,8 @@ def growth(points: list[tuple[str, float]], window_days: int = 30) -> dict | Non
     """Growth for one metric. points = [(iso_ts, value)] sorted ascending.
 
     Uses the latest point and the oldest point within the window (falls back to the closest older
-    point). Returns absolute delta, % change, and change normalised to a 30-day rate.
+    point). Returns absolute delta, % change, and change normalised to a 30-day rate; the rate is None
+    until the points span MIN_GROWTH_DAYS.
     """
     pts = [(_parse(t), v) for t, v in points if v is not None]
     if len(pts) < 2:
@@ -57,7 +62,7 @@ def growth(points: list[tuple[str, float]], window_days: int = 30) -> dict | Non
     delta = end_v - start_v
     pct = delta / start_v if start_v > 0 else None
     monthly = None
-    if start_v > 0 and end_v > 0:
+    if start_v > 0 and end_v > 0 and days >= MIN_GROWTH_DAYS:
         monthly = math.exp(math.log(end_v / start_v) / days * 30) - 1
     return {"start": start_v, "end": end_v, "delta": delta, "pct": pct,
             "monthly_rate": monthly, "days": round(days, 1)}
@@ -70,6 +75,8 @@ HEADROOM_BANDS = {
     "lastfm.listeners": (200, 2_000, 100_000, 1_000_000),
     "youtube.subscribers": (200, 2_000, 100_000, 1_000_000),
     "spotify.followers": (200, 2_000, 100_000, 1_000_000),
+    # Instagram follows come cheaper than listens, so an act needs a larger following to count as big.
+    "instagram.followers": (500, 5_000, 200_000, 2_000_000),
 }
 
 # Fame signals that only count against an artist: having no Wikipedia article is normal for an emerging act,
@@ -155,7 +162,7 @@ def score(metrics: dict[str, float], history: dict[str, list[tuple[str, float]]]
         total_w += w
     components["momentum"] = weighted / total_w if total_w else None
     if not total_w:
-        flags.append("no growth history yet: run snapshots over several days")
+        flags.append(f"no growth rate yet: needs {MIN_GROWTH_DAYS}+ days of snapshots")
 
     # Engagement
     eng = []

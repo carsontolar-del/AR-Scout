@@ -15,6 +15,7 @@ _MIN_INTERVAL = {
     "musicbrainz.org": 1.1,
     "api.deezer.com": 0.12,
     "ws.audioscrobbler.com": 0.2,
+    "graph.facebook.com": 0.5,
 }
 _CACHE_TTL = 15 * 60
 

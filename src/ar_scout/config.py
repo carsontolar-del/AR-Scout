@@ -18,6 +18,9 @@ class Settings:
     youtube_api_key: str | None
     spotify_client_id: str | None
     spotify_client_secret: str | None
+    instagram_access_token: str | None
+    instagram_business_id: str | None
+    instagram_graph_version: str | None
     contact_email: str
     db_path: Path
 
@@ -33,6 +36,7 @@ class Settings:
             "lastfm": bool(self.lastfm_api_key),
             "youtube": bool(self.youtube_api_key),
             "spotify": bool(self.spotify_client_id and self.spotify_client_secret),
+            "instagram": bool(self.instagram_access_token and self.instagram_business_id),
         }
 
 
@@ -48,6 +52,9 @@ def load_settings() -> Settings:
         youtube_api_key=_env("YOUTUBE_API_KEY"),
         spotify_client_id=_env("SPOTIFY_CLIENT_ID"),
         spotify_client_secret=_env("SPOTIFY_CLIENT_SECRET"),
+        instagram_access_token=_env("INSTAGRAM_ACCESS_TOKEN"),
+        instagram_business_id=_env("INSTAGRAM_BUSINESS_ID"),
+        instagram_graph_version=_env("INSTAGRAM_GRAPH_VERSION"),
         contact_email=_env("CONTACT_EMAIL") or "",
         db_path=Path(db) if db else PROJECT_ROOT / "data" / "ar_scout.db",
     )

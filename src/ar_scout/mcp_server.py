@@ -10,7 +10,7 @@ mcp = MCPServer(
     "ar-scout",
     instructions=(
         "A&R research tools. Audience numbers: Deezer fans, Last.fm listeners/plays, YouTube subscribers/views, "
-        "Wikipedia pageviews. Breakout score (0-100) = momentum 40% + engagement 20% + headroom 20% + "
+        "Instagram followers (professional accounts, when configured), Wikipedia pageviews. Breakout score (0-100) = momentum 40% + engagement 20% + headroom 20% + "
         "activity 10% + signability 10%, then scaled down by audience size (headroom 0 keeps 30%), so famous "
         "acts can't rank high; 'confidence' is the share of the model that had data. Momentum needs "
         "snapshots taken on different days, so new artists score on the other components only. Always cite the "
@@ -95,7 +95,7 @@ def leaderboard(limit: int = 25, watchlist_only: bool = False, window_days: int 
                 audience_platform: str = "any") -> list[dict]:
     """Rank every tracked artist (or just the watchlist) by breakout score using stored snapshots.
     max_audience filters out artists already bigger than that: on any platform by default, or only on
-    audience_platform='youtube' | 'lastfm' | 'deezer' (artists with no data there are dropped).
+    audience_platform='youtube' | 'lastfm' | 'deezer' | 'instagram' (artists with no data there are dropped).
     genre filters by tag substring."""
     return service.leaderboard(limit, watchlist_only, window_days, max_audience, genre, audience_platform)
 
@@ -122,6 +122,15 @@ def set_youtube_channel(name: str, url: str) -> dict:
     Deletes the old channel's snapshots and takes a fresh one."""
     a = service.resolve(name, deep=True)
     return service.set_youtube_channel(a["id"], url)
+
+
+@mcp.tool()
+def set_instagram_account(name: str, handle: str) -> dict:
+    """Fix an artist's Instagram account by hand (instagram.com/name, @name or name). Follower counts come from
+    Instagram Business Discovery, which only sees public professional (Business/Creator) accounts.
+    Deletes the old account's Instagram history and takes a fresh snapshot."""
+    a = service.resolve(name, deep=True)
+    return service.set_instagram_account(a["id"], handle)
 
 
 @mcp.tool()

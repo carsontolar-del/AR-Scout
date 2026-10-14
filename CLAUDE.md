@@ -13,7 +13,12 @@ free music data APIs and a local SQLite history in `data/ar_scout.db`.
 - **MusicBrainz** (no key): identity, origin country, career start, social links (Instagram/TikTok URLs).
 - **Wikipedia** (no key): 30-day pageviews, a signal of mainstream crossover.
 - **Spotify** (optional): IDs, genres, releases only. Since Feb/Mar 2026, Dev Mode apps get no followers or
-  popularity. There is **no free TikTok or Instagram metrics API**; use the MusicBrainz links for manual checks.
+  popularity.
+- **Instagram** (optional, `INSTAGRAM_ACCESS_TOKEN` + `INSTAGRAM_BUSINESS_ID`): follower and post counts via Graph
+  API Business Discovery. Only public professional (Business/Creator) accounts are readable; a missing count often
+  means a personal account, not a missing artist. Usernames come from MusicBrainz links (sometimes wrong; fix with
+  `set_instagram_account`). Setup steps are in `.env.example`; `ar-scout instagram-test` checks them.
+- There is **no free TikTok metrics API**; use the MusicBrainz TikTok links for manual checks.
 
 ## Breakout score (0–100)
 momentum 40% · engagement 20% · headroom 20% · activity 10% · signability 10% (see `src/ar_scout/scoring.py`).

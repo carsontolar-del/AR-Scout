@@ -11,12 +11,13 @@ from typing import Any, Callable
 from . import db, scoring
 from .config import settings
 from .http import SourceError
-from .sources import deezer, lastfm, musicbrainz, spotify, wikipedia, youtube
+from .sources import deezer, instagram, lastfm, musicbrainz, spotify, wikipedia, youtube
 
 SNAPSHOT_FRESH_HOURS = 12
 # Written by scripts/install-daily-snapshot.sh
 DAILY_JOB_PLIST = Path.home() / "Library/LaunchAgents/com.ar-scout.snapshot.plist"
-AUDIENCE_METRICS = {"deezer": "deezer.fans", "lastfm": "lastfm.listeners", "youtube": "youtube.subscribers"}
+AUDIENCE_METRICS = {"deezer": "deezer.fans", "lastfm": "lastfm.listeners", "youtube": "youtube.subscribers",
+                    "instagram": "instagram.followers"}
 
 
 def _try(errors: list[str], label: str, fn: Callable[[], Any]) -> Any:
@@ -111,6 +112,30 @@ def _switch_youtube(artist: dict, channel: str, source: str) -> None:
     db.upsert_artist({"youtube_channel": channel, "youtube_source": source}, artist["id"])
 
 
+def _instagram_username(artist: dict) -> str | None:
+    """Stored username, else the MusicBrainz link (artists resolved before Instagram support only have that)."""
+    return artist.get("instagram_username") or instagram.username_from_url((artist.get("links") or {}).get("instagram", ""))
+
+
+def set_instagram_account(artist_id: int, handle: str) -> dict:
+    """Manually set an artist's Instagram username (profile URL, @handle or bare username), then snapshot.
+    With Instagram configured, the account must be one Business Discovery can read."""
+    artist = db.get_artist(artist_id)
+    if not artist:
+        raise SourceError(f"No artist with id {artist_id}")
+    username = instagram.username_from_url(handle)
+    if not username:
+        raise SourceError("Not an Instagram profile. Use instagram.com/name, @name or name")
+    stats = instagram.profile(username) if instagram.available() else None
+    if _instagram_username(artist) != username:
+        db.delete_metrics(artist_id, "instagram.")
+    db.upsert_artist({"instagram_username": username, "instagram_source": "manual"}, artist_id)
+    if stats:
+        snapshot(artist_id)
+    return {"artist": artist["name"], "username": username,
+            "followers": stats["followers"] if stats else None, "media_count": stats["media_count"] if stats else None}
+
+
 def set_youtube_channel(artist_id: int, url: str) -> dict:
     """Manually set an artist's YouTube channel from a channel URL, @handle URL or channel ID, then snapshot.
     Manual choices are never overwritten by recheck_youtube()."""
@@ -188,6 +213,9 @@ def resolve(name: str, deep: bool = True) -> dict:
             fields.update(mbid=mbid, country=mb["country"], career_start=mb["begin"], links=mb["links"])
             if mb["genres"] and not fields.get("genres"):
                 fields["genres"] = mb["genres"][:6]
+            ig = instagram.username_from_url(mb["links"].get("instagram", ""))
+            if ig and (artist or {}).get("instagram_source") != "manual":
+                fields.update(instagram_username=ig, instagram_source="musicbrainz")
             if wd := mb["links"].get("wikidata"):
                 fields["wiki_title"] = _try(errors, "wikidata", lambda: wikipedia.enwiki_title_from_wikidata(wd))
 
@@ -252,6 +280,11 @@ def snapshot(artist_id: int) -> dict:
             m["youtube.subscribers"], m["youtube.views"], m["youtube.videos"] = (
                 yt["subscribers"], yt["views"], yt["videos"])
 
+    if instagram.available() and (ig_user := _instagram_username(a)):
+        ig = _try(errors, "instagram", lambda: instagram.profile(ig_user))
+        if ig:
+            m["instagram.followers"], m["instagram.media_count"] = ig["followers"], ig["media_count"]
+
     if a.get("wiki_title"):
         m["wikipedia.pageviews_30d"] = _try(errors, "wikipedia", lambda: wikipedia.pageviews(a["wiki_title"]))
 
@@ -285,6 +318,12 @@ def relink_all(progress: Callable[[str], None] | None = None) -> dict:
     return {"relinked": done, "errors": errors}
 
 
+def _span_days(cov: dict) -> float:
+    if not cov.get("first"):
+        return 0.0
+    return (datetime.fromisoformat(cov["last"]) - datetime.fromisoformat(cov["first"])).total_seconds() / 86400
+
+
 def data_health() -> dict:
     """How complete the tracked data is: unlinked artists, growth coverage, last snapshot, daily job."""
     coverage = db.snapshot_summary()
@@ -292,7 +331,8 @@ def data_health() -> dict:
     return {
         "artists": len(artists),
         "unlinked": sum(1 for a in artists if not a.get("resolved_at")),
-        "with_growth": sum(1 for c in coverage.values() if c["days"] >= 2),
+        "with_growth": sum(1 for c in coverage.values() if _span_days(c) >= scoring.MIN_GROWTH_DAYS),
+        "min_growth_days": scoring.MIN_GROWTH_DAYS,
         "last_snapshot": max((c["last"] for c in coverage.values()), default=None),
         "daily_job": DAILY_JOB_PLIST.exists(),
     }
@@ -356,6 +396,7 @@ def report(name: str, refresh: bool = True) -> dict:
         snap = snapshot(artist["id"])
         errors += snap["errors"]
     artist = db.get_artist(artist["id"])
+    artist["instagram_username"] = _instagram_username(artist)
     rel = snap["releases"] if snap else (_release_info(artist["deezer_id"]) if artist.get("deezer_id") else {})
 
     similar = []
@@ -378,9 +419,9 @@ def report(name: str, refresh: bool = True) -> dict:
 def leaderboard(limit: int = 25, watchlist_only: bool = False, window_days: int = 30,
                 max_audience: float | None = None, genre: str | None = None,
                 audience_platform: str = "any") -> list[dict]:
-    """audience_platform: 'any' applies max_audience to the largest of Deezer fans, Last.fm listeners and
-    YouTube subscribers; 'youtube' / 'lastfm' / 'deezer' apply it to that platform only and drop artists
-    with no data there (unknown size isn't 'under')."""
+    """audience_platform: 'any' applies max_audience to the largest of Deezer fans, Last.fm listeners,
+    YouTube subscribers and Instagram followers; 'youtube' / 'lastfm' / 'deezer' / 'instagram' apply it to that
+    platform only and drop artists with no data there (unknown size isn't 'under')."""
     if audience_platform != "any" and audience_platform not in AUDIENCE_METRICS:
         raise ValueError(f"audience_platform must be 'any' or one of {', '.join(AUDIENCE_METRICS)}")
     coverage = db.snapshot_summary()
@@ -404,6 +445,7 @@ def leaderboard(limit: int = 25, watchlist_only: bool = False, window_days: int 
             "lastfm_listeners": s["metrics"].get("lastfm.listeners"),
             "youtube_subscribers": s["metrics"].get("youtube.subscribers"),
             "youtube_views": s["metrics"].get("youtube.views"),
+            "instagram_followers": s["metrics"].get("instagram.followers"),
             "lastfm_playcount": s["metrics"].get("lastfm.playcount"),
             "image_url": a.get("image_url"),
             "monthly_growth": {k: round(g["monthly_rate"], 3) for k, g in s["growth"].items() if g["monthly_rate"] is not None},

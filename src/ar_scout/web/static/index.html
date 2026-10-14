@@ -376,6 +376,7 @@ const STATUSES = ["watching", "contacted", "meeting", "passed", "signed"];
 const METRICS = {
   "youtube.views": "YouTube views", "youtube.subscribers": "YouTube subscribers",
   "lastfm.listeners": "Last.fm listeners", "lastfm.playcount": "Last.fm plays",
+  "instagram.followers": "Instagram followers",
   "deezer.fans": "Deezer fans", "wikipedia.pageviews_30d": "Wikipedia views (30d)", "spotify.followers": "Spotify followers",
 };
 // Short labels for score flags shown inline in tables; anything unlisted only appears on the artist page.
@@ -383,7 +384,7 @@ const FLAG_SHORT = [
   [/^deep fandom/, "Deep fandom", "pos"], [/DIY distributor/, "Likely unsigned", "pos"],
   [/^YouTube count looks off/, "Check YT", "warn"], [/^score capped/, "Capped", ""], [/^already established/, "Established", ""],
 ];
-const PLATFORMS = [["any", "any platform"], ["youtube", "YouTube subs"], ["lastfm", "Last.fm listeners"], ["deezer", "Deezer fans"]];
+const PLATFORMS = [["any", "any platform"], ["youtube", "YouTube subs"], ["instagram", "Instagram followers"], ["lastfm", "Last.fm listeners"], ["deezer", "Deezer fans"]];
 const STAR = '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 1.3l2 4.3 4.6.5-3.4 3.2.9 4.6L8 11.6l-4.1 2.3.9-4.6L1.4 6.1 6 5.6z"/></svg>';
 const COMP = { momentum: ["Momentum", 40], engagement: ["Engagement", 20], headroom: ["Headroom", 20], activity: ["Activity", 10], signability: ["Signability", 10] };
 
@@ -427,6 +428,7 @@ const COLS = [
   { key: "depth", label: "Plays / listener", r: true, get: r => r.lastfm_listeners ? r.lastfm_playcount / r.lastfm_listeners : null },
   { key: "youtube_subscribers", label: "YT subs", r: true, get: r => r.youtube_subscribers },
   { key: "youtube_views", label: "YT views", r: true, get: r => r.youtube_views },
+  { key: "instagram_followers", label: "IG followers", r: true, get: r => r.instagram_followers },
   { key: "growth", label: "Growth / mo", r: true, get: r => { const v = Object.values(r.monthly_growth || {}); return v.length ? Math.max(...v) : null; } },
   { key: "snapshot_days", label: "Days tracked", r: true, get: r => r.snapshot_days },
   { key: "latest_release", label: "Last release", r: false, get: r => r.latest_release },
@@ -452,7 +454,7 @@ function dataTable(rows, { empty, showStatus = true, sort = { key: "score", dir:
       c.label + (c.key === sort.key ? (sort.dir < 0 ? " ↓" : " ↑") : ""))),
     el("th", {}, "Label"), showStatus ? el("th", {}, "Status") : null, el("th", {}, ""));
   const body = el("tbody", {}, rows.map((r, i) => {
-    const depth = COLS[3].get(r), growth = COLS[6].get(r), label = r.label || "";
+    const depth = COLS[3].get(r), growth = COLS.find(c => c.key === "growth").get(r), label = r.label || "";
     const minis = FLAG_SHORT.filter(([re]) => r.flags.some(f => re.test(f)))
       .map(([re, t, c]) => el("span", { class: "mini " + c, title: r.flags.find(f => re.test(f)) }, t));
     return el("tr", { class: "row", onclick: () => go(r.name) },
@@ -466,9 +468,11 @@ function dataTable(rows, { empty, showStatus = true, sort = { key: "score", dir:
       el("td", { class: "r num" + (depth > 30 ? " up" : "") }, depth == null ? "–" : depth.toFixed(1)),
       ytCell(r),
       el("td", { class: "r num" + (r.youtube_views == null ? " dim" : "") }, fmt(r.youtube_views)),
+      el("td", { class: "r num" + (r.instagram_followers == null ? " dim" : ""),
+        title: r.instagram_followers == null ? "No count: Instagram not set up, no account linked, or a personal/private account" : "" }, fmt(r.instagram_followers)),
       el("td", { class: "r num " + (growth == null ? "dim" : growth > 0.005 ? "up" : growth < -0.005 ? "down" : ""),
-        title: growth == null ? "Growth needs snapshots on 2+ different days" : "" }, growth == null ? "–" : pct(growth)),
-      el("td", { class: "r num" + (r.snapshot_days < 2 ? " dim" : ""), title: r.last_snapshot ? "Last snapshot " + new Date(r.last_snapshot).toLocaleString() : "" }, r.snapshot_days || "–"),
+        title: growth == null ? "A growth rate needs a week of snapshots" : "" }, growth == null ? "–" : pct(growth)),
+      el("td", { class: "r num" + (r.snapshot_days < 7 ? " dim" : ""), title: r.last_snapshot ? "Last snapshot " + new Date(r.last_snapshot).toLocaleString() : "" }, r.snapshot_days || "–"),
       el("td", { class: "dim", title: r.latest_release || "" }, ago(r.latest_release)),
       el("td", {}, label ? el("span", { class: "pill" + (DIY.test(label) ? " diy" : ""), title: label }, label) : el("span", { class: "dim" }, "–")),
       showStatus ? el("td", {}, r.status ? el("span", { class: "pill st-" + r.status }, r.status) : "") : null,
@@ -476,7 +480,7 @@ function dataTable(rows, { empty, showStatus = true, sort = { key: "score", dir:
   }));
   return el("div", { class: "card" }, el("div", { class: "table-wrap" }, el("table", {}, el("thead", {}, head), body)),
     el("div", { class: "foot" }, el("span", {}, `${rows.length} artist${rows.length === 1 ? "" : "s"}`),
-      el("span", {}, "Scores in grey have under 70% confidence · Plays / listener over 30 = deep fandom · Growth needs 2+ days tracked")));
+      el("span", {}, "Scores in grey have under 70% confidence · Plays / listener over 30 = deep fandom · Growth rates need a week of snapshots")));
 }
 
 // YouTube: tell "never looked up" apart from "looked up, no channel" and "channel numbers don't add up".
@@ -554,12 +558,16 @@ async function renderLeaderboard() {
       el("div", { class: "field" }, el("span", {}, "Growth window"), win)),
     tableSlot);
 
+  let seq = 0;
   async function load() {
+    const mine = ++seq;  // filters can change while a load is in flight; only the newest one may render
     const p = new URLSearchParams({ limit: 200, window: lb.window });
     if (lb.genre) p.set("genre", lb.genre);
     if (lb.max) { p.set("max_audience", lb.max); p.set("platform", lb.platform); }
     let rows, h;
-    try { [rows, h] = await Promise.all([api("/api/leaderboard?" + p), api("/api/health")]); } catch (e) { tableSlot.replaceChildren(errorCard(e)); return; }
+    try { [rows, h] = await Promise.all([api("/api/leaderboard?" + p), api("/api/health")]); }
+    catch (e) { if (mine === seq) tableSlot.replaceChildren(errorCard(e)); return; }
+    if (mine !== seq) return;
     const withGrowth = rows.filter(r => Object.keys(r.monthly_growth || {}).length).length;
     const watched = rows.filter(r => r.status).length;
     const top = rows[0];
@@ -567,7 +575,7 @@ async function renderLeaderboard() {
     statsSlot.replaceChildren(
       stat("Artists", rows.length, filtered ? `matching filters, of ${h.artists}` : "in the database"),
       stat("On watchlist", watched, filtered ? "in this view" : "snapshotted daily"),
-      stat("With growth data", withGrowth, withGrowth ? `${Math.round(withGrowth / Math.max(rows.length, 1) * 100)}% · rest need 2+ days tracked` : "needs snapshots on 2+ different days"),
+      stat("With growth data", withGrowth, withGrowth ? `${Math.round(withGrowth / Math.max(rows.length, 1) * 100)}% of artists` : `needs ${h.min_growth_days}+ days of snapshots`),
       stat("Top score", top ? Math.round(top.score) : "–", top ? top.name : "—"));
     const ytFilter = lb.max && lb.platform === "youtube";
     bannerSlot.replaceChildren(h.unlinked ? relinkBanner(h.unlinked, ytFilter, load) : "");
@@ -738,6 +746,26 @@ function ytChannelLine(a) {
     a.youtube_channel && YT_SOURCE[a.youtube_source] ? " " + YT_SOURCE[a.youtube_source] + " · " : a.youtube_channel ? " · " : null, change);
 }
 
+function igKpi(a, m) {
+  const sub = !igOn ? "Instagram not set up" : !a.instagram_username ? "no account linked" : "not readable: personal or private account?";
+  const tile = el("div", { class: "card kpi" }, el("div", { class: "l" }, "Instagram followers"), el("div", { class: "v" }, fmt(m["instagram.followers"])),
+    el("div", { class: "d" }, m["instagram.followers"] != null ? `${fmt(m["instagram.media_count"])} posts` : sub));
+  const change = el("button", { class: "linkish" }, a.instagram_username ? "Change" : "Set account");
+  change.onclick = async () => {
+    const h = prompt(`Instagram account for ${a.name}\n\nPaste an instagram.com link or @username. Counts only work for public professional (Business/Creator) accounts.`);
+    if (!h || !h.trim()) return;
+    change.disabled = true; change.textContent = "Saving…";
+    try {
+      const r = await post(`/api/artist/${a.id}/instagram`, { handle: h.trim() });
+      toast(r.followers != null ? `@${r.username}: ${fmt(r.followers)} followers` : `Saved @${r.username}`); renderArtist(a.name);
+    } catch (e) { toast("Couldn't set account: " + e.message); change.disabled = false; change.textContent = "Change"; }
+  };
+  tile.append(el("div", { class: "d yt-src" },
+    a.instagram_username ? el("a", { href: `https://www.instagram.com/${a.instagram_username}/`, target: "_blank", rel: "noopener" }, "@" + a.instagram_username + " ↗") : null,
+    a.instagram_username ? (a.instagram_source === "manual" ? " set by you · " : " · ") : null, change));
+  return tile;
+}
+
 const parseTags = v => [...new Set(v.split(",").map(t => t.trim()).filter(Boolean))];
 
 function flagClass(f) {
@@ -796,6 +824,7 @@ async function renderArtist(name) {
   const kpis = el("div", { class: "kpis" },
     ytKpi,
     kpi("YouTube views", "youtube.views", a.resolved_at ? "no channel found" : "not looked up yet"),
+    igKpi(a, m),
     kpi("Last.fm listeners", "lastfm.listeners"),
     el("div", { class: "card kpi" }, el("div", { class: "l" }, "Plays per listener"),
       el("div", { class: "v" }, depth == null ? "–" : depth.toFixed(1)), el("div", { class: "d" }, depth > 30 ? "deep fandom" : "fandom depth")),
@@ -858,6 +887,7 @@ async function renderArtist(name) {
 }
 
 // ============================================================ boot
+let igOn = false;
 async function loadHealth() {
   try {
     const h = await api("/api/health");
@@ -877,7 +907,8 @@ async function loadCounts() {
   } catch {}
 }
 api("/api/status").then(st => {
-  const names = { deezer: "Deezer", lastfm: "Last.fm", youtube: "YouTube", musicbrainz: "MusicBrainz", wikipedia: "Wikipedia", spotify: "Spotify" };
+  igOn = !!st.instagram;
+  const names = { deezer: "Deezer", lastfm: "Last.fm", youtube: "YouTube", instagram: "Instagram", musicbrainz: "MusicBrainz", wikipedia: "Wikipedia", spotify: "Spotify" };
   $("#srcList").replaceChildren(...Object.entries(names).map(([k, n]) =>
     el("div", { class: "src", title: st[k] ? "Connected" : "Not configured — add a key to .env" }, el("span", { class: "dot" + (st[k] ? "" : " off") }), n,
       st[k] ? null : el("span", { class: "dim", style: "margin-left:auto;font-size:11px" }, "off"))));

@@ -80,3 +80,11 @@ def test_flags_youtube_channel_too_small_for_audience():
 def test_channel_with_no_videos_is_suspect():
     assert scoring.youtube_suspect({"youtube.subscribers": 627, "youtube.videos": 0, "lastfm.listeners": 3_000})
     assert not scoring.youtube_suspect({"lastfm.listeners": 80_000})  # no channel at all isn't "wrong"
+
+
+def test_no_growth_rate_from_a_single_day():
+    one_day = [("2026-10-12T03:00:00+00:00", 7_730), ("2026-10-13T00:30:00+00:00", 7_770)]
+    g = scoring.growth(one_day)
+    assert g["delta"] == 40 and g["monthly_rate"] is None
+    s = scoring.score({"youtube.subscribers": 7_770}, {"youtube.subscribers": one_day})
+    assert s["components"]["momentum"] is None

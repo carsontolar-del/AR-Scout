@@ -31,6 +31,10 @@ class YouTubeIn(BaseModel):
     url: str
 
 
+class InstagramIn(BaseModel):
+    handle: str
+
+
 class DiscoverIn(BaseModel):
     mode: str  # similar | tag | country | new | playlists
     query: str = ""
@@ -41,7 +45,8 @@ class DiscoverIn(BaseModel):
 
 @app.get("/")
 def index():
-    return FileResponse(STATIC / "index.html")
+    # no-cache: browsers revalidate, so an updated dashboard shows up on the next load
+    return FileResponse(STATIC / "index.html", headers={"Cache-Control": "no-cache"})
 
 
 @app.get("/api/status")
@@ -77,6 +82,14 @@ def artist(name: str, refresh: bool = True):
 def set_youtube(artist_id: int, body: YouTubeIn):
     try:
         return service.set_youtube_channel(artist_id, body.url)
+    except SourceError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@app.post("/api/artist/{artist_id}/instagram")
+def set_instagram(artist_id: int, body: InstagramIn):
+    try:
+        return service.set_instagram_account(artist_id, body.handle)
     except SourceError as exc:
         raise HTTPException(400, str(exc)) from exc
 

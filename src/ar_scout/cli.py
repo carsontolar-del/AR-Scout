@@ -51,7 +51,7 @@ def _table(rows: list[dict], title: str) -> None:
                   _pct(growth), r["latest_release"] or "-", (r["label"] or "-")[:24], r["status"] or "")
     console.print(t)
     if any(r["confidence"] < 0.6 for r in rows):
-        console.print("[dim]* low confidence: under 60% of the model had data (usually no growth history yet)[/]")
+        console.print("[dim]* low confidence: under 60% of the model had data (usually under a week of growth history)[/]")
 
 
 def _progress(name: str) -> None:
@@ -100,7 +100,7 @@ def report(name: str, as_json: bool = typer.Option(False, "--json")):
 @app.command()
 def top(limit: int = 25, watchlist: bool = False, window: int = 30,
         max_audience: Optional[int] = None, genre: Optional[str] = None,
-        platform: str = typer.Option("any", help="Apply --max-audience to: any | youtube | lastfm | deezer")):
+        platform: str = typer.Option("any", help="Apply --max-audience to: any | youtube | lastfm | deezer | instagram")):
     """Leaderboard of tracked artists by breakout score."""
     _table(service.leaderboard(limit, watchlist, window, max_audience, genre, platform), "Breakout leaderboard")
 
@@ -133,6 +133,26 @@ def recheck_youtube():
         console.print(f"[yellow]No better channel found for: {', '.join(res['unchanged'])}[/]")
     for e in res["errors"]:
         console.print(f"[red]{e}[/]")
+
+
+@app.command("set-instagram")
+def set_instagram(name: str, handle: str):
+    """Set an artist's Instagram account by hand (instagram.com/name, @name or name)."""
+    a = service.resolve(name, deep=True)
+    res = service.set_instagram_account(a["id"], handle)
+    followers = f"{_n(res['followers'])} followers" if res["followers"] is not None else "saved; counts need Instagram set up"
+    console.print(f"{res['artist']} -> @{res['username']} ({followers})")
+
+
+@app.command("instagram-test")
+def instagram_test(handle: str = typer.Argument("instagram", help="Any public professional account")):
+    """Check the Instagram Business Discovery setup by looking up one account."""
+    from .sources import instagram
+    if not instagram.available():
+        console.print("[red]Set INSTAGRAM_ACCESS_TOKEN and INSTAGRAM_BUSINESS_ID in .env (see .env.example)[/]")
+        raise typer.Exit(1)
+    p = instagram.profile(instagram.username_from_url(handle) or handle)
+    console.print(f"[green]Working:[/] @{p['username']} has {_n(p['followers'])} followers, {p['media_count']} posts")
 
 
 @app.command("set-youtube")
