@@ -14,7 +14,7 @@ WEIGHTS = {
     "engagement": 0.20,   # depth of fandom: plays per listener, views per subscriber
     "headroom": 0.20,     # sweet spot: real traction but not already big
     "activity": 0.10,     # recent and frequent releases
-    "signability": 0.10,  # DIY/distributor releases suggest unsigned
+    "signability": 0.10,  # self-released or DIY: likely unsigned; a major: already taken
 }
 
 # Metric -> weight inside the momentum component.
@@ -27,6 +27,13 @@ MOMENTUM_METRICS = {
     "instagram.followers": 1.0,
     "spotify.followers": 1.0,
     "wikipedia.pageviews_30d": 0.3,
+}
+
+SIGNABILITY = {"self": 1.0, "diy": 1.0, "indie": 0.4, "major": 0.0}
+LABEL_FLAGS = {
+    "diy": "latest release via DIY distributor (likely unsigned)",
+    "self": "self-released (likely unsigned)",
+    "major": "on a major label or imprint",
 }
 
 GROWTH_FOR_FULL_SCORE = 0.30  # +30% per month = momentum 1.0
@@ -146,7 +153,7 @@ def activity_score(latest_release: str | None, releases_last_year: int | None) -
 
 def score(metrics: dict[str, float], history: dict[str, list[tuple[str, float]]],
           latest_release: str | None = None, releases_last_year: int | None = None,
-          diy_label: bool | None = None, window_days: int = 30) -> dict:
+          label_class: str | None = None, window_days: int = 30) -> dict:
     components: dict[str, float | None] = {}
     flags: list[str] = []
     growth_detail: dict[str, dict] = {}
@@ -187,12 +194,10 @@ def score(metrics: dict[str, float], history: dict[str, list[tuple[str, float]]]
 
     components["activity"] = activity_score(latest_release, releases_last_year)
 
-    if diy_label is None:
-        components["signability"] = None
-    else:
-        components["signability"] = 1.0 if diy_label else 0.2
-        if diy_label:
-            flags.append("latest release via DIY distributor (likely unsigned)")
+    # label_class from labels.classify: who controls the latest release.
+    components["signability"] = SIGNABILITY.get(label_class) if label_class else None
+    if label_class in LABEL_FLAGS:
+        flags.append(LABEL_FLAGS[label_class])
 
     usable = {k: v for k, v in components.items() if v is not None}
     w_sum = sum(WEIGHTS[k] for k in usable)

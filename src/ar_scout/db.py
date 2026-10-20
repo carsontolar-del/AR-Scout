@@ -5,9 +5,11 @@ from __future__ import annotations
 import json
 import sqlite3
 from contextlib import contextmanager
+from pathlib import Path
 from datetime import datetime, timezone
 from typing import Any, Iterator
 
+from . import tags
 from .config import settings
 
 SCHEMA = """
@@ -32,6 +34,8 @@ CREATE TABLE IF NOT EXISTS artists (
     youtube_source  TEXT,           -- musicbrainz | search | manual
     instagram_username TEXT,
     instagram_source   TEXT,        -- musicbrainz | manual
+    youtube_title   TEXT,           -- channel name, to spot a channel that belongs to someone else
+    verified_at     TEXT,           -- when a person confirmed this artist's linked accounts are right
     created_at      TEXT NOT NULL,
     updated_at      TEXT NOT NULL
 );
@@ -86,7 +90,7 @@ def _migrate(conn: sqlite3.Connection) -> None:
     cols = {r["name"] for r in conn.execute("PRAGMA table_info(artists)")}
     if "resolved_at" not in cols:
         conn.execute("ALTER TABLE artists ADD COLUMN resolved_at TEXT")
-    for col in ("youtube_source", "instagram_username", "instagram_source"):
+    for col in ("youtube_source", "instagram_username", "instagram_source", "youtube_title", "verified_at"):
         if col not in cols:
             conn.execute(f"ALTER TABLE artists ADD COLUMN {col} TEXT")
 
@@ -119,6 +123,8 @@ def find_by_deezer(deezer_id: int) -> dict | None:
 
 
 def upsert_artist(fields: dict[str, Any], artist_id: int | None = None) -> int:
+    if fields.get("genres") is not None:
+        fields = {**fields, "genres": tags.clean(fields["genres"])}
     fields = {k: (json.dumps(v) if k in JSON_FIELDS else v) for k, v in fields.items() if v is not None}
     fields["updated_at"] = now()
     with connect() as c:
@@ -150,6 +156,12 @@ def history(artist_id: int, metric: str | None = None) -> list[dict]:
         return [dict(r) for r in c.execute(q + " ORDER BY taken_at", args)]
 
 
+def set_verified(artist_id: int, when: str | None) -> None:
+    """upsert_artist skips None, so clearing needs its own statement."""
+    with connect() as c:
+        c.execute("UPDATE artists SET verified_at = ?, updated_at = ? WHERE id = ?", (when, now(), artist_id))
+
+
 def delete_metrics(artist_id: int, prefix: str) -> None:
     """Drop an artist's snapshots for metrics starting with `prefix` (e.g. 'youtube.' after a channel change)."""
     with connect() as c:
@@ -164,6 +176,21 @@ def latest_metrics(artist_id: int) -> dict[str, float]:
             "(SELECT max(taken_at) FROM snapshots WHERE artist_id = s.artist_id AND metric = s.metric)",
             (artist_id,)).fetchall()
     return {r["metric"]: r["value"] for r in rows}
+
+
+def backup(dest: Path) -> None:
+    """Consistent copy of the database to `dest`, safe while the dashboard or a snapshot run is using it."""
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    tmp = dest.with_suffix(".partial")
+    src = sqlite3.connect(settings.db_path)
+    try:
+        out = sqlite3.connect(tmp)
+        with out:
+            src.backup(out)
+        out.close()
+    finally:
+        src.close()
+    tmp.replace(dest)
 
 
 def snapshot_summary() -> dict[int, dict]:

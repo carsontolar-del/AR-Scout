@@ -23,6 +23,7 @@ class Settings:
     instagram_graph_version: str | None
     contact_email: str
     db_path: Path
+    backup_dir: Path
 
     @property
     def user_agent(self) -> str:
@@ -57,6 +58,7 @@ def load_settings() -> Settings:
         instagram_graph_version=_env("INSTAGRAM_GRAPH_VERSION"),
         contact_email=_env("CONTACT_EMAIL") or "",
         db_path=Path(db) if db else PROJECT_ROOT / "data" / "ar_scout.db",
+        backup_dir=Path(_env("AR_SCOUT_BACKUP_DIR") or PROJECT_ROOT / "data" / "backups").expanduser(),
     )
 
 

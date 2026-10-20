@@ -31,11 +31,11 @@ def test_fast_growing_unsigned_beats_flat_signed():
     hot = scoring.score(
         {"deezer.fans": 4_000, "lastfm.listeners": 20_000, "lastfm.playcount": 800_000},
         {"deezer.fans": _series(2_500, 4_000), "lastfm.listeners": _series(12_000, 20_000)},
-        latest_release=recent, releases_last_year=6, diy_label=True)
+        latest_release=recent, releases_last_year=6, label_class="diy")
     flat = scoring.score(
         {"deezer.fans": 4_000, "lastfm.listeners": 20_000, "lastfm.playcount": 120_000},
         {"deezer.fans": _series(4_000, 4_020), "lastfm.listeners": _series(20_000, 20_050)},
-        latest_release="2024-01-01", releases_last_year=0, diy_label=False)
+        latest_release="2024-01-01", releases_last_year=0, label_class="indie")
     assert hot["score"] > 80 > 40 > flat["score"]
     assert hot["confidence"] == 1.0
     assert any("unsigned" in f for f in hot["flags"])
@@ -49,7 +49,7 @@ def test_missing_components_renormalise():
 
 def test_famous_artist_is_capped_despite_strong_engagement():
     recent = (date.today() - timedelta(days=10)).isoformat()
-    common = dict(history={}, latest_release=recent, releases_last_year=8, diy_label=False)
+    common = dict(history={}, latest_release=recent, releases_last_year=8, label_class="indie")
     star = scoring.score({"lastfm.listeners": 3_000_000, "lastfm.playcount": 150_000_000}, **common)
     rising = scoring.score({"lastfm.listeners": 40_000, "lastfm.playcount": 600_000}, **common)
     assert star["components"]["headroom"] == 0.0

@@ -24,12 +24,18 @@ free music data APIs and a local SQLite history in `data/ar_scout.db`.
 momentum 40% · engagement 20% · headroom 20% · activity 10% · signability 10% (see `src/ar_scout/scoring.py`).
 The total is then multiplied by `0.3 + 0.7 × headroom`, so an act that's already big (on any platform, or with
 heavy Wikipedia traffic) is capped low. Free sources undercount mainstream US acts, so missing YouTube data can hide size.
-`confidence` = share of weights that had data. Momentum needs snapshots on different days, so newly found
-artists show lower confidence until `refresh_snapshots` / the daily job has run a few times.
+`confidence` = share of weights that had data. Momentum needs 7+ days of snapshots, so newly found
+artists show lower confidence until the daily job has run for a week.
+Signability comes from the label type (`src/ar_scout/labels.py`): self-released or DIY 1.0, independent 0.4,
+major or major imprint 0.0.
 
 ## How to work
 - Lead with the numbers and the flags, then the score. Never present the score alone.
-- Treat a DIY distributor label (DistroKid, TuneCore, Amuse, UnitedMasters…) as "likely unsigned", not as proof.
+- Treat a DIY distributor label (DistroKid, TuneCore, Amuse, UnitedMasters…) or a self-released label as
+  "likely unsigned", not as proof.
+- Before presenting an artist, check `review` in their row: it lists signs a linked account belongs to someone
+  else (YouTube far too big/small, Last.fm too small, channel named for someone else, an overnight jump). Say so
+  plainly, and don't build a pitch on numbers from a flagged account. `review_queue` lists them all.
 - For discovery requests, combine methods: `discover_similar` from reference artists, `discover_by_tag` for the
   scene, `discover_playlists` for curator support, then `leaderboard` filtered by `max_audience`.
 - When you shortlist someone, offer to `watchlist_add` them with tags so they're tracked daily.
@@ -40,5 +46,7 @@ artists show lower confidence until `refresh_snapshots` / the daily job has run 
 ## Dev
 - `uv sync` installs; `uv run pytest` runs the tests; `uv run ar-scout --help` lists the CLI commands;
   `uv run ar-scout serve` starts the dashboard at http://127.0.0.1:8787.
+- The daily job (`ar-scout snapshot all`) skips artists snapshotted in the last 6h, retries network failures once,
+  then backs up the database to `data/backups/` (or `AR_SCOUT_BACKUP_DIR`), keeping 14 days.
 - Code layout: `sources/` (one module per API) → `service.py` (resolve/snapshot/score/discover) →
   `mcp_server.py`, `cli.py`, `web/app.py` (thin front-ends over service).

@@ -134,6 +134,22 @@ def set_instagram_account(name: str, handle: str) -> dict:
 
 
 @mcp.tool()
+def review_queue() -> list[dict]:
+    """Artists whose linked accounts look wrong (YouTube too small or far too big, Last.fm too small, a channel
+    named for someone else, a number that jumped overnight) and that nobody has verified yet. Fix links with
+    set_youtube_channel / set_instagram_account, then mark_verified."""
+    return [{"name": r["name"], "issues": r["review"], "status": r["status"], "score": r["score"]}
+            for r in service.review_queue()]
+
+
+@mcp.tool()
+def mark_verified(name: str, verified: bool = True) -> dict:
+    """Record that this artist's linked accounts were checked by a person (verified=False undoes it)."""
+    a = service.resolve(name, deep=False)
+    return service.set_verified(a["id"], verified)
+
+
+@mcp.tool()
 def metric_history(name: str, metric: str | None = None) -> list[dict]:
     """Raw time series for an artist (e.g. metric='deezer.fans', 'lastfm.listeners', 'youtube.subscribers')."""
     a = db.find_artist(name)
@@ -182,7 +198,7 @@ def add_note(name: str, note: str) -> str:
 
 @mcp.tool()
 def refresh_snapshots(scope: str = "watchlist") -> dict:
-    """Take new metric snapshots. scope='watchlist' or 'all'. Skips artists refreshed in the last 20h."""
+    """Take new metric snapshots. scope='watchlist' or 'all'. Skips artists refreshed in the last 6h."""
     return service.snapshot_many(scope)
 
 

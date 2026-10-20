@@ -29,6 +29,10 @@ class SourceError(RuntimeError):
     pass
 
 
+class TransientSourceError(SourceError):
+    """The network or the service hiccupped (no connection, timeout, 5xx/429 after retries): worth retrying later."""
+
+
 def client() -> httpx.Client:
     global _client
     if _client is None:
@@ -68,7 +72,7 @@ def get_json(
             resp = client().send(request)
         except httpx.TransportError as exc:
             if attempt == 3:
-                raise SourceError(f"{request.url.host}: {exc}") from exc
+                raise TransientSourceError(f"{request.url.host}: {exc}") from exc
             time.sleep(1.5 * (attempt + 1))
             continue
         if resp.status_code in (429, 500, 502, 503, 504) and attempt < 3:
@@ -77,9 +81,10 @@ def get_json(
         if resp.status_code == 404:
             return None
         if resp.status_code >= 400:
-            raise SourceError(f"{request.url.host} HTTP {resp.status_code}: {resp.text[:200]}")
+            kind = TransientSourceError if resp.status_code in (429, 500, 502, 503, 504) else SourceError
+            raise kind(f"{request.url.host} HTTP {resp.status_code}: {resp.text[:200]}")
         data = resp.json()
         if cache:
             _cache[key] = (time.time(), data)
         return data
-    raise SourceError(f"{request.url.host}: retries exhausted")
+    raise TransientSourceError(f"{request.url.host}: retries exhausted")

@@ -35,6 +35,10 @@ class InstagramIn(BaseModel):
     handle: str
 
 
+class VerifyIn(BaseModel):
+    verified: bool = True
+
+
 class DiscoverIn(BaseModel):
     mode: str  # similar | tag | country | new | playlists
     query: str = ""
@@ -92,6 +96,19 @@ def set_instagram(artist_id: int, body: InstagramIn):
         return service.set_instagram_account(artist_id, body.handle)
     except SourceError as exc:
         raise HTTPException(400, str(exc)) from exc
+
+
+@app.get("/api/review")
+def review():
+    return service.review_queue()
+
+
+@app.post("/api/artist/{artist_id}/verify")
+def verify(artist_id: int, body: VerifyIn):
+    try:
+        return service.set_verified(artist_id, body.verified)
+    except SourceError as exc:
+        raise HTTPException(404, str(exc)) from exc
 
 
 @app.post("/api/watch")

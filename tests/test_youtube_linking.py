@@ -63,3 +63,7 @@ def test_recheck_switches_suspect_channels_but_not_manual_ones(tmp_db, fake_yout
     assert [c["name"] for c in res["changed"]] == ["Of The Trees"]
     assert db.get_artist(auto)["youtube_channel"] == RIGHT
     assert db.get_artist(manual)["youtube_channel"] == WRONG
+
+
+def test_ampersand_matches_and():
+    assert youtube.title_matches("Penny and Sparrow", "Penny & Sparrow")

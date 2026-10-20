@@ -106,12 +106,23 @@ def top(limit: int = 25, watchlist: bool = False, window: int = 30,
 
 
 @app.command()
-def snapshot(scope: str = typer.Argument("watchlist", help="watchlist | all"), stale_hours: float = 20):
+def snapshot(scope: str = typer.Argument("watchlist", help="watchlist | all"), stale_hours: float = service.STALE_HOURS):
     """Take metric snapshots (run daily via cron/launchd to build growth history)."""
     res = service.snapshot_many(scope, stale_hours, progress=_progress)
-    console.print(f"Snapshotted {res['snapshotted']}, skipped {res['skipped_fresh']} fresh.")
+    console.print(f"Snapshotted {res['snapshotted']}, skipped {res['skipped_fresh']} fresh, "
+                  f"retried {res['retried']} after network errors.")
+    if scope == "all":  # the daily job's run: keep a dated copy of the history
+        b = service.backup_database()
+        console.print(f"Backed up to {b['path']} ({b['size_mb']} MB, keeping {b['kept']})")
     for name, errs in res["errors"].items():
         console.print(f"  [red]{name}[/]: {'; '.join(errs)}")
+
+
+@app.command()
+def backup():
+    """Save a dated copy of the database now (the daily snapshot does this automatically)."""
+    b = service.backup_database()
+    console.print(f"Backed up to {b['path']} ({b['size_mb']} MB, keeping {b['kept']})")
 
 
 @app.command()

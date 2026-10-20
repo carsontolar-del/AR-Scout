@@ -48,7 +48,7 @@ def channel_from_url(url: str) -> str | None:
 
 
 def _key(s: str) -> str:
-    return re.sub(r"[\W_]", "", s.casefold())
+    return re.sub(r"[\W_]", "", s.casefold().replace("&", "and"))
 
 
 def title_matches(title: str, artist: str) -> bool:

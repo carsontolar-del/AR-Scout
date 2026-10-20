@@ -161,6 +161,23 @@ tr.row:hover td { background: var(--surface-2); }
   background: var(--surface-2); color: var(--text-2); margin-left: 6px; vertical-align: 1px; }
 .mini.pos { background: var(--good-soft); color: var(--good); }
 .mini.warn { background: var(--warn-soft); color: var(--warn); }
+.mini.ok { background: var(--good-soft); color: var(--good); }
+.mini.lc-self { background: var(--good-soft); color: var(--good); }
+.mini.lc-indie { background: var(--surface-2); color: var(--text-2); }
+.mini.lc-major { background: var(--accent-soft); color: var(--accent-text); }
+.label-cell { display: inline-flex; align-items: center; max-width: 260px; }
+.nav .count.warn-count { color: var(--warn); font-weight: 600; }
+.review-list { display: grid; gap: 10px; }
+.review-item { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 14px; align-items: start; padding: 14px 16px; }
+.review-item .n { font-weight: 600; cursor: pointer; }
+.review-item .n:hover { text-decoration: underline; }
+.review-item ul { margin: 6px 0 0; padding-left: 18px; color: var(--text-2); font-size: 13px; display: grid; gap: 3px; }
+.review-item .acts { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.review-banner { display: grid; gap: 8px; padding: 12px 16px; margin-bottom: 20px; border-radius: 10px; background: var(--warn-soft); color: var(--warn); font-size: 13px; }
+.review-banner.ok { background: var(--good-soft); color: var(--good); }
+.review-banner ul { margin: 0; padding-left: 18px; display: grid; gap: 2px; }
+.review-banner .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; justify-content: space-between; }
+@media (max-width: 760px) { .review-item { grid-template-columns: auto minmax(0, 1fr); } .review-item .acts { grid-column: 1 / -1; justify-content: flex-start; } }
 .who .t { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 3px; }
 .yt-note { font-size: 11.5px; font-style: italic; }
 .star { border: 0; background: none; cursor: pointer; color: var(--border-strong); padding: 4px; border-radius: 6px; line-height: 0; }
@@ -307,6 +324,9 @@ textarea.input { width: 100%; min-height: 72px; resize: vertical; margin-top: 10
       <a href="#/discover" data-nav="discover">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6.5"/><path d="m10.5 5.5-1.6 3.4-3.4 1.6 1.6-3.4z"/></svg>
         Discover</a>
+      <a href="#/review" data-nav="review">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 1.5 14.5 13h-13z"/><path d="M8 6v3.2M8 11.2v.3"/></svg>
+        Needs review <span class="count warn-count" id="cntReview"></span></a>
     </nav>
     <div class="sources">
       <h5>Data sources</h5>
@@ -371,7 +391,6 @@ const api = async (path, opts) => {
 };
 const post = (path, body) => api(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
 const toast = msg => { const t = $("#toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("show"), 2400); };
-const DIY = /distrokid|tunecore|cd ?baby|amuse|routenote|ditto|united ?masters|emubands|awal|soundrop|symphonic|onerpm|spinnup|landr|too lost|vydia|independent|self.released|records dk/i;
 const STATUSES = ["watching", "contacted", "meeting", "passed", "signed"];
 const METRICS = {
   "youtube.views": "YouTube views", "youtube.subscribers": "YouTube subscribers",
@@ -410,6 +429,7 @@ function route() {
   if (page === "artist" && arg) return renderArtist(arg);
   if (page === "watchlist") { lastList = "watchlist"; return renderWatchlist(); }
   if (page === "discover") { lastList = "discover"; return renderDiscover(); }
+  if (page === "review") { lastList = "review"; return renderReview(); }
   lastList = "leaderboard"; return renderLeaderboard();
 }
 let lastList = "leaderboard";
@@ -457,6 +477,8 @@ function dataTable(rows, { empty, showStatus = true, sort = { key: "score", dir:
     const depth = COLS[3].get(r), growth = COLS.find(c => c.key === "growth").get(r), label = r.label || "";
     const minis = FLAG_SHORT.filter(([re]) => r.flags.some(f => re.test(f)))
       .map(([re, t, c]) => el("span", { class: "mini " + c, title: r.flags.find(f => re.test(f)) }, t));
+    if (r.verified) minis.unshift(el("span", { class: "mini ok", title: "Linked accounts checked by a person" }, "✓ Verified"));
+    else if (r.review?.length) minis.unshift(el("span", { class: "mini warn", title: r.review.join("\n") }, "Review"));
     return el("tr", { class: "row", onclick: () => go(r.name) },
       el("td", { class: "rank" }, i + 1),
       el("td", {}, el("div", { class: "who" }, avatar(r.image_url, r.name),
@@ -474,7 +496,7 @@ function dataTable(rows, { empty, showStatus = true, sort = { key: "score", dir:
         title: growth == null ? "A growth rate needs a week of snapshots" : "" }, growth == null ? "–" : pct(growth)),
       el("td", { class: "r num" + (r.snapshot_days < 7 ? " dim" : ""), title: r.last_snapshot ? "Last snapshot " + new Date(r.last_snapshot).toLocaleString() : "" }, r.snapshot_days || "–"),
       el("td", { class: "dim", title: r.latest_release || "" }, ago(r.latest_release)),
-      el("td", {}, label ? el("span", { class: "pill" + (DIY.test(label) ? " diy" : ""), title: label }, label) : el("span", { class: "dim" }, "–")),
+      el("td", {}, label ? labelPill(label, r.label_class) : el("span", { class: "dim" }, "–")),
       showStatus ? el("td", {}, r.status ? el("span", { class: "pill st-" + r.status }, r.status) : "") : null,
       el("td", {}, starBtn(r)));
   }));
@@ -484,6 +506,15 @@ function dataTable(rows, { empty, showStatus = true, sort = { key: "score", dir:
 }
 
 // YouTube: tell "never looked up" apart from "looked up, no channel" and "channel numbers don't add up".
+// Label type decides signability: self-released and DIY look unsigned, a major is already taken.
+const LABEL_CLASS = { self: ["Self-released", "lc-self"], diy: ["DIY", "lc-self"], indie: ["Indie", "lc-indie"], major: ["Major", "lc-major"] };
+function labelPill(label, cls) {
+  const [tag, css] = LABEL_CLASS[cls] || [];
+  return el("span", { class: "label-cell", title: label },
+    tag ? el("span", { class: "mini " + css, style: "margin:0 6px 0 0" }, tag) : null,
+    el("span", { class: "pill" }, label));
+}
+
 function ytCell(r) {
   if (r.youtube_subscribers == null)
     return el("td", { class: "r dim yt-note", title: r.linked ? "Full lookup found no YouTube channel" : "Added by discovery, which skips YouTube. Use Link missing data." },
@@ -521,7 +552,7 @@ async function refreshBtn(scope, after) {
     b.disabled = true; b.lastChild.textContent = "Refreshing…";
     try {
       const r = await api("/api/snapshot?scope=" + scope, { method: "POST" });
-      toast(`Updated ${r.snapshotted ?? 0}` + (r.skipped_fresh ? ` · skipped ${r.skipped_fresh} snapshotted in the last 20h` : ""));
+      toast(`Updated ${r.snapshotted ?? 0}` + (r.skipped_fresh ? ` · skipped ${r.skipped_fresh} snapshotted in the last 6h` : ""));
       after(); loadHealth();
     }
     catch (e) { toast("Refresh failed: " + e.message); }
@@ -636,6 +667,52 @@ const MODES = {
   country: ["Country", "e.g. United Kingdom, Nigeria", "Last.fm country charts, filtered to emerging acts."],
 };
 const disc = { mode: "tag", query: "", min: 300, max: 50000, limit: 20, rows: null, sort: { key: "score", dir: -1 } };
+// ============================================================ needs review
+async function renderReview() {
+  const slot = el("div", {}, loadingCard(4));
+  view.replaceChildren(
+    el("div", { class: "page-head" }, el("div", {}, el("h1", {}, "Needs review"),
+      el("p", {}, "Artists whose linked accounts look wrong. Open each one, check the links against the real artist, fix any that are wrong with Change, then mark it verified."))),
+    slot);
+  let rows;
+  try { rows = await api("/api/review"); } catch (e) { slot.replaceChildren(errorCard(e)); return; }
+  if (!rows.length) {
+    slot.replaceChildren(el("div", { class: "card" }, el("div", { class: "empty" }, el("h4", {}, "Nothing to review"),
+      "Every artist's linked accounts either look right or have been checked.")));
+    return;
+  }
+  slot.replaceChildren(el("div", { class: "review-list" }, rows.map(r => {
+    const btn = el("button", { class: "btn" }, "Mark verified");
+    btn.onclick = async () => {
+      btn.disabled = true;
+      try { await post(`/api/artist/${r.id}/verify`, { verified: true }); toast(`${r.name} verified`); loadCounts(); renderReview(); }
+      catch (e) { toast("Couldn't save: " + e.message); btn.disabled = false; }
+    };
+    return el("div", { class: "card review-item" }, avatar(r.image_url, r.name),
+      el("div", { style: "min-width:0" },
+        el("div", {}, el("span", { class: "n", onclick: () => go(r.name) }, r.name), r.status ? el("span", { class: "pill st-" + r.status, style: "margin-left:8px" }, r.status) : null),
+        el("ul", {}, r.review.map(i => el("li", {}, i)))),
+      el("div", { class: "acts" }, el("button", { class: "btn ghost", onclick: () => go(r.name) }, "Open"), btn));
+  })));
+}
+
+function reviewBanner(a, s) {
+  const toggle = (verified) => async (e) => {
+    e.target.disabled = true;
+    try { await post(`/api/artist/${a.id}/verify`, { verified }); toast(verified ? "Marked verified" : "Verification removed"); loadCounts(); renderArtist(a.name); }
+    catch (err) { toast("Couldn't save: " + err.message); e.target.disabled = false; }
+  };
+  if (a.verified_at) return el("div", { class: "review-banner ok" }, el("div", { class: "row" },
+    el("span", {}, `✓ Linked accounts checked on ${new Date(a.verified_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}.`),
+    el("button", { class: "btn ghost", onclick: toggle(false) }, "Undo")));
+  if (!s.review?.length) return null;
+  return el("div", { class: "review-banner" },
+    el("div", { class: "row" }, el("b", {}, "Check this artist's linked accounts"),
+      el("button", { class: "btn", onclick: toggle(true) }, "Mark verified")),
+    el("ul", {}, s.review.map(i => el("li", {}, i))),
+    el("span", {}, "Compare the links above with the artist's real profiles. Fix a wrong YouTube or Instagram account with Change on its tile below."));
+}
+
 function renderDiscover() {
   const mode = el("select", { class: "input" }, Object.entries(MODES).map(([k, [t]]) => el("option", { value: k, selected: k === disc.mode }, t)));
   const q = el("input", { class: "input", placeholder: MODES[disc.mode][1], value: disc.query });
@@ -858,7 +935,7 @@ async function renderArtist(name) {
   const releases = el("div", { class: "card card-pad" },
     el("h3", {}, "Releases", el("span", { class: "aside" }, `${rel.releases_last_year ?? 0} in the last 12 months`)),
     rel.latest_label ? el("div", { style: "margin-bottom:8px;font-size:13px;color:var(--text-2)" }, "Latest label ",
-      el("span", { class: "pill" + (DIY.test(rel.latest_label) ? " diy" : "") }, rel.latest_label)) : null,
+      labelPill(rel.latest_label, a.label_class)) : null,
     (rel.recent || []).length ? (rel.recent || []).map(x => el("div", { class: "rel" },
       el("span", { class: "t", title: x.title }, x.title), el("span", { class: "ty" }, x.type), el("span", { class: "dt" }, x.date)))
       : el("div", { class: "dim" }, "No releases found on Deezer."));
@@ -875,7 +952,7 @@ async function renderArtist(name) {
       await post("/api/note", { name: a.name, body: noteBox.value.trim() }); toast("Note saved"); renderArtist(a.name);
     } }, "Save note")));
 
-  view.replaceChildren(back, hero,
+  view.replaceChildren(back, hero, reviewBanner(a, s) || "",
     el("div", { class: "layout" },
       el("div", { class: "stack" }, kpis,
         el("div", {}, el("div", { class: "page-head", style: "margin:8px 0 10px" },
@@ -896,6 +973,7 @@ async function loadHealth() {
       row("Last snapshot", h.last_snapshot ? ago(h.last_snapshot) === "today" ? new Date(h.last_snapshot).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : ago(h.last_snapshot) : "never", !h.last_snapshot),
       row("Daily job", h.daily_job ? "on · 09:00" : "off", !h.daily_job),
       row("With growth data", `${h.with_growth} / ${h.artists}`),
+      row("Last backup", !h.last_backup ? "none yet" : h.last_backup === new Date().toLocaleDateString("en-CA") ? "today" : ago(h.last_backup + "T12:00:00"), !h.last_backup),
       h.unlinked ? row("Not linked", h.unlinked, true) : null].filter(Boolean));
     $("#health").title = h.daily_job ? "" : "Run scripts/install-daily-snapshot.sh to snapshot every day";
   } catch {}
@@ -904,6 +982,7 @@ async function loadCounts() {
   try {
     const [all, watch] = await Promise.all([api("/api/leaderboard?limit=10000"), api("/api/leaderboard?watchlist=true&limit=10000")]);
     $("#cntAll").textContent = all.length || ""; $("#cntWatch").textContent = watch.length || "";
+    $("#cntReview").textContent = all.filter(r => r.review?.length && !r.verified).length || "";
   } catch {}
 }
 api("/api/status").then(st => {

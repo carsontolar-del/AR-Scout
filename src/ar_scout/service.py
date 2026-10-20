@@ -3,21 +3,31 @@
 from __future__ import annotations
 
 import json
+import time
 from collections import Counter
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Callable
 
-from . import db, scoring
+from . import db, labels, scoring
 from .config import settings
-from .http import SourceError
+from .http import SourceError, TransientSourceError
 from .sources import deezer, instagram, lastfm, musicbrainz, spotify, wikipedia, youtube
 
 SNAPSHOT_FRESH_HOURS = 12
+# A bulk run skips artists snapshotted this recently. Short enough that an evening refresh can't block the next
+# morning's daily run (it was 20h, and a 6 PM refresh made the 09:00 run skip everyone), long enough to avoid
+# re-pulling the same numbers twice in an afternoon.
+STALE_HOURS = 6
 # Written by scripts/install-daily-snapshot.sh
 DAILY_JOB_PLIST = Path.home() / "Library/LaunchAgents/com.ar-scout.snapshot.plist"
 AUDIENCE_METRICS = {"deezer": "deezer.fans", "lastfm": "lastfm.listeners", "youtube": "youtube.subscribers",
                     "instagram": "instagram.followers"}
+
+
+class _Errors(list):
+    """Error messages from one operation; `transient` is set when any came from a network hiccup."""
+    transient = False
 
 
 def _try(errors: list[str], label: str, fn: Callable[[], Any]) -> Any:
@@ -25,6 +35,8 @@ def _try(errors: list[str], label: str, fn: Callable[[], Any]) -> Any:
         return fn()
     except SourceError as exc:
         errors.append(f"{label}: {exc}")
+        if isinstance(exc, TransientSourceError) and isinstance(errors, _Errors):
+            errors.transient = True
     except Exception as exc:  # keep one flaky source from sinking the whole run
         errors.append(f"{label}: {type(exc).__name__}: {exc}")
     return None
@@ -253,7 +265,7 @@ def resolve(name: str, deep: bool = True) -> dict:
 def snapshot(artist_id: int) -> dict:
     """Pull current metrics from every linked source and store a timestamped snapshot."""
     a = db.get_artist(artist_id)
-    errors: list[str] = []
+    errors = _Errors()
     m: dict[str, float | None] = {}
     rel: dict = {}
 
@@ -279,6 +291,8 @@ def snapshot(artist_id: int) -> dict:
         if yt:
             m["youtube.subscribers"], m["youtube.views"], m["youtube.videos"] = (
                 yt["subscribers"], yt["views"], yt["videos"])
+            if yt.get("title") and yt["title"] != a.get("youtube_title"):
+                db.upsert_artist({"youtube_title": yt["title"]}, artist_id)
 
     if instagram.available() and (ig_user := _instagram_username(a)):
         ig = _try(errors, "instagram", lambda: instagram.profile(ig_user))
@@ -296,7 +310,7 @@ def snapshot(artist_id: int) -> dict:
 
     db.add_snapshot(artist_id, m)
     return {"artist_id": artist_id, "metrics": {k: v for k, v in m.items() if v is not None},
-            "releases": rel, "errors": errors}
+            "releases": rel, "errors": list(errors), "transient": errors.transient}
 
 
 def relink_all(progress: Callable[[str], None] | None = None) -> dict:
@@ -324,6 +338,25 @@ def _span_days(cov: dict) -> float:
     return (datetime.fromisoformat(cov["last"]) - datetime.fromisoformat(cov["first"])).total_seconds() / 86400
 
 
+BACKUPS_KEPT = 14
+
+
+def backup_database(keep: int = BACKUPS_KEPT) -> dict:
+    """Save today's dated copy of the database (replacing an earlier one from today) and keep the newest `keep`."""
+    folder = settings.backup_dir
+    dest = folder / f"ar_scout-{date.today().isoformat()}.db"
+    db.backup(dest)
+    copies = sorted(folder.glob("ar_scout-????-??-??.db"))
+    for old in copies[:-keep]:
+        old.unlink()
+    return {"path": str(dest), "kept": min(len(copies), keep), "size_mb": round(dest.stat().st_size / 1e6, 1)}
+
+
+def last_backup() -> str | None:
+    copies = sorted(settings.backup_dir.glob("ar_scout-????-??-??.db"))
+    return copies[-1].stem.removeprefix("ar_scout-") if copies else None
+
+
 def data_health() -> dict:
     """How complete the tracked data is: unlinked artists, growth coverage, last snapshot, daily job."""
     coverage = db.snapshot_summary()
@@ -335,6 +368,7 @@ def data_health() -> dict:
         "min_growth_days": scoring.MIN_GROWTH_DAYS,
         "last_snapshot": max((c["last"] for c in coverage.values()), default=None),
         "daily_job": DAILY_JOB_PLIST.exists(),
+        "last_backup": last_backup(),
     }
 
 
@@ -346,11 +380,13 @@ def _last_snapshot_age_hours(artist_id: int) -> float | None:
     return (datetime.now(timezone.utc) - last).total_seconds() / 3600
 
 
-def snapshot_many(scope: str = "watchlist", stale_hours: float = 20,
-                  progress: Callable[[str], None] | None = None) -> dict:
-    """scope: 'watchlist' | 'all'. Skips artists snapshotted within `stale_hours`."""
+def snapshot_many(scope: str = "watchlist", stale_hours: float = STALE_HOURS,
+                  progress: Callable[[str], None] | None = None, retry_wait: float = 30) -> dict:
+    """scope: 'watchlist' | 'all'. Skips artists snapshotted within `stale_hours`. Artists whose lookup hit a
+    network hiccup are tried once more at the end, after `retry_wait` seconds, so a brief Wi-Fi drop doesn't
+    leave a gap in that day's numbers."""
     artists = db.all_artists(watchlist_only=(scope == "watchlist"))
-    done, skipped, errors = 0, 0, {}
+    done, skipped, errors, again = 0, 0, {}, []
     for a in artists:
         age = _last_snapshot_age_hours(a["id"])
         if age is not None and age < stale_hours:
@@ -362,7 +398,19 @@ def snapshot_many(scope: str = "watchlist", stale_hours: float = 20,
         done += 1
         if res["errors"]:
             errors[a["name"]] = res["errors"]
-    return {"snapshotted": done, "skipped_fresh": skipped, "errors": errors}
+        if res["transient"]:
+            again.append(a)
+    if again:
+        time.sleep(retry_wait)
+        for a in again:
+            if progress:
+                progress(f"{a['name']} (retry)")
+            res = snapshot(a["id"])
+            if res["errors"]:
+                errors[a["name"]] = res["errors"]
+            else:
+                errors.pop(a["name"], None)
+    return {"snapshotted": done, "skipped_fresh": skipped, "retried": len(again), "errors": errors}
 
 
 # --------------------------------------------------------------------------- scoring / reports
@@ -374,16 +422,67 @@ def _history_by_metric(artist_id: int) -> dict[str, list[tuple[str, float]]]:
     return out
 
 
+# Review checks: signs that a linked account belongs to someone else. Tuned on the Oct 2026 data, where they
+# flagged 6 of 134 artists, every one a real mismatch.
+YT_PER_DEEZER_MAX = 100        # median act has ~6 YouTube subscribers per Deezer fan; 100+ means a different channel
+LASTFM_PER_DEEZER_MIN = 3      # median ~59 Last.fm listeners per Deezer fan; under 3 means a different Last.fm artist
+JUMP_FACTOR = 3                # one number tripling (or dropping to a third) between snapshots is an account change
+_JUMP_METRICS = {"deezer.fans": "Deezer fans", "lastfm.listeners": "Last.fm listeners",
+                 "youtube.subscribers": "YouTube subscribers", "instagram.followers": "Instagram followers"}
+
+
+def review_issues(artist: dict, metrics: dict, history: dict[str, list[tuple[str, float]]]) -> list[str]:
+    """Plain-language reasons this artist's linked accounts may be wrong. Jumps from before the artist was
+    marked verified are left out; the other checks always run, since verifying says they were looked at."""
+    issues = []
+    dz, lf, yt = metrics.get("deezer.fans"), metrics.get("lastfm.listeners"), metrics.get("youtube.subscribers")
+    if scoring.youtube_suspect(metrics):
+        issues.append("YouTube channel looks too small for this act (or has no videos)")
+    if dz and yt and yt > 20_000 and yt / dz > YT_PER_DEEZER_MAX:
+        issues.append(f"YouTube channel looks far too big for this act: {yt:,.0f} subscribers vs {dz:,.0f} Deezer fans")
+    if dz and lf and dz >= 500 and lf < LASTFM_PER_DEEZER_MIN * dz:
+        issues.append(f"Last.fm looks too small for this act ({lf:,.0f} listeners vs {dz:,.0f} Deezer fans): "
+                      "it may be a different artist with the same name")
+    title = artist.get("youtube_title")
+    if title and artist.get("youtube_source") != "manual" and not youtube.title_matches(title, artist["name"]):
+        issues.append(f"YouTube channel is called “{title}”, which doesn't match the artist's name")
+    since = (artist.get("verified_at") or "")[:10]
+    for metric, label in _JUMP_METRICS.items():
+        pts = history.get(metric, [])
+        for (_, before), (when, after) in zip(pts, pts[1:]):
+            if before > 0 and when[:10] > since and (after / before > JUMP_FACTOR or after / before < 1 / JUMP_FACTOR):
+                issues.append(f"{label} jumped from {before:,.0f} to {after:,.0f} on {when[:10]}: "
+                              "likely an account change, not real growth")
+                break
+    return issues
+
+
 def score_artist(artist: dict, window_days: int = 30) -> dict:
     metrics = db.latest_metrics(artist["id"])
+    history = _history_by_metric(artist["id"])
     label = artist.get("latest_label")
     return scoring.score(
-        metrics, _history_by_metric(artist["id"]),
+        metrics, history,
         latest_release=artist.get("latest_release"),
         releases_last_year=int(metrics["releases_last_year"]) if "releases_last_year" in metrics else None,
-        diy_label=deezer.is_diy_label(label) if label else None,
+        label_class=labels.classify(label, artist.get("name")),
         window_days=window_days,
-    ) | {"metrics": metrics}
+    ) | {"metrics": metrics, "review": review_issues(artist, metrics, history)}
+
+
+def set_verified(artist_id: int, verified: bool = True) -> dict:
+    """Record that a person checked this artist's linked accounts (or undo it)."""
+    if not db.get_artist(artist_id):
+        raise SourceError(f"No artist with id {artist_id}")
+    db.set_verified(artist_id, db.now() if verified else None)
+    return {"artist_id": artist_id, "verified_at": db.get_artist(artist_id).get("verified_at")}
+
+
+def review_queue() -> list[dict]:
+    """Artists whose linked accounts look wrong and that nobody has verified yet, most-watched first."""
+    rows = [r for r in leaderboard(limit=100_000) if r["review"] and not r["verified"]]
+    rows.sort(key=lambda r: (r["status"] is None, -r["score"]))
+    return rows
 
 
 def report(name: str, refresh: bool = True) -> dict:
@@ -397,6 +496,7 @@ def report(name: str, refresh: bool = True) -> dict:
         errors += snap["errors"]
     artist = db.get_artist(artist["id"])
     artist["instagram_username"] = _instagram_username(artist)
+    artist["label_class"] = labels.classify(artist.get("latest_label"), artist["name"])
     rel = snap["releases"] if snap else (_release_info(artist["deezer_id"]) if artist.get("deezer_id") else {})
 
     similar = []
@@ -450,8 +550,10 @@ def leaderboard(limit: int = 25, watchlist_only: bool = False, window_days: int 
             "image_url": a.get("image_url"),
             "monthly_growth": {k: round(g["monthly_rate"], 3) for k, g in s["growth"].items() if g["monthly_rate"] is not None},
             "latest_release": a.get("latest_release"), "label": a.get("latest_label"),
+            "label_class": labels.classify(a.get("latest_label"), a.get("name")),
             "flags": s["flags"], "discovered_via": a.get("discovered_via"),
             "tags": json.loads(a.get("watch_tags") or "[]"),
+            "review": s["review"], "verified": bool(a.get("verified_at")), "verified_at": a.get("verified_at"),
             "linked": bool(a.get("resolved_at")), "youtube_linked": bool(a.get("youtube_channel")),
             "snapshot_days": cov.get("days", 0), "last_snapshot": cov.get("last"),
         })
