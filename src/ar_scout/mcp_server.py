@@ -150,6 +150,22 @@ def mark_verified(name: str, verified: bool = True) -> dict:
 
 
 @mcp.tool()
+def record_manual_metric(name: str, metric: str, value: int) -> dict:
+    """Save a number read off a public profile as today's snapshot. metric: tiktok.followers, tiktok.likes,
+    spotify.monthly_listeners, or instagram.followers (only while the Instagram API isn't set up)."""
+    a = service.resolve(name, deep=False)
+    return service.record_manual(a["id"], metric, value)
+
+
+@mcp.tool()
+def set_management(name: str, status: str | None) -> dict:
+    """Record whether an artist already has a manager: 'managed', 'unmanaged', or null to go back to what their
+    Instagram bio says. Each leaderboard row's `management` shows the result and where it came from."""
+    a = service.resolve(name, deep=False)
+    return service.set_management(a["id"], status)
+
+
+@mcp.tool()
 def metric_history(name: str, metric: str | None = None) -> list[dict]:
     """Raw time series for an artist (e.g. metric='deezer.fans', 'lastfm.listeners', 'youtube.subscribers')."""
     a = db.find_artist(name)

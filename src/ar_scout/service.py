@@ -9,7 +9,7 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Callable
 
-from . import db, labels, scoring
+from . import db, labels, management, scoring
 from .config import settings
 from .http import SourceError, TransientSourceError
 from .sources import deezer, instagram, lastfm, musicbrainz, spotify, wikipedia, youtube
@@ -22,7 +22,16 @@ STALE_HOURS = 6
 # Written by scripts/install-daily-snapshot.sh
 DAILY_JOB_PLIST = Path.home() / "Library/LaunchAgents/com.ar-scout.snapshot.plist"
 AUDIENCE_METRICS = {"deezer": "deezer.fans", "lastfm": "lastfm.listeners", "youtube": "youtube.subscribers",
-                    "instagram": "instagram.followers"}
+                    "instagram": "instagram.followers", "tiktok": "tiktok.followers",
+                    "spotify": "spotify.monthly_listeners"}
+
+# Numbers with no free API, typed in from the public profile. Instagram is manual only until the API is set up.
+MANUAL_METRICS = {
+    "tiktok.followers": "TikTok followers",
+    "tiktok.likes": "TikTok likes",
+    "spotify.monthly_listeners": "Spotify monthly listeners",
+    "instagram.followers": "Instagram followers",
+}
 
 
 class _Errors(list):
@@ -127,6 +136,21 @@ def _switch_youtube(artist: dict, channel: str, source: str) -> None:
 def _instagram_username(artist: dict) -> str | None:
     """Stored username, else the MusicBrainz link (artists resolved before Instagram support only have that)."""
     return artist.get("instagram_username") or instagram.username_from_url((artist.get("links") or {}).get("instagram", ""))
+
+
+def record_manual(artist_id: int, metric: str, value: float) -> dict:
+    """Save a number read off a public profile (TikTok followers, Spotify monthly listeners...) as a dated snapshot,
+    so it builds a trend like any other platform."""
+    if metric not in MANUAL_METRICS:
+        raise ValueError(f"metric must be one of: {', '.join(MANUAL_METRICS)}")
+    if metric == "instagram.followers" and instagram.available():
+        raise ValueError("Instagram followers come from the Instagram API; fix the account with Change instead")
+    if value is None or value < 0 or value > 2_000_000_000:
+        raise ValueError("Enter a whole number of people, e.g. 12500")
+    if not db.get_artist(artist_id):
+        raise SourceError(f"No artist with id {artist_id}")
+    db.add_snapshot(artist_id, {metric: int(round(value))})
+    return {"artist_id": artist_id, "metric": metric, "label": MANUAL_METRICS[metric], "value": int(round(value))}
 
 
 def set_instagram_account(artist_id: int, handle: str) -> dict:
@@ -298,6 +322,10 @@ def snapshot(artist_id: int) -> dict:
         ig = _try(errors, "instagram", lambda: instagram.profile(ig_user))
         if ig:
             m["instagram.followers"], m["instagram.media_count"] = ig["followers"], ig["media_count"]
+            found = management.from_bio(ig.get("biography"), ig.get("website"))
+            if found:
+                db.upsert_artist({"instagram_bio": ig.get("biography"), "mgmt_auto": found["status"],
+                                  "mgmt_evidence": found["evidence"] or ""}, artist_id)
 
     if a.get("wiki_title"):
         m["wikipedia.pageviews_30d"] = _try(errors, "wikipedia", lambda: wikipedia.pageviews(a["wiki_title"]))
@@ -467,7 +495,40 @@ def score_artist(artist: dict, window_days: int = 30) -> dict:
         releases_last_year=int(metrics["releases_last_year"]) if "releases_last_year" in metrics else None,
         label_class=labels.classify(label, artist.get("name")),
         window_days=window_days,
-    ) | {"metrics": metrics, "review": review_issues(artist, metrics, history)}
+    ) | {"metrics": metrics, "review": review_issues(artist, metrics, history),
+         "change_7d": {k: scoring.window_change(history.get(m, []), 7) for k, m in MOVER_METRICS.items()}}
+
+
+CHANGE_WINDOWS = (7, 28)
+MOVER_METRICS = {"youtube": "youtube.subscribers", "lastfm": "lastfm.listeners", "deezer": "deezer.fans",
+                 "instagram": "instagram.followers", "tiktok": "tiktok.followers", "spotify": "spotify.monthly_listeners"}
+
+
+def window_changes(artist_id: int, history: dict | None = None) -> dict:
+    """{metric: {"7": change or None, "28": change or None, "28_from": date the 28-day figure starts}}."""
+    history = history if history is not None else _history_by_metric(artist_id)
+    out = {}
+    for metric, pts in history.items():
+        if not pts:
+            continue
+        out[metric] = {str(d): scoring.window_change(pts, d) for d in CHANGE_WINDOWS}
+        first = datetime.fromisoformat(pts[0][0])
+        out[metric]["28_from"] = (first + timedelta(days=28)).date().isoformat()
+    return out
+
+
+def set_management(artist_id: int, status: str | None) -> dict:
+    """status: 'managed', 'unmanaged', or None to go back to what the Instagram bio says."""
+    if status not in (None, "managed", "unmanaged"):
+        raise ValueError("status must be managed, unmanaged or empty")
+    if not db.get_artist(artist_id):
+        raise SourceError(f"No artist with id {artist_id}")
+    db.set_management(artist_id, status)
+    return management_info(db.get_artist(artist_id))
+
+
+def management_info(a: dict) -> dict:
+    return management.resolve(a.get("management"), a.get("mgmt_auto"), a.get("mgmt_evidence"))
 
 
 def set_verified(artist_id: int, verified: bool = True) -> dict:
@@ -497,6 +558,7 @@ def report(name: str, refresh: bool = True) -> dict:
     artist = db.get_artist(artist["id"])
     artist["instagram_username"] = _instagram_username(artist)
     artist["label_class"] = labels.classify(artist.get("latest_label"), artist["name"])
+    artist["management_info"] = management_info(artist)
     rel = snap["releases"] if snap else (_release_info(artist["deezer_id"]) if artist.get("deezer_id") else {})
 
     similar = []
@@ -512,6 +574,7 @@ def report(name: str, refresh: bool = True) -> dict:
         "watchlist": db.watch_entry(artist["id"]),
         "notes": db.notes(artist["id"]),
         "history_points": len(db.history(artist["id"])),
+        "changes": window_changes(artist["id"]),
         "errors": errors,
     }
 
@@ -554,6 +617,10 @@ def leaderboard(limit: int = 25, watchlist_only: bool = False, window_days: int 
             "flags": s["flags"], "discovered_via": a.get("discovered_via"),
             "tags": json.loads(a.get("watch_tags") or "[]"),
             "review": s["review"], "verified": bool(a.get("verified_at")), "verified_at": a.get("verified_at"),
+            "accelerating": s["acceleration"]["accelerating"],
+            "management": management_info(a),
+            "change_7d": {k: ({"delta": c["delta"], "pct": c["pct"], "start": c["start"]} if c else None)
+                          for k, c in s["change_7d"].items()},
             "linked": bool(a.get("resolved_at")), "youtube_linked": bool(a.get("youtube_channel")),
             "snapshot_days": cov.get("days", 0), "last_snapshot": cov.get("last"),
         })

@@ -166,6 +166,15 @@ def instagram_test(handle: str = typer.Argument("instagram", help="Any public pr
     console.print(f"[green]Working:[/] @{p['username']} has {_n(p['followers'])} followers, {p['media_count']} posts")
 
 
+@app.command()
+def record(name: str, metric: str = typer.Argument(..., help="tiktok.followers | tiktok.likes | spotify.monthly_listeners | instagram.followers"),
+           value: int = typer.Argument(..., help="The number shown on the profile")):
+    """Save a number read off a public profile (no API for it) as today's snapshot."""
+    a = service.resolve(name, deep=False)
+    res = service.record_manual(a["id"], metric, value)
+    console.print(f"{a['name']}: {res['label']} = {res['value']:,}")
+
+
 @app.command("set-youtube")
 def set_youtube(name: str, url: str):
     """Set an artist's YouTube channel by hand (channel URL, @handle URL or UC… ID)."""

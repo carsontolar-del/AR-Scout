@@ -162,9 +162,11 @@ tr.row:hover td { background: var(--surface-2); }
 .mini.pos { background: var(--good-soft); color: var(--good); }
 .mini.warn { background: var(--warn-soft); color: var(--warn); }
 .mini.ok { background: var(--good-soft); color: var(--good); }
+.mini.hot { background: var(--good); color: var(--surface); }
 .mini.lc-self { background: var(--good-soft); color: var(--good); }
 .mini.lc-indie { background: var(--surface-2); color: var(--text-2); }
 .mini.lc-major { background: var(--accent-soft); color: var(--accent-text); }
+.field.check .check-row { display: flex; align-items: center; gap: 6px; height: 34px; font-size: 13px; color: var(--text-2); }
 .label-cell { display: inline-flex; align-items: center; max-width: 260px; }
 .nav .count.warn-count { color: var(--warn); font-weight: 600; }
 .review-list { display: grid; gap: 10px; }
@@ -284,6 +286,7 @@ textarea.input { width: 100%; min-height: 72px; resize: vertical; margin-top: 10
 .tooltip { position: fixed; pointer-events: none; background: var(--surface); border: 1px solid var(--border);
   border-radius: 8px; padding: 7px 10px; font-size: 12px; box-shadow: var(--shadow-lg); display: none; z-index: 50; }
 .tooltip strong { font-size: 14px; display: block; font-variant-numeric: tabular-nums; }
+.tooltip .tip-rel { display: block; margin-top: 4px; color: var(--warn); font-weight: 500; }
 .toast { position: fixed; bottom: 24px; left: 50%; transform: translate(-50%, 20px); opacity: 0; background: var(--text); color: var(--bg);
   padding: 9px 16px; border-radius: 8px; font-size: 13px; font-weight: 500; transition: .2s; z-index: 60; pointer-events: none; }
 .toast.show { opacity: 1; transform: translate(-50%, 0); }
@@ -318,6 +321,9 @@ textarea.input { width: 100%; min-height: 72px; resize: vertical; margin-top: 10
       <a href="#/" data-nav="leaderboard">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 13.5h12M4 11V7M8 11V3M12 11V5.5"/></svg>
         Leaderboard <span class="count" id="cntAll"></span></a>
+      <a href="#/movers" data-nav="movers">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1.5 12 6 7.5l3 3 5.5-6"/><path d="M10.5 4.5h4v4"/></svg>
+        Movers this week</a>
       <a href="#/watchlist" data-nav="watchlist">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1.5 8s2.4-4.5 6.5-4.5S14.5 8 14.5 8s-2.4 4.5-6.5 4.5S1.5 8 1.5 8Z"/><circle cx="8" cy="8" r="2"/></svg>
         Watchlist <span class="count" id="cntWatch"></span></a>
@@ -396,10 +402,12 @@ const METRICS = {
   "youtube.views": "YouTube views", "youtube.subscribers": "YouTube subscribers",
   "lastfm.listeners": "Last.fm listeners", "lastfm.playcount": "Last.fm plays",
   "instagram.followers": "Instagram followers",
+  "spotify.monthly_listeners": "Spotify monthly listeners", "tiktok.followers": "TikTok followers",
   "deezer.fans": "Deezer fans", "wikipedia.pageviews_30d": "Wikipedia views (30d)", "spotify.followers": "Spotify followers",
 };
 // Short labels for score flags shown inline in tables; anything unlisted only appears on the artist page.
 const FLAG_SHORT = [
+  [/^accelerating/, "Accelerating", "hot"],
   [/^deep fandom/, "Deep fandom", "pos"], [/DIY distributor/, "Likely unsigned", "pos"],
   [/^YouTube count looks off/, "Check YT", "warn"], [/^score capped/, "Capped", ""], [/^already established/, "Established", ""],
 ];
@@ -430,6 +438,7 @@ function route() {
   if (page === "watchlist") { lastList = "watchlist"; return renderWatchlist(); }
   if (page === "discover") { lastList = "discover"; return renderDiscover(); }
   if (page === "review") { lastList = "review"; return renderReview(); }
+  if (page === "movers") { lastList = "movers"; return renderMovers(); }
   lastList = "leaderboard"; return renderLeaderboard();
 }
 let lastList = "leaderboard";
@@ -477,6 +486,9 @@ function dataTable(rows, { empty, showStatus = true, sort = { key: "score", dir:
     const depth = COLS[3].get(r), growth = COLS.find(c => c.key === "growth").get(r), label = r.label || "";
     const minis = FLAG_SHORT.filter(([re]) => r.flags.some(f => re.test(f)))
       .map(([re, t, c]) => el("span", { class: "mini " + c, title: r.flags.find(f => re.test(f)) }, t));
+    const ms = r.management?.status;
+    if (ms === "managed" || ms === "listed") minis.push(el("span", { class: "mini", title: r.management.evidence || r.management.label }, "Managed"));
+    else if (ms === "unmanaged" || ms === "not_listed") minis.push(el("span", { class: "mini pos", title: r.management.label + (r.management.source ? ` (${r.management.source})` : "") }, "No mgmt"));
     if (r.verified) minis.unshift(el("span", { class: "mini ok", title: "Linked accounts checked by a person" }, "✓ Verified"));
     else if (r.review?.length) minis.unshift(el("span", { class: "mini warn", title: r.review.join("\n") }, "Review"));
     return el("tr", { class: "row", onclick: () => go(r.name) },
@@ -562,7 +574,21 @@ async function refreshBtn(scope, after) {
 }
 
 // ============================================================ leaderboard
-const lb = { genre: "", max: "", platform: "any", window: "30", sort: { key: "score", dir: -1 } };
+const lb = { genre: "", max: "", platform: "any", mgmt: "", window: "30", sort: { key: "score", dir: -1 } };
+// Management filter shared by the leaderboard and Movers. "Unknown" counts as possibly unmanaged.
+const MGMT_FILTERS = [["", "Any"], ["open", "No manager known"], ["none", "No management (confirmed)"], ["has", "Has management"]];
+const mgmtPass = (r, f) => {
+  const st = r.management?.status;
+  if (f === "open") return st !== "managed" && st !== "listed";
+  if (f === "none") return st === "unmanaged" || st === "not_listed";
+  if (f === "has") return st === "managed" || st === "listed";
+  return true;
+};
+const mgmtSelect = (state, onchange) => {
+  const sel = el("select", { class: "input" }, MGMT_FILTERS.map(([v, t]) => el("option", { value: v, selected: v === state.mgmt }, t)));
+  sel.onchange = () => { state.mgmt = sel.value; onchange(); };
+  return el("label", { class: "field" }, el("span", {}, "Management"), sel);
+};
 async function renderLeaderboard() {
   const tableSlot = el("div", {}, loadingCard());
   const statsSlot = el("div", { class: "stats" });
@@ -586,6 +612,7 @@ async function renderLeaderboard() {
       el("label", { class: "field" }, el("span", {}, "Genre"), genre),
       el("label", { class: "field" }, el("span", {}, "Audience"), max),
       el("label", { class: "field" }, el("span", {}, "Measured on"), plat),
+      mgmtSelect(lb, () => draw && draw()),
       el("div", { class: "field" }, el("span", {}, "Growth window"), win)),
     tableSlot);
 
@@ -610,10 +637,11 @@ async function renderLeaderboard() {
       stat("Top score", top ? Math.round(top.score) : "–", top ? top.name : "—"));
     const ytFilter = lb.max && lb.platform === "youtube";
     bannerSlot.replaceChildren(h.unlinked ? relinkBanner(h.unlinked, ytFilter, load) : "");
-    const draw = () => tableSlot.replaceChildren(dataTable(rows, {
-      empty: ["No artists yet", "Look up an artist above or run a search in Discover."], sort: lb.sort, onSort: s => { lb.sort = s; draw(); } }));
+    draw = () => tableSlot.replaceChildren(dataTable(rows.filter(r => mgmtPass(r, lb.mgmt)), {
+      empty: ["No artists match", "Loosen the filters above, or look up an artist with the search bar."], sort: lb.sort, onSort: s => { lb.sort = s; draw(); } }));
     draw();
   }
+  let draw = null;
   load();
 }
 function relinkBanner(n, ytFilter, after) {
@@ -667,12 +695,77 @@ const MODES = {
   country: ["Country", "e.g. United Kingdom, Nigeria", "Last.fm country charts, filtered to emerging acts."],
 };
 const disc = { mode: "tag", query: "", min: 300, max: 50000, limit: 20, rows: null, sort: { key: "score", dir: -1 } };
+// ============================================================ movers this week
+const MOVER_PLATFORMS = [["best", "Best platform"], ["youtube", "YouTube subscribers"], ["lastfm", "Last.fm listeners"],
+  ["deezer", "Deezer fans"], ["instagram", "Instagram followers"], ["tiktok", "TikTok followers"], ["spotify", "Spotify listeners"]];
+const MOVER_COLS = [["youtube", "YouTube"], ["lastfm", "Last.fm"], ["deezer", "Deezer"], ["instagram", "Instagram"]];
+// A gain counts only from a base of 200+ and by 20+ people, so tiny accounts can't post huge percentages.
+const MOVER_MIN_BASE = 200, MOVER_MIN_GAIN = 20;
+const mv = { platform: "best", max: "", sizeOn: "youtube", mgmt: "", hideReview: true };
+const counts = c => c && c.start >= MOVER_MIN_BASE && c.delta >= MOVER_MIN_GAIN && c.pct != null;
+function moverGain(r, platform) {
+  if (platform !== "best") return counts(r.change_7d?.[platform]) ? { key: platform, ...r.change_7d[platform] } : null;
+  let best = null;
+  for (const [k] of MOVER_PLATFORMS.slice(1)) { const c = r.change_7d?.[k]; if (counts(c) && (!best || c.pct > best.pct)) best = { key: k, ...c }; }
+  return best;
+}
+async function renderMovers() {
+  const slot = el("div", {}, loadingCard(6));
+  const plat = el("select", { class: "input", id: "mv-platform" }, MOVER_PLATFORMS.map(([v, t]) => el("option", { value: v, selected: v === mv.platform }, t)));
+  const max = el("select", { class: "input", id: "mv-max" }, [["", "Any size"], ["10000", "Under 10k"], ["20000", "Under 20k"], ["50000", "Under 50k"], ["250000", "Under 250k"]]
+    .map(([v, t]) => el("option", { value: v, selected: v === mv.max }, t)));
+  const hide = el("input", { type: "checkbox", id: "mv-hide", checked: mv.hideReview });
+  const sizeOn = el("select", { class: "input", id: "mv-size-on" }, PLATFORMS.map(([v, t]) => el("option", { value: v, selected: v === mv.sizeOn }, t)));
+  view.replaceChildren(
+    el("div", { class: "page-head" }, el("div", {}, el("h1", {}, "Movers this week"),
+      el("p", {}, "Artists ranked by real growth over the last 7 days. Gains count from a base of 200+ and by 20+ people."))),
+    el("div", { class: "toolbar" },
+      el("label", { class: "field" }, el("span", {}, "Rank by"), plat),
+      el("label", { class: "field" }, el("span", {}, "Audience"), max),
+      el("label", { class: "field" }, el("span", {}, "Measured on"), sizeOn),
+      mgmtSelect(mv, () => draw()),
+      el("label", { class: "field check" }, el("span", {}, "Accounts under review"), el("span", { class: "check-row" }, hide, " Hide"))),
+    slot);
+  let rows;
+  try { rows = await api("/api/leaderboard?limit=100000" + (mv.max ? `&max_audience=${mv.max}&platform=${mv.sizeOn}` : "")); } catch (e) { slot.replaceChildren(errorCard(e)); return; }
+  const draw = () => {
+    const list = rows.filter(r => !(mv.hideReview && r.review?.length && !r.verified) && mgmtPass(r, mv.mgmt))
+      .map(r => ({ r, g: moverGain(r, mv.platform) })).filter(x => x.g).sort((a, b) => b.g.pct - a.g.pct);
+    if (!list.length) { slot.replaceChildren(el("div", { class: "card" }, el("div", { class: "empty" }, el("h4", {}, "No movers yet"), "Movers need a week of daily snapshots on that platform."))); return; }
+    const recent = d => d && (Date.now() - new Date(d + "T12:00:00")) / 864e5 <= 14 && (Date.now() - new Date(d + "T12:00:00")) >= -864e5;
+    const head = el("tr", {}, el("th", {}, "#"), el("th", {}, "Artist"), el("th", { class: "r" }, mv.platform === "best" ? "Best 7-day gain" : "7-day gain"),
+      ...MOVER_COLS.map(([, t]) => el("th", { class: "r" }, t)), el("th", {}, "Breakout"), el("th", {}, "Label"), el("th", {}, "Last release"), el("th", {}, ""));
+    const cell = c => !c ? el("td", { class: "r dim" }, "–")
+      : el("td", { class: "r num " + (c.delta > 0 ? "up" : c.delta < 0 ? "down" : "") }, `${c.delta > 0 ? "+" : ""}${fmt(c.delta)} (${pct(c.pct)})`);
+    const body = el("tbody", {}, list.map(({ r, g }, i) => el("tr", { class: "row", onclick: () => go(r.name) },
+      el("td", { class: "rank" }, i + 1),
+      el("td", {}, el("div", { class: "who" }, avatar(r.image_url, r.name), el("div", {},
+        el("div", { class: "n" }, r.name, r.accelerating ? el("span", { class: "mini hot" }, "Accelerating") : null,
+          r.review?.length && !r.verified ? el("span", { class: "mini warn", title: r.review.join("\n") }, "Review") : null),
+        el("div", { class: "g" }, [r.country, ...(r.genres || [])].filter(Boolean).join(" · ") || "—")))),
+      el("td", { class: "r num up" }, el("b", {}, pct(g.pct)), el("div", { class: "dim", style: "font-size:11.5px" }, `+${fmt(g.delta)} ${MOVER_PLATFORMS.find(p => p[0] === g.key)[1]}`)),
+      ...MOVER_COLS.map(([k]) => cell(r.change_7d?.[k])),
+      el("td", {}, scoreCell(r)),
+      el("td", {}, r.label ? labelPill(r.label, r.label_class) : el("span", { class: "dim" }, "–")),
+      el("td", { title: r.latest_release || "" }, recent(r.latest_release) ? el("span", { class: "mini hot", style: "margin:0" }, "New: " + ago(r.latest_release)) : el("span", { class: "dim" }, ago(r.latest_release))),
+      el("td", {}, starBtn(r)))));
+    slot.replaceChildren(el("div", { class: "card" }, el("div", { class: "table-wrap" }, el("table", {}, el("thead", {}, head), body)),
+      el("div", { class: "foot" }, el("span", {}, `${list.length} artist${list.length === 1 ? "" : "s"} grew this week`),
+        el("span", {}, "Gains are actual changes over 7 days, not projections"))));
+  };
+  plat.onchange = () => { mv.platform = plat.value; draw(); };
+  max.onchange = () => { mv.max = max.value; renderMovers(); };
+  sizeOn.onchange = () => { mv.sizeOn = sizeOn.value; if (mv.max) renderMovers(); };
+  hide.onchange = () => { mv.hideReview = hide.checked; draw(); };
+  draw();
+}
+
 // ============================================================ needs review
 async function renderReview() {
   const slot = el("div", {}, loadingCard(4));
   view.replaceChildren(
     el("div", { class: "page-head" }, el("div", {}, el("h1", {}, "Needs review"),
-      el("p", {}, "Artists whose linked accounts look wrong. Open each one, check the links against the real artist, fix any that are wrong with Change, then mark it verified."))),
+      el("p", {}, "Artists whose linked accounts look wrong. Open each one and compare its links with the real artist. Fix a wrong account with Change on its tile. Click “Links are correct” only once every account is right; until then, leave it here so its numbers stay out of rankings."))),
     slot);
   let rows;
   try { rows = await api("/api/review"); } catch (e) { slot.replaceChildren(errorCard(e)); return; }
@@ -682,10 +775,10 @@ async function renderReview() {
     return;
   }
   slot.replaceChildren(el("div", { class: "review-list" }, rows.map(r => {
-    const btn = el("button", { class: "btn" }, "Mark verified");
+    const btn = el("button", { class: "btn", title: "Only after you've checked: every linked account is this artist" }, "Links are correct");
     btn.onclick = async () => {
       btn.disabled = true;
-      try { await post(`/api/artist/${r.id}/verify`, { verified: true }); toast(`${r.name} verified`); loadCounts(); renderReview(); }
+      try { await post(`/api/artist/${r.id}/verify`, { verified: true }); toast(`${r.name}: links confirmed`); loadCounts(); renderReview(); }
       catch (e) { toast("Couldn't save: " + e.message); btn.disabled = false; }
     };
     return el("div", { class: "card review-item" }, avatar(r.image_url, r.name),
@@ -699,16 +792,16 @@ async function renderReview() {
 function reviewBanner(a, s) {
   const toggle = (verified) => async (e) => {
     e.target.disabled = true;
-    try { await post(`/api/artist/${a.id}/verify`, { verified }); toast(verified ? "Marked verified" : "Verification removed"); loadCounts(); renderArtist(a.name); }
+    try { await post(`/api/artist/${a.id}/verify`, { verified }); toast(verified ? "Links confirmed" : "Back in the review queue"); loadCounts(); renderArtist(a.name); }
     catch (err) { toast("Couldn't save: " + err.message); e.target.disabled = false; }
   };
   if (a.verified_at) return el("div", { class: "review-banner ok" }, el("div", { class: "row" },
     el("span", {}, `✓ Linked accounts checked on ${new Date(a.verified_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}.`),
-    el("button", { class: "btn ghost", onclick: toggle(false) }, "Undo")));
+    el("button", { class: "btn ghost", onclick: toggle(false) }, "Undo: send back to review")));
   if (!s.review?.length) return null;
   return el("div", { class: "review-banner" },
     el("div", { class: "row" }, el("b", {}, "Check this artist's linked accounts"),
-      el("button", { class: "btn", onclick: toggle(true) }, "Mark verified")),
+      el("button", { class: "btn", onclick: toggle(true), title: "Only after you've checked: every linked account is this artist" }, "Links are correct")),
     el("ul", {}, s.review.map(i => el("li", {}, i))),
     el("span", {}, "Compare the links above with the artist's real profiles. Fix a wrong YouTube or Instagram account with Change on its tile below."));
 }
@@ -749,7 +842,8 @@ function renderDiscover() {
 }
 
 // ============================================================ artist
-function lineChart(points, label) {
+// releases: [{title, date, type}] from the artist's release list; each one in range gets a dashed marker.
+function lineChart(points, label, releases = []) {
   const last = points.at(-1)?.value;
   const wrap = el("div", { class: "card chart" }, el("div", { class: "h" }, el("b", {}, label), el("span", {}, fmt(last))));
   const days = new Set(points.map(p => p.taken_at.slice(0, 10))).size;
@@ -778,6 +872,14 @@ function lineChart(points, label) {
   const fmtD = t => new Date(t).toLocaleDateString(undefined, { month: "short", day: "numeric" });
   add("text", { x: P.l, y: H - 3, "font-size": 10, fill: "var(--muted)" }).textContent = fmtD(x0);
   add("text", { x: W - P.r, y: H - 3, "font-size": 10, fill: "var(--muted)", "text-anchor": "end" }).textContent = fmtD(x1);
+  const DAY = 864e5;
+  const marks = releases.map(r => ({ ...r, t: new Date(r.date + "T12:00:00Z").getTime() }))
+    .filter(r => r.t >= x0 - DAY / 2 && r.t <= x1 + DAY / 2);
+  for (const r of marks) {
+    const rx = Math.max(P.l, Math.min(W - P.r, sx(r.t)));
+    add("line", { x1: rx, x2: rx, y1: P.t, y2: H - P.b, stroke: "var(--warn)", "stroke-width": 1, "stroke-dasharray": "3 3",
+      "vector-effect": "non-scaling-stroke", opacity: .8 });
+  }
   const hair = add("line", { y1: P.t, y2: H - P.b, stroke: "var(--border-strong)", "stroke-width": 1, "vector-effect": "non-scaling-stroke", visibility: "hidden" });
   const dot = add("circle", { r: 3.5, fill: "var(--accent)", stroke: "var(--surface)", "stroke-width": 2, visibility: "hidden" });
   const hit = add("rect", { x: 0, y: 0, width: W, height: H, fill: "transparent" });
@@ -788,7 +890,9 @@ function lineChart(points, label) {
     const cx = sx(xs[b]), cy = sy(ys[b]);
     hair.setAttribute("visibility", "visible"); dot.setAttribute("visibility", "visible");
     hair.setAttribute("x1", cx); hair.setAttribute("x2", cx); dot.setAttribute("cx", cx); dot.setAttribute("cy", cy);
-    tip.replaceChildren(el("strong", {}, Math.round(ys[b]).toLocaleString()), el("span", { class: "dim" }, new Date(xs[b]).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })));
+    const near = marks.filter(r => Math.abs(r.t - xs[b]) <= 1.5 * DAY);
+    tip.replaceChildren(el("strong", {}, Math.round(ys[b]).toLocaleString()), el("span", { class: "dim" }, new Date(xs[b]).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })),
+      ...near.map(r => el("span", { class: "tip-rel" }, `Release: ${r.title} (${r.type}, ${fmtD(r.t)})`)));
     tip.style.display = "block"; tip.style.left = Math.min(ev.clientX + 12, innerWidth - 180) + "px"; tip.style.top = ev.clientY - 48 + "px";
   });
   hit.addEventListener("pointerleave", () => { tip.style.display = "none"; hair.setAttribute("visibility", "hidden"); dot.setAttribute("visibility", "hidden"); });
@@ -823,6 +927,30 @@ function ytChannelLine(a) {
     a.youtube_channel && YT_SOURCE[a.youtube_source] ? " " + YT_SOURCE[a.youtube_source] + " · " : a.youtube_channel ? " · " : null, change);
 }
 
+// "12.5k", "1.2M", "12,500" or "1.2 million" -> a number; null if it isn't one.
+function parseCount(text) {
+  const t = String(text || "").trim().toLowerCase().replace(/,/g, "").replace(/\s+/g, "");
+  const m = t.match(/^(\d+(?:\.\d+)?)(k|thousand|m|million|b|billion)?$/);
+  if (!m) return null;
+  const mult = { k: 1e3, thousand: 1e3, m: 1e6, million: 1e6, b: 1e9, billion: 1e9 }[m[2]] || 1;
+  return Math.round(parseFloat(m[1]) * mult);
+}
+
+// A button that saves a number read off a public profile as today's snapshot.
+function manualButton(a, metric, label, where) {
+  const b = el("button", { class: "linkish" }, "Update");
+  b.onclick = async () => {
+    const text = prompt(`${label} for ${a.name}\n\n${where}\nType the number shown, e.g. 12,500 or 12.5K. It's saved with today's date.`);
+    if (text == null || !text.trim()) return;
+    const value = parseCount(text);
+    if (value == null) { toast(`“${text}” isn't a number. Try something like 12,500 or 12.5K`); return; }
+    b.disabled = true; b.textContent = "Saving…";
+    try { await post(`/api/artist/${a.id}/manual`, { metric, value }); toast(`${label}: ${value.toLocaleString()} saved`); renderArtist(a.name); }
+    catch (e) { toast("Couldn't save: " + e.message); b.disabled = false; b.textContent = "Update"; }
+  };
+  return b;
+}
+
 function igKpi(a, m) {
   const sub = !igOn ? "Instagram not set up" : !a.instagram_username ? "no account linked" : "not readable: personal or private account?";
   const tile = el("div", { class: "card kpi" }, el("div", { class: "l" }, "Instagram followers"), el("div", { class: "v" }, fmt(m["instagram.followers"])),
@@ -839,14 +967,36 @@ function igKpi(a, m) {
   };
   tile.append(el("div", { class: "d yt-src" },
     a.instagram_username ? el("a", { href: `https://www.instagram.com/${a.instagram_username}/`, target: "_blank", rel: "noopener" }, "@" + a.instagram_username + " ↗") : null,
-    a.instagram_username ? (a.instagram_source === "manual" ? " set by you · " : " · ") : null, change));
+    a.instagram_username ? (a.instagram_source === "manual" ? " set by you · " : " · ") : null, change,
+    // until the Instagram API is connected, the count can be typed in from the profile
+    !igOn ? " · " : null, !igOn ? manualButton(a, "instagram.followers", "Instagram followers", "On the Instagram profile, it's the number above “followers”.") : null));
   return tile;
+}
+
+function managementCard(a) {
+  const info = a.management_info || { label: "Unknown" };
+  const sel = el("select", { class: "input", id: "mgmt-status", "aria-label": "Management status" },
+    [["", info.source === "instagram bio" ? "Use Instagram bio" : "Unknown"], ["unmanaged", "No management"], ["managed", "Has management"]]
+      .map(([v, t]) => el("option", { value: v, selected: v === (a.management || "") }, t)));
+  sel.onchange = async () => {
+    sel.disabled = true;
+    try { const r = await post(`/api/artist/${a.id}/management`, { status: sel.value || null }); toast(`Management: ${r.label}`); renderArtist(a.name); }
+    catch (e) { toast("Couldn't save: " + e.message); sel.disabled = false; }
+  };
+  const tone = info.status === "unmanaged" || info.status === "not_listed" ? "flag pos" : info.status ? "flag" : "flag warn";
+  return el("div", { class: "card card-pad" },
+    el("h3", {}, "Management", el("span", { class: "aside" }, info.source ? `from ${info.source}` : "")),
+    el("div", { class: tone }, info.label),
+    info.evidence ? el("div", { class: "dim", style: "font-size:12.5px;margin-top:8px" }, "Bio says: “", info.evidence, "”") : null,
+    !info.status ? el("div", { class: "dim", style: "font-size:12.5px;margin-top:8px" },
+      igOn ? "Their Instagram bio doesn't say, or isn't readable." : "Connect Instagram to read this from their bio, or set it here.") : null,
+    el("div", { style: "margin-top:10px" }, sel));
 }
 
 const parseTags = v => [...new Set(v.split(",").map(t => t.trim()).filter(Boolean))];
 
 function flagClass(f) {
-  if (/deep fandom|DIY|unsigned|growing|surging/i.test(f)) return "flag pos";
+  if (/accelerating|deep fandom|DIY|unsigned|self-released|growing|surging/i.test(f)) return "flag pos";
   if (/no growth|only|missing|established|stale|no youtube|looks off|capped/i.test(f)) return "flag warn";
   return "flag";
 }
@@ -889,11 +1039,31 @@ async function renderArtist(name) {
     el("div", { class: "tag-edit", style: "flex-basis:100%" }, el("span", { class: "dim", style: "font-size:12px" }, "Tags"), tagInput));
 
   // KPIs
+  // Real changes over the last 7 and 28 days, not a projected monthly rate.
+  const changeLine = (key, days) => {
+    const c = r.changes?.[key]?.[String(days)];
+    if (!c) {
+      const from = r.changes?.[key]?.["28_from"];
+      return el("div", { class: "d" }, days === 28 && from ? `28d: from ${new Date(from + "T12:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" })}` : `${days}d: not enough history`);
+    }
+    const cls = Math.abs(c.pct ?? 0) < 0.0005 ? "" : c.delta > 0 ? "up" : "down";
+    const sign = c.delta > 0 ? "+" : c.delta < 0 ? "−" : "±";
+    return el("div", { class: "d " + cls }, `${days}d: ${sign}${fmt(Math.abs(c.delta))}` + (c.pct != null ? ` (${pct(c.pct)})` : ""));
+  };
   const kpi = (label, key, sub) => el("div", { class: "card kpi" },
     el("div", { class: "l" }, label), el("div", { class: "v" }, fmt(m[key])),
-    g[key] ? el("div", { class: "d " + (g[key].delta >= 0 ? "up" : "down") }, `${pct(g[key].monthly_rate)} / mo`)
-      : el("div", { class: "d" }, m[key] == null ? (sub || "not linked") : "no trend yet"));
+    m[key] == null ? el("div", { class: "d" }, sub || "not linked") : [changeLine(key, 7), changeLine(key, 28)]);
   const depth = m["lastfm.listeners"] ? m["lastfm.playcount"] / m["lastfm.listeners"] : null;
+  // Numbers with no API: the tile links to the profile and takes a typed-in count. Shows when it was last entered.
+  const lastEntered = metric => { const h = r.history.filter(x => x.metric === metric).at(-1); return h ? new Date(h.taken_at).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : null; };
+  const manualTile = (metric, label, link, linkText, where) => {
+    const entered = lastEntered(metric);
+    const t = kpi(label, metric, "not entered yet");
+    t.append(el("div", { class: "d yt-src" },
+      link ? el("a", { href: link, target: "_blank", rel: "noopener" }, linkText + " ↗") : null, link ? " · " : null,
+      manualButton(a, metric, label, where), entered ? ` · entered ${entered}` : null));
+    return t;
+  };
   const ytOff = s.flags.some(f => /^YouTube count looks off/.test(f));
   const ytKpi = kpi("YouTube subscribers", "youtube.subscribers", a.resolved_at ? "no channel found" : "not looked up yet");
   if (ytOff) ytKpi.append(el("div", { class: "d down" }, "Doesn't look like their main channel"));
@@ -902,6 +1072,10 @@ async function renderArtist(name) {
     ytKpi,
     kpi("YouTube views", "youtube.views", a.resolved_at ? "no channel found" : "not looked up yet"),
     igKpi(a, m),
+    manualTile("spotify.monthly_listeners", "Spotify monthly listeners", a.links?.spotify, "Spotify",
+      "On the artist's Spotify page, it's the number under their name: “monthly listeners”."),
+    manualTile("tiktok.followers", "TikTok followers", a.links?.tiktok, "TikTok",
+      "On the TikTok profile, it's the number above “Followers”."),
     kpi("Last.fm listeners", "lastfm.listeners"),
     el("div", { class: "card kpi" }, el("div", { class: "l" }, "Plays per listener"),
       el("div", { class: "v" }, depth == null ? "–" : depth.toFixed(1)), el("div", { class: "d" }, depth > 30 ? "deep fandom" : "fandom depth")),
@@ -911,7 +1085,7 @@ async function renderArtist(name) {
   // charts
   const byMetric = {};
   for (const h of r.history) (byMetric[h.metric] ||= []).push(h);
-  const charts = el("div", { class: "charts" }, Object.keys(METRICS).filter(k => byMetric[k]).map(k => lineChart(byMetric[k], METRICS[k])));
+  const charts = el("div", { class: "charts" }, Object.keys(METRICS).filter(k => byMetric[k]).map(k => lineChart(byMetric[k], METRICS[k], rel.recent || [])));
   const snapDays = new Set(r.history.map(h => h.taken_at.slice(0, 10))).size;
 
   // score card
@@ -957,9 +1131,10 @@ async function renderArtist(name) {
       el("div", { class: "stack" }, kpis,
         el("div", {}, el("div", { class: "page-head", style: "margin:8px 0 10px" },
           el("h3", { style: "margin:0;font-size:13px;font-weight:600" }, "Trends"),
-          el("span", { class: "dim", style: "font-size:12px" }, `${snapDays} day${snapDays === 1 ? "" : "s"} of snapshots`)), charts),
+          el("span", { class: "dim", style: "font-size:12px" }, `${snapDays} day${snapDays === 1 ? "" : "s"} of snapshots · `,
+            el("span", { style: "color:var(--warn)" }, "┆"), " release")), charts),
         releases),
-      el("div", { class: "stack" }, scoreCard, similar, notes)),
+      el("div", { class: "stack" }, scoreCard, managementCard(a), similar, notes)),
     r.errors.length ? el("div", { class: "errors" }, "Source issues: " + r.errors.join("; ")) : null);
 }
 

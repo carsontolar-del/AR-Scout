@@ -66,3 +66,29 @@ def test_backup_keeps_a_dated_copy_and_prunes_old_ones(tmp_path, monkeypatch):
     import sqlite3
     with sqlite3.connect(res["path"]) as c:
         assert c.execute("SELECT count(*) FROM snapshots").fetchone()[0] == 1
+
+
+def test_schema_upgrade_survives_parallel_first_requests(tmp_path, monkeypatch):
+    import sqlite3
+    import threading
+    path = tmp_path / "old.db"
+    with sqlite3.connect(path) as c:  # a database from before the newer columns existed
+        c.execute("CREATE TABLE artists (id INTEGER PRIMARY KEY, name TEXT NOT NULL, deezer_id INTEGER UNIQUE, "
+                  "created_at TEXT NOT NULL, updated_at TEXT NOT NULL)")
+    monkeypatch.setattr(db, "settings", dataclasses.replace(config.settings, db_path=path))
+    errors = []
+
+    def hit():
+        try:
+            db.all_artists()
+        except Exception as exc:  # noqa: BLE001
+            errors.append(exc)
+
+    threads = [threading.Thread(target=hit) for _ in range(8)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert errors == []
+    with sqlite3.connect(path) as c:
+        assert "management" in {r[1] for r in c.execute("PRAGMA table_info(artists)")}

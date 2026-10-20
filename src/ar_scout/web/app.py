@@ -39,6 +39,15 @@ class VerifyIn(BaseModel):
     verified: bool = True
 
 
+class ManagementIn(BaseModel):
+    status: str | None = None
+
+
+class ManualIn(BaseModel):
+    metric: str
+    value: float
+
+
 class DiscoverIn(BaseModel):
     mode: str  # similar | tag | country | new | playlists
     query: str = ""
@@ -95,6 +104,22 @@ def set_instagram(artist_id: int, body: InstagramIn):
     try:
         return service.set_instagram_account(artist_id, body.handle)
     except SourceError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@app.post("/api/artist/{artist_id}/manual")
+def manual(artist_id: int, body: ManualIn):
+    try:
+        return service.record_manual(artist_id, body.metric, body.value)
+    except (ValueError, SourceError) as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@app.post("/api/artist/{artist_id}/management")
+def set_management(artist_id: int, body: ManagementIn):
+    try:
+        return service.set_management(artist_id, body.status or None)
+    except (ValueError, SourceError) as exc:
         raise HTTPException(400, str(exc)) from exc
 
 

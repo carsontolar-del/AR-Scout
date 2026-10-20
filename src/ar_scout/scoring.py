@@ -25,6 +25,8 @@ MOMENTUM_METRICS = {
     "lastfm.playcount": 0.7,
     "youtube.views": 0.7,
     "instagram.followers": 1.0,
+    "tiktok.followers": 1.0,
+    "spotify.monthly_listeners": 1.0,
     "spotify.followers": 1.0,
     "wikipedia.pageviews_30d": 0.3,
 }
@@ -48,6 +50,76 @@ def _clamp(x: float) -> float:
 
 def _parse(ts: str) -> datetime:
     return datetime.fromisoformat(ts)
+
+
+# Acceleration: is an artist growing faster than they were? Compares average daily gains in the latest window
+# with the window before it.
+ACCEL_METRICS = {
+    "youtube.subscribers": "YouTube", "lastfm.listeners": "Last.fm", "deezer.fans": "Deezer",
+    "instagram.followers": "Instagram", "tiktok.followers": "TikTok", "spotify.monthly_listeners": "Spotify",
+}
+ACCEL_WINDOW_DAYS = 7
+ACCEL_MIN_HALF_DAYS = 3      # each window needs at least this many days
+ACCEL_RATIO = 1.5            # recent daily gains this many times the earlier ones
+ACCEL_MIN_RECENT_PCT = 0.01  # and a real gain (1%+) in the recent window, so rounding can't fake it
+ACCEL_MIN_PLATFORMS = 2
+
+
+def _value_at(pts: list[tuple[datetime, float]], t: datetime) -> tuple[datetime, float]:
+    """The last point at or before `t` (or the first point)."""
+    best = pts[0]
+    for p in pts:
+        if p[0] <= t:
+            best = p
+    return best
+
+
+def acceleration(history: dict[str, list[tuple[str, float]]]) -> dict:
+    """Per platform: average daily gain in the latest window vs the one before, and whether the artist counts as
+    accelerating. Windows are 7 days once there are 14 days of history; before that, the two halves of it."""
+    from datetime import timedelta
+    per: dict[str, dict] = {}
+    for metric, name in ACCEL_METRICS.items():
+        pts = [(_parse(t), v) for t, v in history.get(metric, []) if v is not None]
+        if len(pts) < 3:
+            continue
+        end_t, end_v = pts[-1]
+        span = (end_t - pts[0][0]).total_seconds() / 86400
+        half = min(ACCEL_WINDOW_DAYS, span / 2)
+        if half < ACCEL_MIN_HALF_DAYS:
+            continue
+        mid_t, mid_v = _value_at(pts, end_t - timedelta(days=half))
+        start_t, start_v = _value_at(pts, mid_t - timedelta(days=half))
+        d_recent = (end_t - mid_t).total_seconds() / 86400
+        d_earlier = (mid_t - start_t).total_seconds() / 86400
+        if d_recent < ACCEL_MIN_HALF_DAYS - 0.5 or d_earlier < ACCEL_MIN_HALF_DAYS - 0.5 or mid_v <= 0:
+            continue
+        recent, earlier = (end_v - mid_v) / d_recent, (mid_v - start_v) / d_earlier
+        per[metric] = {
+            "platform": name, "days": round(d_recent, 1),
+            "earlier_per_day": round(earlier, 2), "recent_per_day": round(recent, 2),
+            "ratio": round(recent / earlier, 2) if earlier > 0 else None,
+            "recent_pct": round((end_v - mid_v) / mid_v, 4),
+        }
+    faster = [m for m, a in per.items()
+              if a["recent_pct"] >= ACCEL_MIN_RECENT_PCT and (a["ratio"] is None or a["ratio"] >= ACCEL_RATIO)]
+    return {"platforms": per, "faster": faster, "accelerating": len(faster) >= ACCEL_MIN_PLATFORMS}
+
+
+def window_change(points: list[tuple[str, float]], days: int) -> dict | None:
+    """Actual change over the last `days` days (no projection): from the last point at or before that many days
+    ago to the latest. None until the history reaches back that far (half a day of slack)."""
+    from datetime import timedelta
+    pts = [(_parse(t), v) for t, v in points if v is not None]
+    if len(pts) < 2:
+        return None
+    end_t, end_v = pts[-1]
+    if (end_t - pts[0][0]).total_seconds() / 86400 < days - 0.5:
+        return None
+    start_t, start_v = _value_at(pts, end_t - timedelta(days=days - 0.5))
+    return {"start": start_v, "end": end_v, "delta": end_v - start_v,
+            "pct": (end_v - start_v) / start_v if start_v else None,
+            "days": round((end_t - start_t).total_seconds() / 86400, 1)}
 
 
 def growth(points: list[tuple[str, float]], window_days: int = 30) -> dict | None:
@@ -84,6 +156,10 @@ HEADROOM_BANDS = {
     "spotify.followers": (200, 2_000, 100_000, 1_000_000),
     # Instagram follows come cheaper than listens, so an act needs a larger following to count as big.
     "instagram.followers": (500, 5_000, 200_000, 2_000_000),
+    # Entered by hand from public profiles. TikTok follows are cheaper still; Spotify monthly listeners run larger
+    # than Last.fm listeners because they count casual and playlist listening.
+    "tiktok.followers": (1_000, 10_000, 500_000, 5_000_000),
+    "spotify.monthly_listeners": (1_000, 10_000, 300_000, 3_000_000),
 }
 
 # Fame signals that only count against an artist: having no Wikipedia article is normal for an emerging act,
@@ -208,10 +284,20 @@ def score(metrics: dict[str, float], history: dict[str, list[tuple[str, float]]]
         if headroom < 0.5:
             flags.append("score capped: audience already large")
 
+    # Acceleration is reported alongside the score, not inside it, until a few weeks of data show how it behaves.
+    accel = acceleration(history)
+    if accel["accelerating"]:
+        parts = [f'{accel["platforms"][m]["ratio"]:.1f}× on {accel["platforms"][m]["platform"]}'
+                 if accel["platforms"][m]["ratio"] else f'new growth on {accel["platforms"][m]["platform"]}'
+                 for m in accel["faster"]]
+        days = max(accel["platforms"][m]["days"] for m in accel["faster"])
+        flags.insert(0, f"accelerating: daily gains {', '.join(parts)} (last {days:.0f} days vs the {days:.0f} before)")
+
     return {
         "score": round(total, 1),
         "components": {k: (round(v, 3) if v is not None else None) for k, v in components.items()},
         "growth": growth_detail,
         "flags": flags,
         "confidence": round(w_sum, 2),  # share of the model that had data
+        "acceleration": accel,
     }

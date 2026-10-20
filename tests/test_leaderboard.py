@@ -25,7 +25,7 @@ def test_audience_platform_filters_on_one_platform(tmp_db):
     assert names() == {"Small everywhere", "No YouTube"}
     assert names(audience_platform="youtube") == {"Small YT big Last.fm", "Small everywhere"}
     with pytest.raises(ValueError):
-        names(audience_platform="tiktok")
+        names(audience_platform="myspace")
 
 
 def test_rows_carry_tags_link_state_and_coverage(tmp_db):

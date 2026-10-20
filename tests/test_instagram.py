@@ -32,7 +32,9 @@ def test_profile_reads_business_discovery(ig_settings, monkeypatch):
         seen.update(url=url, fields=params["fields"])
         return {"business_discovery": {"username": "kaeto", "followers_count": 24_000, "media_count": 310}, "id": "1"}
     monkeypatch.setattr(instagram, "get_json", fake_get)
-    assert instagram.profile("kaeto") == {"username": "kaeto", "name": None, "followers": 24_000, "media_count": 310}
+    assert instagram.profile("kaeto") == {"username": "kaeto", "name": None, "followers": 24_000, "media_count": 310,
+                                          "biography": None, "website": None}
+    assert "biography,website" in seen["fields"]
     assert seen["url"].endswith("/17841400000000000")
     assert seen["fields"].startswith("business_discovery.username(kaeto){")
 

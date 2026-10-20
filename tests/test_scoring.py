@@ -88,3 +88,34 @@ def test_no_growth_rate_from_a_single_day():
     assert g["delta"] == 40 and g["monthly_rate"] is None
     s = scoring.score({"youtube.subscribers": 7_770}, {"youtube.subscribers": one_day})
     assert s["components"]["momentum"] is None
+
+
+def _daily(start_day, values):
+    from datetime import datetime, timedelta
+    t0 = datetime.fromisoformat(f"{start_day}T15:00:00+00:00")
+    return [((t0 + timedelta(days=i)).isoformat(), v) for i, v in enumerate(values)]
+
+
+def test_acceleration_needs_two_platforms_speeding_up():
+    # Sophia Stel, Oct 13-20: slow until the Oct 16 album, then fast
+    hist = {"youtube.subscribers": _daily("2026-10-13", [5390, 5410, 5440, 5490, 5710, 5830, 5900, 5970]),
+            "deezer.fans": _daily("2026-10-13", [751, 753, 759, 766, 783, 791, 797, 806])}
+    acc = scoring.acceleration(hist)
+    assert acc["accelerating"] and set(acc["faster"]) == {"youtube.subscribers", "deezer.fans"}
+    assert acc["platforms"]["youtube.subscribers"]["ratio"] > 3
+    assert scoring.score({}, hist)["flags"][0].startswith("accelerating")
+
+    one = {"youtube.subscribers": hist["youtube.subscribers"]}
+    assert not scoring.acceleration(one)["accelerating"]
+
+
+def test_steady_growth_is_not_acceleration():
+    steady = {m: _daily("2026-10-13", [1000 + 10 * i for i in range(8)]) for m in ("deezer.fans", "lastfm.listeners")}
+    assert not scoring.acceleration(steady)["accelerating"]
+
+
+def test_window_change_is_actual_not_projected():
+    pts = _daily("2026-10-13", [5390, 5410, 5440, 5490, 5710, 5830, 5900, 5970])
+    c = scoring.window_change(pts, 7)
+    assert c["delta"] == 580 and c["days"] == 7.0
+    assert scoring.window_change(pts, 28) is None

@@ -18,7 +18,9 @@ free music data APIs and a local SQLite history in `data/ar_scout.db`.
   API Business Discovery. Only public professional (Business/Creator) accounts are readable; a missing count often
   means a personal account, not a missing artist. Usernames come from MusicBrainz links (sometimes wrong; fix with
   `set_instagram_account`). Setup steps are in `.env.example`; `ar-scout instagram-test` checks them.
-- There is **no free TikTok metrics API**; use the MusicBrainz TikTok links for manual checks.
+- There is **no free TikTok metrics API**, and Spotify gives free apps no listener counts. Both numbers are public
+  on the profile, so they're entered by hand (`record_manual_metric`: `tiktok.followers`, `tiktok.likes`,
+  `spotify.monthly_listeners`, or `instagram.followers` until the API is set up) and build a trend like any other.
 
 ## Breakout score (0–100)
 momentum 40% · engagement 20% · headroom 20% · activity 10% · signability 10% (see `src/ar_scout/scoring.py`).
@@ -28,6 +30,14 @@ heavy Wikipedia traffic) is capped low. Free sources undercount mainstream US ac
 artists show lower confidence until the daily job has run for a week.
 Signability comes from the label type (`src/ar_scout/labels.py`): self-released or DIY 1.0, independent 0.4,
 major or major imprint 0.0.
+
+Reported beside the score, not in it:
+- **Accelerating**: daily gains at least 1.5× the previous window's on 2+ platforms, each with a 1%+ real gain
+  (`scoring.acceleration`). This is the strongest early signal; lead with it when present.
+- **7-day / 28-day changes**: actual changes, not projections; prefer them over `monthly_growth` when talking
+  to people.
+- **Management** (`management` in each row): set by a person, else read from the Instagram bio ("mgmt:",
+  "management"...). For a management company, "no management known" is a key filter. A bio is evidence, not proof.
 
 ## How to work
 - Lead with the numbers and the flags, then the score. Never present the score alone.

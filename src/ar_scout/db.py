@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import threading
 from contextlib import contextmanager
 from pathlib import Path
 from datetime import datetime, timezone
@@ -36,6 +37,10 @@ CREATE TABLE IF NOT EXISTS artists (
     instagram_source   TEXT,        -- musicbrainz | manual
     youtube_title   TEXT,           -- channel name, to spot a channel that belongs to someone else
     verified_at     TEXT,           -- when a person confirmed this artist's linked accounts are right
+    instagram_bio   TEXT,
+    mgmt_auto       TEXT,           -- listed | not_listed, read from the Instagram bio
+    mgmt_evidence   TEXT,           -- the bio line that mentions management
+    management      TEXT,           -- managed | unmanaged, set by a person (wins over mgmt_auto)
     created_at      TEXT NOT NULL,
     updated_at      TEXT NOT NULL
 );
@@ -77,8 +82,7 @@ def connect() -> Iterator[sqlite3.Connection]:
     conn = sqlite3.connect(settings.db_path)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
-    conn.executescript(SCHEMA)
-    _migrate(conn)
+    _prepare(conn)
     try:
         yield conn
         conn.commit()
@@ -86,13 +90,39 @@ def connect() -> Iterator[sqlite3.Connection]:
         conn.close()
 
 
+_prepared: set[str] = set()
+_prepare_lock = threading.Lock()
+
+
+def _prepare(conn: sqlite3.Connection) -> None:
+    """Create and upgrade the schema once per database per process. The dashboard opens several connections at
+    once, so without the lock two of them could both try to add the same new column."""
+    key = str(settings.db_path)
+    if key in _prepared:
+        return
+    with _prepare_lock:
+        if key in _prepared:
+            return
+        conn.executescript(SCHEMA)
+        _migrate(conn)
+        conn.commit()
+        _prepared.add(key)
+
+
+_ADDED_COLUMNS = ("resolved_at", "youtube_source", "instagram_username", "instagram_source", "youtube_title",
+                  "verified_at", "instagram_bio", "mgmt_auto", "mgmt_evidence", "management")
+
+
 def _migrate(conn: sqlite3.Connection) -> None:
     cols = {r["name"] for r in conn.execute("PRAGMA table_info(artists)")}
-    if "resolved_at" not in cols:
-        conn.execute("ALTER TABLE artists ADD COLUMN resolved_at TEXT")
-    for col in ("youtube_source", "instagram_username", "instagram_source", "youtube_title", "verified_at"):
-        if col not in cols:
+    for col in _ADDED_COLUMNS:
+        if col in cols:
+            continue
+        try:
             conn.execute(f"ALTER TABLE artists ADD COLUMN {col} TEXT")
+        except sqlite3.OperationalError as exc:  # another process (e.g. the daily job) added it first
+            if "duplicate column" not in str(exc):
+                raise
 
 
 def _row(row: sqlite3.Row | None) -> dict | None:
@@ -154,6 +184,11 @@ def history(artist_id: int, metric: str | None = None) -> list[dict]:
         args.append(metric)
     with connect() as c:
         return [dict(r) for r in c.execute(q + " ORDER BY taken_at", args)]
+
+
+def set_management(artist_id: int, status: str | None) -> None:
+    with connect() as c:
+        c.execute("UPDATE artists SET management = ?, updated_at = ? WHERE id = ?", (status, now(), artist_id))
 
 
 def set_verified(artist_id: int, when: str | None) -> None:

@@ -45,7 +45,7 @@ def profile(username: str) -> dict:
     accounts and SourceError for setup problems (expired token, missing permission, rate limit)."""
     if not available():
         raise SourceError("INSTAGRAM_ACCESS_TOKEN / INSTAGRAM_BUSINESS_ID not set")
-    fields = f"business_discovery.username({username}){{username,name,followers_count,media_count}}"
+    fields = f"business_discovery.username({username}){{username,name,followers_count,media_count,biography,website}}"
     try:
         data = get_json(f"{_base()}/{settings.instagram_business_id}",
                         params={"fields": fields, "access_token": settings.instagram_access_token})
@@ -59,6 +59,8 @@ def profile(username: str) -> dict:
         "name": bd.get("name"),
         "followers": bd.get("followers_count"),
         "media_count": bd.get("media_count"),
+        "biography": bd.get("biography"),
+        "website": bd.get("website"),
     }
 
 
