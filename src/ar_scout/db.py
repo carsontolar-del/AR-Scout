@@ -42,6 +42,8 @@ CREATE TABLE IF NOT EXISTS artists (
     mgmt_evidence   TEXT,           -- the bio line that mentions management
     management      TEXT,           -- managed | unmanaged, set by a person (wins over mgmt_auto)
     archived_at     TEXT,           -- hidden from rankings and daily snapshots, history kept
+    lastfm_source   TEXT,           -- manual when a person picked the Last.fm artist
+    deezer_source   TEXT,           -- manual when a person picked the Deezer artist
     created_at      TEXT NOT NULL,
     updated_at      TEXT NOT NULL
 );
@@ -130,7 +132,8 @@ def _prepare(conn: sqlite3.Connection) -> None:
 
 _ADDED_COLUMNS = {
     "artists": ("resolved_at", "youtube_source", "instagram_username", "instagram_source", "youtube_title",
-                "verified_at", "instagram_bio", "mgmt_auto", "mgmt_evidence", "management", "archived_at"),
+                "verified_at", "instagram_bio", "mgmt_auto", "mgmt_evidence", "management", "archived_at",
+                "lastfm_source", "deezer_source"),
     "watchlist": ("status_since", "owner", "next_step", "next_date"),
 }
 

@@ -34,3 +34,12 @@ def test_run_once_snapshots_backs_up_and_records(tmp_path, monkeypatch):
     res = scheduler.run_once()
     assert res["ok"] and res["snapshotted"] == 3 and (tmp_path / "bk").exists()
     assert scheduler.last_status()["snapshotted"] == 3
+
+
+def test_serve_keeps_request_urls_with_keys_out_of_logs(monkeypatch):
+    import logging
+    import uvicorn
+    from ar_scout import cli
+    monkeypatch.setattr(uvicorn, "run", lambda *a, **k: None)
+    cli.serve(host="127.0.0.1", port=0)
+    assert logging.getLogger("httpx").getEffectiveLevel() >= logging.WARNING

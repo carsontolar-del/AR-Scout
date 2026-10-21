@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 from typing import Any
 
 from ..http import get_json
@@ -33,6 +35,15 @@ def artist(deezer_id: int) -> dict | None:
     if not payload or "error" in payload:
         return None
     return payload
+
+
+def id_from_url(link: str) -> int | None:
+    """'https://www.deezer.com/en/artist/14799941' or a bare number -> 14799941."""
+    link = link.strip()
+    if link.isdigit():
+        return int(link)
+    m = re.search(r"deezer\.com/(?:[a-z]{2}(?:-[a-z]{2})?/)?artist/(\d+)", link)
+    return int(m.group(1)) if m else None
 
 
 def related(deezer_id: int, limit: int = 50) -> list[dict]:

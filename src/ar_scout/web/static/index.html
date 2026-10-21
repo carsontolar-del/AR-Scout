@@ -227,6 +227,12 @@ body:not(.admin) .admin-only { display: none !important; }
 .disc-form .input, .pipeline-edit .input { width: 100%; }
 .pipeline-edit { width: 100%; }
 @media (max-width: 520px) { .disc-form, .pipeline-edit { grid-template-columns: 1fr; } }
+.kpi .src-at { display: block; margin-top: 4px; font-size: 11px; color: var(--muted); }
+.kpi.uncounted .v { color: var(--text-2); text-decoration: line-through; text-decoration-color: var(--warn); text-decoration-thickness: 1.5px; }
+body.demo .demo-hide, body.demo .admin-toggle, body.demo .admin-only, body.demo .signout { display: none !important; }
+.demo-banner { padding: 8px 32px; font-size: 12.5px; background: var(--accent-soft); color: var(--accent-text); border-bottom: 1px solid var(--border); }
+.demo-banner a { color: inherit; font-weight: 600; }
+@media (max-width: 760px) { .demo-banner { padding: 8px 16px; } }
 .head-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .label-cell { display: inline-flex; align-items: center; max-width: 260px; }
 .nav .count.warn-count { color: var(--warn); font-weight: 600; }
@@ -457,7 +463,36 @@ const ago = iso => {
 };
 const initials = n => n.replace(/^the\s+/i, "").split(/\s+/).slice(0, 2).map(w => w[0] || "").join("").toUpperCase();
 const avatar = (url, name, cls = "avatar") => url ? el("img", { class: cls, src: url, alt: "", loading: "lazy" }) : el("div", { class: cls }, initials(name));
+// ---------- demo mode: `ar-scout export-demo` builds a static, read-only copy that reads snapshot files
+const DEMO = !!window.AR_DEMO;
+let demoBoard = null;
+const demoLoad = async () => demoBoard ||= await fetch("demo-data/board.json").then(r => r.json());
+async function demoApi(path, opts) {
+  if (opts?.method && opts.method !== "GET") throw new Error("This is a read-only demo, so changes are turned off.");
+  const d = await demoLoad(), u = new URL(path, location.origin), q = u.searchParams, at = u.pathname;
+  if (at === "/api/status") return d.status;
+  if (at === "/api/health") return d.health;
+  if (at === "/api/review") return d.review;
+  if (at === "/api/leaderboard") {
+    if (q.get("watchlist") === "true" || q.get("archived") === "true") return [];  // private to the team
+    const max = +q.get("max_audience") || 0, plat = q.get("platform") || "any", genre = (q.get("genre") || "").toLowerCase();
+    return d.rows.filter(r => {
+      if (genre && !r._genres.some(g => g.toLowerCase().includes(genre))) return false;
+      if (!max) return true;
+      const v = plat === "any" ? Math.max(0, ...Object.values(r._audience).map(x => x || 0)) : r._audience[plat];
+      return v != null && v <= max;
+    }).slice(0, +q.get("limit") || 25);
+  }
+  if (at.startsWith("/api/artist/")) {
+    const name = decodeURIComponent(at.slice("/api/artist/".length)).toLowerCase();
+    const row = d.rows.find(r => r.name.toLowerCase() === name);
+    if (!row) throw new Error("This demo only includes the artists in its snapshot. Try one from the leaderboard.");
+    return fetch(`demo-data/artists/${row.id}.json`).then(r => r.json());
+  }
+  throw new Error("Not available in the demo.");
+}
 const api = async (path, opts) => {
+  if (DEMO) return demoApi(path, opts);
   const r = await fetch(path, opts);
   if (r.status === 401) { location.href = "/login"; throw new Error("Sign in first"); }  // session expired
   if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || r.statusText);
@@ -608,7 +643,7 @@ function ytCell(r) {
 }
 
 function starBtn(r) {
-  const b = el("button", { class: "star" + (r.status ? " on" : ""), title: r.status ? "On watchlist (click to remove)" : "Add to watchlist", "aria-label": r.status ? "Remove from watchlist" : "Add to watchlist" });
+  const b = el("button", { class: "star demo-hide" + (r.status ? " on" : ""), title: r.status ? "On watchlist (click to remove)" : "Add to watchlist", "aria-label": r.status ? "Remove from watchlist" : "Add to watchlist" });
   b.innerHTML = STAR;
   b.onclick = async e => {
     e.stopPropagation(); b.disabled = true;
@@ -661,7 +696,9 @@ function remembered(name, defaults, skip = []) {
 const resetTo = (state, defaults) => Object.assign(state, structuredClone(defaults));
 
 // First visit opens on small acts by YouTube size, the view scouting starts from.
-const LB_DEFAULTS = { genre: "", max: "20000", platform: "youtube", mgmt: "", archived: false, window: "30", sort: { key: "score", dir: -1 } };
+const LB_DEFAULTS = { genre: "", max: "20000", platform: "youtube", mgmt: "", archived: false, hideReview: true, window: "30", sort: { key: "score", dir: -1 } };
+// Artists whose linked accounts are under review don't lead rankings until someone checks them.
+const underReview = r => r.review?.length && !r.verified;
 const lb = remembered("leaderboard", LB_DEFAULTS);
 let lbRows = null, mvRows = [], wlRows = [];
 // Management filter shared by the leaderboard and Movers. "Unknown" counts as possibly unmanaged.
@@ -697,7 +734,7 @@ async function renderLeaderboard() {
       el("div", {}, el("h1", {}, "Leaderboard"), el("p", {}, "Every tracked artist, ranked by breakout score.")),
       el("div", { class: "head-actions" },
         el("button", { class: "btn ghost", onclick: () => { resetTo(lb, LB_DEFAULTS); renderLeaderboard(); } }, "Reset filters"),
-        csvBtn(() => (lbRows || []).filter(r => mgmtPass(r, lb.mgmt)), "leaderboard"),
+        csvBtn(() => (lbRows || []).filter(r => mgmtPass(r, lb.mgmt) && !(lb.hideReview && underReview(r))), "leaderboard"),
         await refreshBtn("all", () => load()))),
     bannerSlot, statsSlot,
     el("div", { class: "toolbar" },
@@ -705,6 +742,8 @@ async function renderLeaderboard() {
       el("label", { class: "field" }, el("span", {}, "Audience"), max),
       el("label", { class: "field" }, el("span", {}, "Measured on"), plat),
       mgmtSelect(lb, () => draw && draw()),
+      el("label", { class: "field check" }, el("span", {}, "Accounts under review"), el("span", { class: "check-row" },
+        el("input", { type: "checkbox", id: "lb-hide-review", checked: lb.hideReview, onchange: e => { lb.hideReview = e.target.checked; draw && draw(); } }), " Hide")),
       el("label", { class: "field check" }, el("span", {}, "Archived"), el("span", { class: "check-row" },
         el("input", { type: "checkbox", id: "lb-archived", checked: lb.archived, onchange: e => { lb.archived = e.target.checked; load(); } }), " Show only archived")),
       el("div", { class: "field" }, el("span", {}, "Growth window"), win)),
@@ -721,20 +760,27 @@ async function renderLeaderboard() {
     try { [rows, h] = await Promise.all([api("/api/leaderboard?" + p), api("/api/health")]); }
     catch (e) { if (mine === seq) tableSlot.replaceChildren(errorCard(e)); return; }
     if (mine !== seq) return;
-    const withGrowth = rows.filter(r => Object.keys(r.monthly_growth || {}).length).length;
-    const watched = rows.filter(r => r.status).length;
-    const top = rows[0];
-    const filtered = lb.genre || lb.max;
-    statsSlot.replaceChildren(
-      stat("Artists", rows.length, filtered ? `matching filters, of ${h.artists}` : "in the database"),
-      stat("On watchlist", watched, filtered ? "in this view" : "snapshotted daily"),
-      stat("With growth data", withGrowth, withGrowth ? `${Math.round(withGrowth / Math.max(rows.length, 1) * 100)}% of artists` : `needs ${h.min_growth_days}+ days of snapshots`),
-      stat("Top score", top ? Math.round(top.score) : "–", top ? top.name : "—"));
+    // Stats describe exactly the rows in the table, so they follow every filter.
+    const drawStats = shown => {
+      const withGrowth = shown.filter(r => Object.keys(r.monthly_growth || {}).length).length;
+      const watched = shown.filter(r => r.status).length;
+      const top = shown[0];
+      const filtered = lb.genre || lb.max || lb.mgmt || lb.hideReview;
+      statsSlot.replaceChildren(
+        stat("Artists", shown.length, filtered ? `matching filters, of ${h.artists}` : "in the database"),
+        stat("On watchlist", watched, filtered ? "in this view" : "snapshotted daily"),
+        stat("With growth data", withGrowth, withGrowth ? `${Math.round(withGrowth / Math.max(shown.length, 1) * 100)}% of artists` : `needs ${h.min_growth_days}+ days of snapshots`),
+        stat("Top score", top ? Math.round(top.score) : "–", top ? top.name : "—"));
+    };
     const ytFilter = lb.max && lb.platform === "youtube";
     bannerSlot.replaceChildren(h.unlinked ? relinkBanner(h.unlinked, ytFilter, load) : "");
     lbRows = rows;
-    draw = () => tableSlot.replaceChildren(dataTable(rows.filter(r => mgmtPass(r, lb.mgmt)), {
-      empty: ["No artists match", "Loosen the filters above, or look up an artist with the search bar."], sort: lb.sort, onSort: s => { lb.sort = s; draw(); } }));
+    draw = () => {
+      const shown = rows.filter(r => mgmtPass(r, lb.mgmt) && !(lb.hideReview && underReview(r)));
+      drawStats(shown);
+      tableSlot.replaceChildren(dataTable(shown, {
+        empty: ["No artists match", "Loosen the filters above, or look up an artist with the search bar."], sort: lb.sort, onSort: s => { lb.sort = s; draw(); } }));
+    };
     draw();
   }
   let draw = null;
@@ -783,8 +829,10 @@ async function renderWatchlist() {
   const shown = () => (wlRows = rows.filter(r => !wl.tag || (r.tags || []).includes(wl.tag)).filter(r => wl.view === "board" || !wl.status || r.status === wl.status));
   const draw = () => {
     if (!rows.length) {
-      slot.replaceChildren(el("div", { class: "card" }, el("div", { class: "empty" }, el("h4", {}, "Your watchlist is empty"),
-        "Star an artist in any table, or open one and click Watch, to start tracking them.")));
+      slot.replaceChildren(el("div", { class: "card" }, el("div", { class: "empty" }, DEMO
+        ? [el("h4", {}, "The pipeline is private to the team"),
+           "In the full tool this is a board with a column per stage (watching, contacted, meeting, signed, passed), an owner, a next step and a due date for every artist. The demo leaves it out, along with the artists on it."]
+        : [el("h4", {}, "Your watchlist is empty"), "Star an artist in any table, or open one and click Watch, to start tracking them."])));
       return;
     }
     if (wl.view === "board") { slot.replaceChildren(pipelineBoard(shown(), renderWatchlist)); return; }
@@ -1136,7 +1184,7 @@ async function renderReview() {
     return;
   }
   slot.replaceChildren(el("div", { class: "review-list" }, rows.map(r => {
-    const btn = el("button", { class: "btn", title: "Only after you've checked: every linked account is this artist" }, "Links are correct");
+    const btn = el("button", { class: "btn demo-hide", title: "Only after you've checked: every linked account is this artist" }, "Links are correct");
     btn.onclick = async () => {
       btn.disabled = true;
       try { await post(`/api/artist/${r.id}/verify`, { verified: true }); toast(`${r.name}: links confirmed`); loadCounts(); renderReview(); }
@@ -1158,16 +1206,22 @@ function reviewBanner(a, s) {
   };
   if (a.verified_at) return el("div", { class: "review-banner ok" }, el("div", { class: "row" },
     el("span", {}, `✓ Linked accounts checked on ${new Date(a.verified_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}.`),
-    el("button", { class: "btn ghost", onclick: toggle(false) }, "Undo: send back to review")));
+    el("button", { class: "btn ghost demo-hide", onclick: toggle(false) }, "Undo: send back to review")));
   if (!s.review?.length) return null;
   return el("div", { class: "review-banner" },
     el("div", { class: "row" }, el("b", {}, "Check this artist's linked accounts"),
-      el("button", { class: "btn", onclick: toggle(true), title: "Only after you've checked: every linked account is this artist" }, "Links are correct")),
+      el("button", { class: "btn demo-hide", onclick: toggle(true), title: "Only after you've checked: every linked account is this artist" }, "Links are correct")),
     el("ul", {}, s.review.map(i => el("li", {}, i))),
     el("span", {}, "Compare the links above with the artist's real profiles. Fix a wrong YouTube or Instagram account with Change on its tile below."));
 }
 
 function renderDiscover() {
+  if (DEMO) {
+    view.replaceChildren(el("div", { class: "page-head" }, el("div", {}, el("h1", {}, "Discover"))),
+      el("div", { class: "card" }, el("div", { class: "empty" }, el("h4", {}, "Discovery searches live music data"),
+        "In the full tool this finds new artists by similar acts, scene tags, curated playlists, new releases and country charts, and adds them to the leaderboard. The demo is a fixed snapshot, so it's switched off here.")));
+    return;
+  }
   const mode = el("select", { class: "input" }, Object.entries(MODES).map(([k, [t]]) => el("option", { value: k, selected: k === disc.mode }, t)));
   const q = el("input", { class: "input", placeholder: MODES[disc.mode][1], value: disc.query });
   const mn = el("input", { class: "input num", type: "number", value: disc.min });
@@ -1300,7 +1354,7 @@ function parseCount(text) {
 
 // A button that saves a number read off a public profile as today's snapshot.
 function manualButton(a, metric, label, where) {
-  const b = el("button", { class: "linkish" }, "Update");
+  const b = el("button", { class: "linkish demo-hide" }, "Update");
   b.onclick = async () => {
     const text = prompt(`${label} for ${a.name}\n\n${where}\nType the number shown, e.g. 12,500 or 12.5K. It's saved with today's date.`);
     if (text == null || !text.trim()) return;
@@ -1338,7 +1392,7 @@ function igKpi(a, m) {
 
 function managementCard(a) {
   const info = a.management_info || { label: "Unknown" };
-  const sel = el("select", { class: "input", id: "mgmt-status", "aria-label": "Management status" },
+  const sel = el("select", { class: "input demo-hide", id: "mgmt-status", "aria-label": "Management status" },
     [["", info.source === "instagram bio" ? "Use Instagram bio" : "Unknown"], ["unmanaged", "No management"], ["managed", "Has management"]]
       .map(([v, t]) => el("option", { value: v, selected: v === (a.management || "") }, t)));
   sel.onchange = async () => {
@@ -1393,7 +1447,8 @@ function explainScore(r) {
   const mg = a.management_info?.status;
   if (mg === "unmanaged" || mg === "not_listed") pro.push(`No management ${mg === "unmanaged" ? "(you checked)" : "listed in their Instagram bio"}.`);
   else if (mg === "managed" || mg === "listed") con.push("Already has management.");
-  if (s.review?.length && !a.verified_at) con.push("Some linked accounts may belong to someone else, so treat these numbers with care.");
+  if (s.excluded?.length) con.push(`${s.excluded.map(p => ({ youtube: "YouTube", lastfm: "Last.fm", deezer: "Deezer", instagram: "Instagram" })[p] || p).join(" and ")} left out of the score until someone checks the linked account.`);
+  else if (s.review?.length && !a.verified_at) con.push("Some linked accounts may belong to someone else, so treat these numbers with care.");
   const list = (items, cls) => el("ul", { class: "why " + cls }, items.map(t => el("li", {}, t)));
   return el("div", { class: "explain" },
     pro.length ? [el("div", { class: "why-h pos" }, "Working for them"), list(pro, "pos")] : null,
@@ -1427,12 +1482,37 @@ function manageCard(a) {
         catch (err) { toast("Couldn't delete: " + err.message); e.target.disabled = false; }
       } }, "Yes, delete")));
   del.onclick = () => { del.hidden = true; confirmRow.hidden = false; };
-  return el("div", { class: "card card-pad" },
+  return el("div", { class: "card card-pad demo-hide" },
     el("h3", {}, "Manage artist"),
     el("p", { class: "dim", style: "font-size:12.5px;margin:0 0 10px" }, a.archived_at
       ? "Restoring brings them back into rankings and daily snapshots."
       : "Archive dead ends and passes: they leave every ranking and stop using API quota, and discovery won't bring them back."),
     el("div", { class: "head-actions" }, arch, del), confirmRow);
+}
+
+// Last.fm and Deezer matches: a link to the profile, and (admin) a way to point at the right one.
+const ACCOUNTS = {
+  lastfm: { label: "Last.fm", field: "lastfm_source",
+    href: a => a.lastfm_name ? "https://www.last.fm/music/" + encodeURIComponent(a.lastfm_name).replace(/%20/g, "+") : null,
+    ask: a => `Last.fm artist for ${a.name}\n\nPaste their last.fm/music/... link. The old Last.fm history for this artist is deleted so the switch doesn't read as growth.` },
+  deezer: { label: "Deezer", field: "deezer_source",
+    href: a => a.deezer_id ? `https://www.deezer.com/artist/${a.deezer_id}` : null,
+    ask: a => `Deezer artist for ${a.name}\n\nPaste their deezer.com/artist/... link. The old Deezer history for this artist is deleted so the switch doesn't read as growth.` },
+};
+function accountLine(a, kind) {
+  const k = ACCOUNTS[kind], href = k.href(a);
+  const change = el("button", { class: "linkish" }, "Change");
+  change.onclick = async () => {
+    const link = prompt(k.ask(a));
+    if (!link || !link.trim()) return;
+    change.disabled = true; change.textContent = "Saving…";
+    try { await post(`/api/artist/${a.id}/${kind}`, { link: link.trim() }); toast(`${k.label} updated`); renderArtist(a.name); }
+    catch (e) { toast(`Couldn't change ${k.label}: ` + e.message); change.disabled = false; change.textContent = "Change"; }
+  };
+  return el("div", { class: "d yt-src" },
+    href ? el("a", { href, target: "_blank", rel: "noopener" }, k.label + " ↗") : null,
+    a[k.field] === "manual" ? " set by you" : null,
+    el("span", { class: "admin-only" }, href ? " · " : "", change));
 }
 
 const parseTags = v => [...new Set(v.split(",").map(t => t.trim()).filter(Boolean))];
@@ -1470,17 +1550,20 @@ async function renderArtist(name) {
   const unwatch = watched ? el("button", { class: "btn ghost", onclick: async () => {
     await api("/api/watch/" + a.id, { method: "DELETE" }); toast("Removed from watchlist"); loadCounts(); renderArtist(a.name); } }, "Unwatch") : null;
 
-  const meta = [a.country, (a.genres || []).slice(0, 4).join(", "), rel.first_release && `releasing since ${rel.first_release.slice(0, 4)}`].filter(Boolean);
+  const newest = r.history.length ? r.history[r.history.length - 1].taken_at : null;
+  const meta = [a.country, (a.genres || []).slice(0, 4).join(", "), rel.first_release && `releasing since ${rel.first_release.slice(0, 4)}`,
+    newest && `numbers as of ${new Date(newest).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}`].filter(Boolean);
   const hero = el("div", { class: "hero" }, avatar(a.image_url, a.name),
     el("div", { class: "hero-main" },
       el("h1", {}, a.name),
       el("div", { class: "meta" }, meta.map(x => el("span", {}, x))),
       Object.keys(a.links || {}).length ? el("div", { class: "links" },
         Object.entries(a.links).filter(([k]) => k !== "wikidata").map(([k, u]) => el("a", { href: u, target: "_blank", rel: "noopener" }, k[0].toUpperCase() + k.slice(1) + " ↗"))) : null),
-    el("div", { class: "hero-actions" }, watched ? el("span", { class: "pill st-" + watched.status }, "On watchlist") : null, statusSel, watchBtn, unwatch,
+    el("div", { class: "hero-actions" }, watched ? el("span", { class: "pill st-" + watched.status }, "On watchlist") : null,
+      el("span", { class: "demo-hide head-actions" }, statusSel, watchBtn, unwatch),
       (() => { const b = el("button", { class: "btn ghost" }, inCompare(a.name) ? "✓ In compare" : "Compare");
         b.onclick = () => { if (toggleCompare(a.name)) b.textContent = inCompare(a.name) ? "✓ In compare" : "Compare"; }; return b; })()),
-    el("div", { class: "tag-edit", style: "flex-basis:100%" }, el("span", { class: "dim", style: "font-size:12px" }, "Tags"), tagInput),
+    el("div", { class: "tag-edit demo-hide", style: "flex-basis:100%" }, el("span", { class: "dim", style: "font-size:12px" }, "Tags"), tagInput),
     watched ? pipelineEditor(a, watched) : null);
 
   // KPIs
@@ -1495,9 +1578,22 @@ async function renderArtist(name) {
     const sign = c.delta > 0 ? "+" : c.delta < 0 ? "−" : "±";
     return el("div", { class: "d " + cls }, `${days}d: ${sign}${fmt(Math.abs(c.delta))}` + (c.pct != null ? ` (${pct(c.pct)})` : ""));
   };
-  const kpi = (label, key, sub) => el("div", { class: "card kpi" },
-    el("div", { class: "l" }, label), el("div", { class: "v" }, fmt(m[key])),
-    m[key] == null ? el("div", { class: "d" }, sub || "not linked") : [changeLine(key, 7), changeLine(key, 28)]);
+  const uncounted = key => (s.excluded || []).includes(key.split(".")[0]);
+  // Where each number comes from, and when it was last collected.
+  const SOURCE = { youtube: "YouTube", lastfm: "Last.fm", deezer: "Deezer", wikipedia: "Wikipedia", instagram: "Instagram", spotify: "typed in", tiktok: "typed in" };
+  const lastAt = {}; for (const h of r.history) lastAt[h.metric] = h.taken_at;
+  const sourceLine = key => {
+    const at = lastAt[key];
+    if (!at) return null;
+    const src = key === "instagram.followers" && !igOn ? "typed in" : SOURCE[key.split(".")[0]] || "";
+    const d = new Date(at);
+    return el("span", { class: "src-at", title: `${src === "typed in" ? "Entered by hand from the public profile" : "From " + src} · ${d.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}` },
+      `${src} · ${d.toLocaleDateString(undefined, { month: "short", day: "numeric" })}`);
+  };
+  const kpi = (label, key, sub) => el("div", { class: "card kpi" + (uncounted(key) ? " uncounted" : "") },
+    el("div", { class: "l" }, label, uncounted(key) ? el("span", { class: "mini warn", style: "margin-left:6px", title: "Flagged for review, so left out of the score until someone fixes or checks it" }, "Not in score") : null),
+    el("div", { class: "v" }, fmt(m[key])),
+    m[key] == null ? el("div", { class: "d" }, sub || "not linked") : [changeLine(key, 7), changeLine(key, 28)], sourceLine(key));
   const depth = m["lastfm.listeners"] ? m["lastfm.playcount"] / m["lastfm.listeners"] : null;
   // Numbers with no API: the tile links to the profile and takes a typed-in count. Shows when it was last entered.
   const lastEntered = metric => { const h = r.history.filter(x => x.metric === metric).at(-1); return h ? new Date(h.taken_at).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : null; };
@@ -1521,10 +1617,10 @@ async function renderArtist(name) {
       "On the artist's Spotify page, it's the number under their name: “monthly listeners”."),
     manualTile("tiktok.followers", "TikTok followers", a.links?.tiktok, "TikTok",
       "On the TikTok profile, it's the number above “Followers”."),
-    kpi("Last.fm listeners", "lastfm.listeners"),
+    (() => { const t = kpi("Last.fm listeners", "lastfm.listeners"); t.append(accountLine(a, "lastfm")); return t; })(),
     el("div", { class: "card kpi" }, el("div", { class: "l" }, "Plays per listener"),
       el("div", { class: "v" }, depth == null ? "–" : depth.toFixed(1)), el("div", { class: "d" }, depth > 30 ? "deep fandom" : "fandom depth")),
-    kpi("Deezer fans", "deezer.fans"),
+    (() => { const t = kpi("Deezer fans", "deezer.fans"); t.append(accountLine(a, "deezer")); return t; })(),
     kpi("Wikipedia views (30d)", "wikipedia.pageviews_30d", "no article"));
 
   // charts
@@ -1566,7 +1662,7 @@ async function renderArtist(name) {
       : el("div", { class: "dim" }, "None found."));
 
   const noteBox = el("textarea", { class: "input", placeholder: "Add a scouting note — show report, contact, gut feel…" });
-  const notes = el("div", { class: "card card-pad" }, el("h3", {}, "Notes", el("span", { class: "aside" }, r.notes.length || "")),
+  const notes = el("div", { class: "card card-pad demo-hide" }, el("h3", {}, "Notes", el("span", { class: "aside" }, r.notes.length || "")),
     r.notes.length ? r.notes.map(n => el("div", { class: "note" }, el("time", {}, n.created_at.slice(0, 10)), n.body)) : el("div", { class: "dim", style: "font-size:13px" }, "No notes yet."),
     noteBox, el("div", { style: "display:flex;justify-content:flex-end;margin-top:8px" }, el("button", { class: "btn", onclick: async () => {
       if (!noteBox.value.trim()) return;
@@ -1628,6 +1724,20 @@ $("#adminToggle").onchange = e => {
   try { localStorage.setItem("ars-admin", adminOn ? "1" : "0"); } catch {}
   toast(adminOn ? "Admin tools shown" : "Admin tools hidden");
 };
+
+// ============================================================ demo banner
+if (DEMO) {
+  document.body.classList.add("demo");
+  adminOn = false; document.body.classList.remove("admin");
+  demoLoad().then(d => {
+    const m = d.meta || {};
+    const bar = el("div", { class: "demo-banner" },
+      el("b", {}, "Read-only demo"), ` · data snapshot from ${new Date(m.snapshot + "T12:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}`,
+      m.credit ? ` · ${m.credit}` : null,
+      m.repo ? [" · ", el("a", { href: m.repo, target: "_blank", rel: "noopener" }, "Code on GitHub ↗")] : null);
+    $(".main").prepend(bar);
+  }).catch(() => {});
+}
 
 // ============================================================ boot
 let igOn = false;

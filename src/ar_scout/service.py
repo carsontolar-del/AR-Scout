@@ -97,12 +97,15 @@ def track_light(dz: dict, via: str | None = None) -> int:
     metrics: dict[str, float | None] = {"deezer.fans": dz.get("nb_fan"), "deezer.albums": dz.get("nb_album"),
                                         "releases_last_year": rel.get("releases_last_year")}
     if lastfm.available():
-        info = _try(errors, "lastfm", lambda: lastfm.artist_info(dz["name"]))
+        manual_lf = existing and existing.get("lastfm_source") == "manual"
+        lf_name = existing["lastfm_name"] if manual_lf else dz["name"]
+        info = _try(errors, "lastfm", lambda: lastfm.artist_info(lf_name, autocorrect=not manual_lf))
         if info:
             metrics["lastfm.listeners"] = info["listeners"]
             metrics["lastfm.playcount"] = info["playcount"]
-            db.upsert_artist({"lastfm_name": info["name"], "mbid": info["mbid"],
-                              "genres": info["tags"][:6]}, artist_id)
+            if not manual_lf:
+                db.upsert_artist({"lastfm_name": info["name"], "mbid": info["mbid"],
+                                  "genres": info["tags"][:6]}, artist_id)
     db.add_snapshot(artist_id, metrics)
     return artist_id
 
@@ -173,6 +176,49 @@ def set_instagram_account(artist_id: int, handle: str) -> dict:
             "followers": stats["followers"] if stats else None, "media_count": stats["media_count"] if stats else None}
 
 
+def set_lastfm_artist(artist_id: int, link: str) -> dict:
+    """Point an artist at the right Last.fm artist (a last.fm/music/... link or the exact name), drop the old
+    artist's Last.fm history and snapshot. Kept even when later lookups would pick someone else."""
+    artist = db.get_artist(artist_id)
+    if not artist:
+        raise SourceError(f"No artist with id {artist_id}")
+    name = lastfm.name_from_url(link)
+    if not name:
+        raise SourceError("Not a Last.fm artist link. Use last.fm/music/Artist+Name or the exact name")
+    info = lastfm.artist_info(name, autocorrect=False)
+    if not info or not info["listeners"]:
+        raise SourceError(f"Last.fm has no listeners for “{name}”. Check the spelling or the link")
+    if info["name"] != artist.get("lastfm_name"):
+        db.delete_metrics(artist_id, "lastfm.")
+    db.upsert_artist({"lastfm_name": info["name"], "lastfm_source": "manual", "genres": info["tags"][:6]}, artist_id)
+    snapshot(artist_id)
+    return {"artist": artist["name"], "lastfm_name": info["name"], "listeners": info["listeners"],
+            "playcount": info["playcount"], "url": info["url"]}
+
+
+def set_deezer_artist(artist_id: int, link: str) -> dict:
+    """Point an artist at the right Deezer artist (a deezer.com/artist/... link or its number), drop the old
+    artist's Deezer history and snapshot."""
+    artist = db.get_artist(artist_id)
+    if not artist:
+        raise SourceError(f"No artist with id {artist_id}")
+    dz_id = deezer.id_from_url(link)
+    if not dz_id:
+        raise SourceError("Not a Deezer artist link. Use deezer.com/artist/12345")
+    dz = deezer.artist(dz_id)
+    if not dz:
+        raise SourceError(f"Deezer has no artist {dz_id}")
+    other = db.find_by_deezer(dz_id)
+    if other and other["id"] != artist_id:
+        raise SourceError(f"That Deezer page is already tracked as “{other['name']}”")
+    if dz_id != artist.get("deezer_id"):
+        db.delete_metrics(artist_id, "deezer.")
+        db.delete_metrics(artist_id, "releases_last_year")
+    db.upsert_artist({"deezer_id": dz_id, "deezer_source": "manual", "image_url": dz.get("picture_medium")}, artist_id)
+    snapshot(artist_id)
+    return {"artist": artist["name"], "deezer_id": dz_id, "deezer_name": dz.get("name"), "fans": dz.get("nb_fan")}
+
+
 def set_youtube_channel(artist_id: int, url: str) -> dict:
     """Manually set an artist's YouTube channel from a channel URL, @handle URL or channel ID, then snapshot.
     Manual choices are never overwritten by recheck_youtube()."""
@@ -235,7 +281,8 @@ def resolve(name: str, deep: bool = True) -> dict:
         fields.update(name=dz["name"], deezer_id=dz["id"], image_url=dz.get("picture_medium"))
     display = fields.get("name") or name
 
-    lf = _try(errors, "lastfm", lambda: lastfm.artist_info(display)) if lastfm.available() else None
+    manual_lf = (artist or {}).get("lastfm_source") == "manual"
+    lf = _try(errors, "lastfm", lambda: lastfm.artist_info(display)) if lastfm.available() and not manual_lf else None
     if lf:
         fields.update(lastfm_name=lf["name"], mbid=lf["mbid"], genres=lf["tags"][:6])
 
@@ -307,7 +354,8 @@ def snapshot(artist_id: int) -> dict:
                           "latest_release": rel.get("latest_release")}, artist_id)
 
     if lastfm.available():
-        lf = _try(errors, "lastfm", lambda: lastfm.artist_info(a.get("lastfm_name") or a["name"]))
+        exact = a.get("lastfm_source") == "manual"
+        lf = _try(errors, "lastfm", lambda: lastfm.artist_info(a.get("lastfm_name") or a["name"], autocorrect=not exact))
         if lf:
             m["lastfm.listeners"], m["lastfm.playcount"] = lf["listeners"], lf["playcount"]
 
@@ -484,44 +532,65 @@ _JUMP_METRICS = {"deezer.fans": "Deezer fans", "lastfm.listeners": "Last.fm list
                  "youtube.subscribers": "YouTube subscribers", "instagram.followers": "Instagram followers"}
 
 
-def review_issues(artist: dict, metrics: dict, history: dict[str, list[tuple[str, float]]]) -> list[str]:
-    """Plain-language reasons this artist's linked accounts may be wrong. Jumps from before the artist was
-    marked verified are left out; the other checks always run, since verifying says they were looked at."""
-    issues = []
+def review_findings(artist: dict, metrics: dict, history: dict[str, list[tuple[str, float]]]) -> list[tuple[str, str]]:
+    """(platform, plain-language reason) for each sign that a linked account belongs to someone else. Jumps from
+    before the artist was marked verified are left out; the other checks always run, since verifying says they
+    were looked at."""
+    found: list[tuple[str, str]] = []
     dz, lf, yt = metrics.get("deezer.fans"), metrics.get("lastfm.listeners"), metrics.get("youtube.subscribers")
     if scoring.youtube_suspect(metrics):
-        issues.append("YouTube channel looks too small for this act (or has no videos)")
+        found.append(("youtube", "YouTube channel looks too small for this act (or has no videos)"))
     if dz and yt and yt > 20_000 and yt / dz > YT_PER_DEEZER_MAX:
-        issues.append(f"YouTube channel looks far too big for this act: {yt:,.0f} subscribers vs {dz:,.0f} Deezer fans")
-    if dz and lf and dz >= 500 and lf < LASTFM_PER_DEEZER_MIN * dz:
-        issues.append(f"Last.fm looks too small for this act ({lf:,.0f} listeners vs {dz:,.0f} Deezer fans): "
-                      "it may be a different artist with the same name")
+        found.append(("youtube", f"YouTube channel looks far too big for this act: {yt:,.0f} subscribers vs "
+                                 f"{dz:,.0f} Deezer fans"))
+    if dz and lf and dz >= 500 and lf < LASTFM_PER_DEEZER_MIN * dz and artist.get("lastfm_source") != "manual":
+        found.append(("lastfm", f"Last.fm looks too small for this act ({lf:,.0f} listeners vs {dz:,.0f} Deezer "
+                                "fans): it may be a different artist with the same name"))
+    lf_name = artist.get("lastfm_name")
+    if lf_name and artist.get("lastfm_source") != "manual" and youtube._key(lf_name) != youtube._key(artist["name"]):
+        found.append(("lastfm", f"Last.fm matched a different name, “{lf_name}”: Last.fm's autocorrect may have "
+                                "picked another artist"))
     title = artist.get("youtube_title")
     if title and artist.get("youtube_source") != "manual" and not youtube.title_matches(title, artist["name"]):
-        issues.append(f"YouTube channel is called “{title}”, which doesn't match the artist's name")
+        found.append(("youtube", f"YouTube channel is called “{title}”, which doesn't match the artist's name"))
     since = (artist.get("verified_at") or "")[:10]
     for metric, label in _JUMP_METRICS.items():
         pts = history.get(metric, [])
         for (_, before), (when, after) in zip(pts, pts[1:]):
             if before > 0 and when[:10] > since and (after / before > JUMP_FACTOR or after / before < 1 / JUMP_FACTOR):
-                issues.append(f"{label} jumped from {before:,.0f} to {after:,.0f} on {when[:10]}: "
-                              "likely an account change, not real growth")
+                found.append((metric.split(".")[0], f"{label} jumped from {before:,.0f} to {after:,.0f} on "
+                                                    f"{when[:10]}: likely an account change, not real growth"))
                 break
-    return issues
+    return found
+
+
+def review_issues(artist: dict, metrics: dict, history: dict[str, list[tuple[str, float]]]) -> list[str]:
+    return [text for _, text in review_findings(artist, metrics, history)]
+
+
+PLATFORM_NAMES = {"youtube": "YouTube", "lastfm": "Last.fm", "deezer": "Deezer", "instagram": "Instagram"}
 
 
 def score_artist(artist: dict, window_days: int = 30) -> dict:
     metrics = db.latest_metrics(artist["id"])
     history = _history_by_metric(artist["id"])
     label = artist.get("latest_label")
-    return scoring.score(
-        metrics, history,
+    findings = review_findings(artist, metrics, history)
+    # A flagged platform's numbers stay on the page but don't count until a person fixes or verifies the artist.
+    excluded = sorted({p for p, _ in findings}) if not artist.get("verified_at") else []
+    keep = lambda k: not any(k.startswith(p + ".") for p in excluded)
+    result = scoring.score(
+        {k: v for k, v in metrics.items() if keep(k)}, {k: v for k, v in history.items() if keep(k)},
         latest_release=artist.get("latest_release"),
         releases_last_year=int(metrics["releases_last_year"]) if "releases_last_year" in metrics else None,
         label_class=labels.classify(label, artist.get("name")),
         window_days=window_days,
-    ) | {"metrics": metrics, "review": review_issues(artist, metrics, history),
-         "change_7d": {k: scoring.window_change(history.get(m, []), 7) for k, m in MOVER_METRICS.items()}}
+    )
+    if excluded:
+        result["flags"].insert(0, "left out of the score until checked: "
+                               + ", ".join(PLATFORM_NAMES.get(p, p) for p in excluded))
+    return result | {"metrics": metrics, "review": [t for _, t in findings], "excluded": excluded,
+                     "change_7d": {k: scoring.window_change(history.get(m, []), 7) for k, m in MOVER_METRICS.items()}}
 
 
 CHANGE_WINDOWS = (7, 28)
@@ -672,6 +741,10 @@ def leaderboard(limit: int = 25, watchlist_only: bool = False, window_days: int 
 _score_cache: dict[tuple, list] = {}
 
 
+def _all_ids() -> set[int]:
+    return {a["id"] for a in db.all_artists()}
+
+
 def _scored(watchlist_only: bool, window_days: int, archived: bool) -> list[tuple[dict, dict, list[str]]]:
     """(row, latest metrics, all genres) for every artist in scope, best score first."""
     version = db.data_version()
@@ -705,6 +778,7 @@ def _scored(watchlist_only: bool, window_days: int, archived: bool) -> list[tupl
             "status_since": a.get("status_since") or a.get("watch_added"),
             "review": s["review"], "verified": bool(a.get("verified_at")), "verified_at": a.get("verified_at"),
             "accelerating": s["acceleration"]["accelerating"], "archived_at": a.get("archived_at"),
+            "excluded": s["excluded"],
             "management": management_info(a),
             "change_7d": {k: ({"delta": c["delta"], "pct": c["pct"], "start": c["start"]} if c else None)
                           for k, c in s["change_7d"].items()},

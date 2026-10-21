@@ -125,6 +125,22 @@ def set_youtube_channel(name: str, url: str) -> dict:
 
 
 @mcp.tool()
+def set_lastfm_artist(name: str, link: str) -> dict:
+    """Fix an artist's Last.fm match (a last.fm/music/... link or the exact Last.fm name). Deletes the old
+    match's Last.fm history and takes a fresh snapshot."""
+    a = service.resolve(name, deep=False)
+    return service.set_lastfm_artist(a["id"], link)
+
+
+@mcp.tool()
+def set_deezer_artist(name: str, link: str) -> dict:
+    """Fix an artist's Deezer match (a deezer.com/artist/... link or the number). Deletes the old match's Deezer
+    history and takes a fresh snapshot."""
+    a = service.resolve(name, deep=False)
+    return service.set_deezer_artist(a["id"], link)
+
+
+@mcp.tool()
 def set_instagram_account(name: str, handle: str) -> dict:
     """Fix an artist's Instagram account by hand (instagram.com/name, @name or name). Follower counts come from
     Instagram Business Discovery, which only sees public professional (Business/Creator) accounts.

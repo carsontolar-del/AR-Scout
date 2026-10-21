@@ -125,6 +125,20 @@ def backup():
     console.print(f"Backed up to {b['path']} ({b['size_mb']} MB, keeping {b['kept']})")
 
 
+@app.command("export-demo")
+def export_demo(out: str = typer.Option("docs", help="Folder to write the demo site into (GitHub Pages serves docs/)"),
+                include_watchlist: bool = typer.Option(False, help="Also include watchlisted artists"),
+                repo: str = typer.Option(None, help="Link to the code, shown in the demo banner"),
+                credit: str = typer.Option(None, help='Shown in the banner, e.g. "Built by Carson Wilkinson"')):
+    """Build a read-only demo of the dashboard from a snapshot of the data, without team-only information."""
+    from pathlib import Path
+
+    from . import demo
+    res = demo.export(Path(out), include_watchlist, repo, credit, progress=_progress)
+    console.print(f"Demo with {res['artists']} artists written to {res['path']} ({res['size_mb']} MB); "
+                  f"{res['left_out_watchlist']} watchlist artists left out")
+
+
 @app.command("upload-db")
 def upload_db(url: str = typer.Argument(..., help="The hosted dashboard, e.g. https://ar-scout.onrender.com")):
     """Copy this computer's database (all history) to a hosted dashboard. Replaces the host's data; it backs
@@ -299,6 +313,10 @@ def serve(host: str = typer.Option("127.0.0.1", envvar="AR_SCOUT_HOST", help="0.
 
     import uvicorn
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(message)s")
+    # httpx logs every request URL at INFO, and Last.fm/YouTube keys travel in the URL: keep those out of logs
+    # (on a host, logs are readable by everyone with access to the account).
+    for noisy in ("httpx", "httpcore"):
+        logging.getLogger(noisy).setLevel(logging.WARNING)
     console.print(f"Dashboard at http://{host}:{port}")
     uvicorn.run("ar_scout.web.app:app", host=host, port=port, proxy_headers=True, forwarded_allow_ips="*")
 

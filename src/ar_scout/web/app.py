@@ -182,6 +182,26 @@ def set_youtube(artist_id: int, body: YouTubeIn):
         raise HTTPException(400, str(exc)) from exc
 
 
+class LinkIn(BaseModel):
+    link: str
+
+
+@app.post("/api/artist/{artist_id}/lastfm", dependencies=[Depends(admin_only)])
+def set_lastfm(artist_id: int, body: LinkIn):
+    try:
+        return service.set_lastfm_artist(artist_id, body.link)
+    except SourceError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@app.post("/api/artist/{artist_id}/deezer", dependencies=[Depends(admin_only)])
+def set_deezer(artist_id: int, body: LinkIn):
+    try:
+        return service.set_deezer_artist(artist_id, body.link)
+    except SourceError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
 @app.post("/api/artist/{artist_id}/instagram", dependencies=[Depends(admin_only)])
 def set_instagram(artist_id: int, body: InstagramIn):
     try:

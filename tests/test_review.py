@@ -38,3 +38,18 @@ def test_verifying_clears_queue_and_old_jumps_only(tmp_db):
 
     service.set_verified(artist_id, False)
     assert db.get_artist(artist_id)["verified_at"] is None
+
+
+def test_flagged_platform_is_left_out_of_the_score_until_verified():
+    a = db.upsert_artist({"name": "Snuggle"})
+    db.add_snapshot(a, {"deezer.fans": 483, "lastfm.listeners": 84_000, "youtube.subscribers": 98_600})
+    s = service.score_artist(db.get_artist(a))
+    assert s["excluded"] == ["youtube"] and s["flags"][0].startswith("left out of the score")
+    assert s["metrics"]["youtube.subscribers"] == 98_600            # still shown
+
+    without_yt = db.upsert_artist({"name": "Snuggle copy"})
+    db.add_snapshot(without_yt, {"deezer.fans": 483, "lastfm.listeners": 84_000})
+    assert s["score"] == service.score_artist(db.get_artist(without_yt))["score"]
+
+    service.set_verified(a)
+    assert service.score_artist(db.get_artist(a))["excluded"] == []

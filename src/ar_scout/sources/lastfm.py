@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 from typing import Any
 
 from ..config import settings
@@ -32,8 +34,10 @@ def _as_list(value: Any) -> list:
     return value if isinstance(value, list) else [value]
 
 
-def artist_info(name: str) -> dict | None:
-    data = _call("artist.getinfo", artist=name, autocorrect=1).get("artist")
+def artist_info(name: str, autocorrect: bool = True) -> dict | None:
+    """autocorrect lets Last.fm fix misspellings, but it can also swap in a different artist ("Ratboys" ->
+    "Ratboy"), so names a person chose are looked up exactly."""
+    data = _call("artist.getinfo", artist=name, autocorrect=1 if autocorrect else 0).get("artist")
     if not data:
         return None
     stats = data.get("stats", {})
@@ -46,6 +50,16 @@ def artist_info(name: str) -> dict | None:
         "tags": [t["name"] for t in _as_list(data.get("tags", {}).get("tag"))],
         "bio": (data.get("bio", {}).get("summary") or "").split("<a href")[0].strip(),
     }
+
+
+def name_from_url(link: str) -> str | None:
+    """'https://www.last.fm/music/The+K%27s' -> "The K's"; a plain name passes through."""
+    from urllib.parse import unquote_plus
+    link = link.strip()
+    if "last.fm" not in link and "lastfm" not in link:
+        return link or None
+    m = re.search(r"/music/([^/?#]+)", link)
+    return unquote_plus(m.group(1)) if m else None
 
 
 def similar(name: str, limit: int = 50) -> list[dict]:

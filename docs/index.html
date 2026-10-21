@@ -1,0 +1,1789 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AR Scout</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  color-scheme: light;
+  --bg: #f7f7f5; --surface: #ffffff; --surface-2: #f2f2ef; --surface-3: #e9e9e5;
+  --border: #e4e4df; --border-strong: #d4d4cd;
+  --text: #16161a; --text-2: #55555c; --muted: #8e8e95;
+  --accent: #3b5bdb; --accent-hover: #2f4bc4; --accent-soft: #e8edfd; --accent-text: #2a46b8;
+  --good: #1f8a4c; --good-soft: #e3f4ea; --bad: #c9372c; --bad-soft: #fbe9e7; --warn: #a86a00; --warn-soft: #fbf1dc;
+  --grid: #efefeb; --shadow: 0 1px 2px rgba(16,16,20,.04), 0 1px 1px rgba(16,16,20,.03);
+  --shadow-lg: 0 12px 32px rgba(16,16,20,.10), 0 2px 6px rgba(16,16,20,.06);
+  --s1: #3b5bdb; --s2: #1f8a4c; --s3: #b06a00; --s4: #b4387e;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #0f0f11; --surface: #17171a; --surface-2: #1e1e22; --surface-3: #27272c;
+    --border: #2a2a2f; --border-strong: #37373d;
+    --text: #f2f2f4; --text-2: #b4b4bb; --muted: #7c7c84;
+    --accent: #6b8afd; --accent-hover: #8099ff; --accent-soft: #1d2547; --accent-text: #a9baff;
+    --good: #4cc27e; --good-soft: #15301f; --bad: #f07067; --bad-soft: #3a1a17; --warn: #e0a83a; --warn-soft: #33270f;
+    --grid: #222226; --shadow: 0 1px 2px rgba(0,0,0,.3); --shadow-lg: 0 12px 32px rgba(0,0,0,.5);
+    --s1: #7d97ff; --s2: #4cc27e; --s3: #e0a83a; --s4: #e57bb9;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0f0f11; --surface: #17171a; --surface-2: #1e1e22; --surface-3: #27272c;
+  --border: #2a2a2f; --border-strong: #37373d;
+  --text: #f2f2f4; --text-2: #b4b4bb; --muted: #7c7c84;
+  --accent: #6b8afd; --accent-hover: #8099ff; --accent-soft: #1d2547; --accent-text: #a9baff;
+  --good: #4cc27e; --good-soft: #15301f; --bad: #f07067; --bad-soft: #3a1a17; --warn: #e0a83a; --warn-soft: #33270f;
+  --grid: #222226; --shadow: 0 1px 2px rgba(0,0,0,.3); --shadow-lg: 0 12px 32px rgba(0,0,0,.5);
+  --s1: #7d97ff; --s2: #4cc27e; --s3: #e0a83a; --s4: #e57bb9;
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body { margin: 0; background: var(--bg); color: var(--text);
+  font: 14px/1.5 Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased; font-feature-settings: "cv11", "ss01"; }
+a { color: inherit; }
+button, input, select, textarea { font: inherit; color: inherit; }
+.hidden, [hidden] { display: none !important; }
+.num { font-variant-numeric: tabular-nums; }
+
+/* ---------- shell */
+.app { display: grid; grid-template-columns: 232px 1fr; min-height: 100vh; }
+.sidebar { position: sticky; top: 0; height: 100vh; overflow-y: auto; display: flex; flex-direction: column; gap: 4px;
+  padding: 20px 14px; border-right: 1px solid var(--border); background: var(--surface); }
+.brand { display: flex; align-items: center; gap: 10px; padding: 4px 8px 20px; }
+.brand-mark { width: 28px; height: 28px; border-radius: 8px; background: var(--text); color: var(--bg);
+  display: grid; place-items: center; font-weight: 700; font-size: 13px; letter-spacing: -.02em; }
+.brand-name { font-weight: 650; letter-spacing: -.01em; }
+.brand-sub { font-size: 11px; color: var(--muted); margin-top: -2px; }
+.nav-label { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; padding: 12px 10px 6px; }
+.nav a { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 7px; color: var(--text-2);
+  text-decoration: none; font-weight: 500; }
+.nav a:hover { background: var(--surface-2); color: var(--text); }
+.nav a.active { background: var(--surface-2); color: var(--text); }
+.nav svg { width: 16px; height: 16px; flex: none; opacity: .8; }
+.nav .count { margin-left: auto; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.sources { margin-top: auto; padding: 12px 10px 0; border-top: 1px solid var(--border); }
+.sources h5 { margin: 0 0 8px; font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.src { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text-2); padding: 2px 0; }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--good); flex: none; }
+.dot.off { background: var(--border-strong); }
+.theme-toggle { margin-top: 12px; display: flex; gap: 2px; background: var(--surface-2); border-radius: 7px; padding: 2px; }
+.theme-toggle button { flex: 1; border: 0; background: none; padding: 4px 0; border-radius: 5px; font-size: 12px; color: var(--text-2); cursor: pointer; }
+.theme-toggle button.on { background: var(--surface); color: var(--text); box-shadow: var(--shadow); }
+
+.main { min-width: 0; display: flex; flex-direction: column; }
+.topbar { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 12px; padding: 12px 32px;
+  background: color-mix(in srgb, var(--bg) 85%, transparent); backdrop-filter: blur(10px); border-bottom: 1px solid var(--border); }
+.menu-btn { display: none; }
+.search { position: relative; flex: 1; max-width: 460px; }
+.search svg { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); width: 15px; height: 15px; color: var(--muted); }
+.search input { width: 100%; padding: 8px 52px 8px 34px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface);
+  outline: none; transition: border-color .15s, box-shadow .15s; }
+.search input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.kbd { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); font-size: 11px; color: var(--muted);
+  border: 1px solid var(--border); border-radius: 4px; padding: 0 5px; background: var(--surface-2); }
+.content { padding: 28px 32px 64px; max-width: 1360px; width: 100%; }
+
+/* ---------- page header */
+.page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
+.page-head h1 { margin: 0; font-size: 22px; font-weight: 650; letter-spacing: -.02em; }
+.page-head p { margin: 4px 0 0; color: var(--text-2); }
+
+/* ---------- controls */
+.btn { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--border); background: var(--surface); color: var(--text);
+  padding: 7px 12px; border-radius: 8px; cursor: pointer; font-weight: 500; box-shadow: var(--shadow); white-space: nowrap;
+  transition: background .12s, border-color .12s; }
+.btn:hover { background: var(--surface-2); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn.primary:hover { background: var(--accent-hover); }
+.btn.ghost { box-shadow: none; border-color: transparent; background: none; color: var(--text-2); }
+.btn.ghost:hover { background: var(--surface-2); color: var(--text); }
+.btn:disabled { opacity: .55; cursor: progress; }
+.btn svg { width: 15px; height: 15px; }
+.field { display: flex; flex-direction: column; gap: 5px; }
+.field > span { font-size: 12px; font-weight: 500; color: var(--text-2); }
+.input, select.input { border: 1px solid var(--border); background: var(--surface); border-radius: 8px; padding: 7px 10px; outline: none; min-width: 0; }
+.input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.toolbar { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 16px; }
+.segmented { display: inline-flex; background: var(--surface-2); border-radius: 8px; padding: 3px; gap: 2px; flex-wrap: wrap; }
+.segmented button { border: 0; background: none; padding: 5px 12px; border-radius: 6px; cursor: pointer; color: var(--text-2); font-weight: 500; font-size: 13px; }
+.segmented button.on { background: var(--surface); color: var(--text); box-shadow: var(--shadow); }
+.segmented .c { color: var(--muted); margin-left: 4px; font-variant-numeric: tabular-nums; }
+
+/* ---------- cards & tables */
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow); }
+.card-pad { padding: 18px 20px; }
+.card h3 { margin: 0 0 14px; font-size: 13px; font-weight: 600; color: var(--text); display: flex; align-items: center; justify-content: space-between; }
+.card h3 .aside { font-weight: 400; color: var(--muted); font-size: 12px; }
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; }
+th { text-align: left; font-weight: 500; color: var(--muted); font-size: 12px; padding: 10px 14px; border-bottom: 1px solid var(--border);
+  white-space: nowrap; background: var(--surface); position: sticky; top: 0; }
+th.sortable { cursor: pointer; user-select: none; }
+th.sortable:hover { color: var(--text); }
+th.sorted { color: var(--text); }
+td { padding: 11px 14px; border-bottom: 1px solid var(--grid); white-space: nowrap; vertical-align: middle; }
+tbody tr:last-child td { border-bottom: 0; }
+td.r, th.r { text-align: right; }
+tr.row { cursor: pointer; transition: background .1s; }
+tr.row:hover td { background: var(--surface-2); }
+.who { display: flex; align-items: center; gap: 12px; min-width: 220px; }
+.avatar { width: 34px; height: 34px; border-radius: 50%; object-fit: cover; background: var(--surface-3); flex: none;
+  display: grid; place-items: center; font-size: 12px; font-weight: 600; color: var(--text-2); }
+.who .n { font-weight: 600; }
+.who .g { font-size: 12px; color: var(--muted); max-width: 260px; overflow: hidden; text-overflow: ellipsis; }
+.rank { color: var(--muted); font-variant-numeric: tabular-nums; width: 36px; }
+.dim { color: var(--muted); }
+.score { display: inline-flex; align-items: center; gap: 10px; }
+.score b { font-weight: 650; font-variant-numeric: tabular-nums; min-width: 22px; text-align: right; }
+.meter { width: 56px; height: 5px; background: var(--surface-3); border-radius: 3px; overflow: hidden; }
+.meter i { display: block; height: 100%; background: var(--accent); border-radius: 3px; }
+.score.low b { color: var(--text-2); }
+.score.low .meter i { background: var(--muted); }
+.up { color: var(--good); font-weight: 500; } .down { color: var(--bad); font-weight: 500; }
+.pill { display: inline-flex; align-items: center; gap: 5px; padding: 2px 9px; border-radius: 999px; background: var(--surface-2);
+  color: var(--text-2); font-size: 12px; font-weight: 500; max-width: 200px; overflow: hidden; text-overflow: ellipsis; }
+.pill.diy { background: var(--accent-soft); color: var(--accent-text); }
+.pill.st-watching { background: var(--surface-2); color: var(--text); }
+.pill.st-contacted { background: var(--warn-soft); color: var(--warn); }
+.pill.st-meeting { background: var(--accent-soft); color: var(--accent-text); }
+.pill.st-signed { background: var(--good-soft); color: var(--good); }
+.pill.st-passed { background: var(--surface-2); color: var(--muted); }
+.empty { padding: 56px 24px; text-align: center; color: var(--text-2); }
+.empty h4 { margin: 0 0 4px; color: var(--text); font-size: 15px; font-weight: 600; }
+.foot { padding: 10px 14px; font-size: 12px; color: var(--muted); border-top: 1px solid var(--border); display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+
+.pill.tag { background: none; border: 1px solid var(--border); color: var(--text-2); padding: 1px 8px; font-size: 11.5px; }
+.mini { display: inline-flex; padding: 0 6px; border-radius: 4px; font-size: 10.5px; font-weight: 600; letter-spacing: .01em;
+  background: var(--surface-2); color: var(--text-2); margin-left: 6px; vertical-align: 1px; }
+.mini.pos { background: var(--good-soft); color: var(--good); }
+.mini.warn { background: var(--warn-soft); color: var(--warn); }
+.mini.ok { background: var(--good-soft); color: var(--good); }
+.mini.hot { background: var(--good); color: var(--surface); }
+.mini.lc-self { background: var(--good-soft); color: var(--good); }
+.mini.lc-indie { background: var(--surface-2); color: var(--text-2); }
+.mini.lc-major { background: var(--accent-soft); color: var(--accent-text); }
+.field.check .check-row { display: flex; align-items: center; gap: 6px; height: 34px; font-size: 13px; color: var(--text-2); }
+.cmp-box { width: 15px; height: 15px; cursor: pointer; accent-color: var(--accent); }
+.cmpbar { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 45;
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 12px 10px 16px; border-radius: 12px;
+  background: var(--surface); border: 1px solid var(--border-strong); box-shadow: var(--shadow-lg); max-width: calc(100vw - 32px); font-size: 13px; }
+.cmpbar .who-list { color: var(--text-2); max-width: 46ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cmp-table td, .cmp-table th { white-space: normal; vertical-align: top; }
+.cmp-table th.metric { color: var(--text-2); font-weight: 500; width: 190px; }
+.cmp-table .best { color: var(--good); font-weight: 600; }
+.cmp-head { display: flex; align-items: center; gap: 10px; min-width: 150px; }
+.cmp-head .swatch { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+.cmp-chart svg { width: 100%; height: 260px; display: block; overflow: visible; }
+.cmp-legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12.5px; color: var(--text-2); margin-top: 8px; }
+.cmp-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.board { display: grid; grid-template-columns: repeat(5, minmax(220px, 1fr)); gap: 12px; overflow-x: auto; padding-bottom: 6px; align-items: start; }
+.lane { background: var(--surface-2); border-radius: 12px; padding: 10px; display: grid; gap: 8px; min-height: 120px; align-content: start; }
+.lane.drop { outline: 2px dashed var(--accent); outline-offset: -2px; }
+.lane h4 { margin: 2px 4px 4px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--text-2); display: flex; justify-content: space-between; }
+.lane .empty-lane { font-size: 12px; color: var(--muted); padding: 8px 4px; }
+.pcard { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px; display: grid; gap: 6px; cursor: grab; box-shadow: var(--shadow); }
+.pcard:active { cursor: grabbing; }
+.pcard .top { display: flex; gap: 8px; align-items: center; min-width: 0; }
+.pcard .top .avatar { width: 28px; height: 28px; font-size: 11px; }
+.pcard .nm { font-weight: 600; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pcard .nm:hover { text-decoration: underline; }
+.pcard .meta-line { font-size: 12px; color: var(--text-2); display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.pcard .next { font-size: 12.5px; }
+.pcard .due.late { color: var(--bad); font-weight: 600; }
+.pcard select { font-size: 12px; padding: 3px 6px; }
+.pipeline-edit { display: grid; grid-template-columns: 1fr 1.6fr auto auto; gap: 8px; align-items: end; margin-top: 12px; flex-basis: 100%; }
+.pipeline-edit .field span { font-size: 11.5px; }
+@media (max-width: 760px) { .board { grid-template-columns: repeat(5, 80vw); } .pipeline-edit { grid-template-columns: 1fr 1fr; } }
+.btn.danger { color: var(--bad); }
+.btn.danger-solid { background: var(--bad); border-color: var(--bad); color: #fff; }
+.confirm-row { display: grid; gap: 8px; margin-top: 10px; padding: 10px 12px; border-radius: 8px; background: var(--bad-soft); color: var(--bad); font-size: 12.5px; }
+.explain { display: grid; gap: 4px; margin: 4px 0 6px; }
+.why-h { font-size: 11.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; margin-top: 6px; }
+.why-h.pos { color: var(--good); } .why-h.neg { color: var(--warn); }
+.why { margin: 0; padding-left: 18px; display: grid; gap: 3px; font-size: 13px; color: var(--text); }
+.help { max-width: 760px; line-height: 1.6; }
+.help h1 { font-size: 24px; letter-spacing: -.02em; margin: 0 0 8px; }
+.help-h { font-size: 16px; margin: 28px 0 8px; letter-spacing: -.01em; }
+.help p, .help li { color: var(--text-2); }
+.help ol, .help ul { padding-left: 20px; display: grid; gap: 6px; }
+.help-dl { display: grid; grid-template-columns: minmax(150px, 220px) 1fr; gap: 8px 16px; margin: 0; }
+.help-dl dt { font-weight: 500; }
+.help-dl dd { margin: 0; color: var(--text-2); }
+@media (max-width: 640px) { .help-dl { grid-template-columns: 1fr; } .help-dl dd { margin-bottom: 8px; } }
+body:not(.admin) .admin-only { display: none !important; }
+.admin-toggle { display: flex; align-items: center; gap: 6px; margin-top: 10px; font-size: 12px; color: var(--muted); cursor: pointer; }
+.admin-toggle input { accent-color: var(--accent); }
+.signout { display: block; margin-top: 8px; font-size: 12px; }
+/* form fields in grids must be allowed to shrink, or they push the page wider than a phone */
+.disc-form > *, .pipeline-edit > *, .toolbar > .field { min-width: 0; }
+.disc-form .input, .pipeline-edit .input { width: 100%; }
+.pipeline-edit { width: 100%; }
+@media (max-width: 520px) { .disc-form, .pipeline-edit { grid-template-columns: 1fr; } }
+.kpi .src-at { display: block; margin-top: 4px; font-size: 11px; color: var(--muted); }
+.kpi.uncounted .v { color: var(--text-2); text-decoration: line-through; text-decoration-color: var(--warn); text-decoration-thickness: 1.5px; }
+body.demo .demo-hide, body.demo .admin-toggle, body.demo .admin-only, body.demo .signout { display: none !important; }
+.demo-banner { padding: 8px 32px; font-size: 12.5px; background: var(--accent-soft); color: var(--accent-text); border-bottom: 1px solid var(--border); }
+.demo-banner a { color: inherit; font-weight: 600; }
+@media (max-width: 760px) { .demo-banner { padding: 8px 16px; } }
+.head-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.label-cell { display: inline-flex; align-items: center; max-width: 260px; }
+.nav .count.warn-count { color: var(--warn); font-weight: 600; }
+.review-list { display: grid; gap: 10px; }
+.review-item { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 14px; align-items: start; padding: 14px 16px; }
+.review-item .n { font-weight: 600; cursor: pointer; }
+.review-item .n:hover { text-decoration: underline; }
+.review-item ul { margin: 6px 0 0; padding-left: 18px; color: var(--text-2); font-size: 13px; display: grid; gap: 3px; }
+.review-item .acts { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.review-banner { display: grid; gap: 8px; padding: 12px 16px; margin-bottom: 20px; border-radius: 10px; background: var(--warn-soft); color: var(--warn); font-size: 13px; }
+.review-banner.ok { background: var(--good-soft); color: var(--good); }
+.review-banner ul { margin: 0; padding-left: 18px; display: grid; gap: 2px; }
+.review-banner .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; justify-content: space-between; }
+@media (max-width: 760px) { .review-item { grid-template-columns: auto minmax(0, 1fr); } .review-item .acts { grid-column: 1 / -1; justify-content: flex-start; } }
+.who .t { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 3px; }
+.yt-note { font-size: 11.5px; font-style: italic; }
+.star { border: 0; background: none; cursor: pointer; color: var(--border-strong); padding: 4px; border-radius: 6px; line-height: 0; }
+.star:hover { color: var(--text-2); background: var(--surface-3); }
+.star.on { color: var(--warn); }
+.star svg { width: 16px; height: 16px; }
+.star:disabled { opacity: .5; cursor: progress; }
+.banner { display: flex; align-items: center; gap: 14px; padding: 12px 16px; margin-bottom: 16px; border-radius: 10px;
+  background: var(--warn-soft); color: var(--warn); font-size: 13px; flex-wrap: wrap; }
+.banner b { font-weight: 600; }
+.banner .btn { margin-left: auto; }
+.health { display: grid; gap: 3px; margin: 14px 0 0; font-size: 12px; color: var(--text-2); }
+.health .row { display: flex; justify-content: space-between; gap: 8px; }
+.health .row span:last-child { color: var(--text); font-variant-numeric: tabular-nums; }
+.health .warn { color: var(--warn) !important; }
+.tag-edit { display: flex; gap: 8px; margin-top: 12px; align-items: center; flex-wrap: wrap; }
+.tag-edit .input { flex: 1; min-width: 200px; }
+
+/* ---------- stats */
+.stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
+.stat { padding: 16px 18px; }
+.stat .l { font-size: 12px; color: var(--text-2); font-weight: 500; }
+.stat .v { font-size: 26px; font-weight: 650; letter-spacing: -.025em; margin-top: 2px; font-variant-numeric: tabular-nums; }
+.stat .d { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+/* ---------- artist page */
+.back { display: inline-flex; align-items: center; gap: 6px; color: var(--text-2); text-decoration: none; font-size: 13px; margin-bottom: 18px; }
+.back:hover { color: var(--text); }
+.hero { display: flex; gap: 22px; align-items: center; margin-bottom: 24px; flex-wrap: wrap; }
+.hero img, .hero .avatar { width: 96px; height: 96px; border-radius: 50%; object-fit: cover; font-size: 28px; box-shadow: var(--shadow-lg); }
+.hero-main { flex: 1; min-width: 260px; }
+.hero h1 { margin: 0; font-size: 30px; font-weight: 700; letter-spacing: -.03em; line-height: 1.15; }
+.meta { display: flex; gap: 6px 14px; flex-wrap: wrap; color: var(--text-2); margin-top: 6px; font-size: 13px; }
+.meta span + span::before { content: "·"; margin-right: 14px; color: var(--muted); }
+.links { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 12px; }
+.links a { font-size: 12px; font-weight: 500; text-decoration: none; padding: 3px 10px; border: 1px solid var(--border); border-radius: 999px; color: var(--text-2); background: var(--surface); }
+.links a:hover { color: var(--text); border-color: var(--border-strong); }
+.hero-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+.layout { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 16px; align-items: start; }
+.stack { display: grid; gap: 16px; }
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.kpi { padding: 14px 16px; }
+.kpi .l { font-size: 12px; color: var(--text-2); font-weight: 500; }
+.kpi .v { font-size: 22px; font-weight: 650; letter-spacing: -.02em; margin: 2px 0; font-variant-numeric: tabular-nums; }
+.kpi .d { font-size: 12px; color: var(--muted); }
+.linkish { border: 0; background: none; padding: 0; color: var(--accent-text); cursor: pointer; font-size: inherit; }
+.linkish:hover { text-decoration: underline; }
+.yt-src { margin-top: 4px; }
+.yt-src a { color: var(--text-2); text-decoration: none; } .yt-src a:hover { color: var(--text); }
+.kpi .d.up { color: var(--good); } .kpi .d.down { color: var(--bad); }
+
+.score-card { display: flex; gap: 18px; align-items: center; margin-bottom: 16px; }
+.ring { position: relative; width: 84px; height: 84px; flex: none; }
+.ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+.ring .val { position: absolute; inset: 0; display: grid; place-items: center; font-size: 24px; font-weight: 700; letter-spacing: -.03em; }
+.comp { display: grid; grid-template-columns: 96px 1fr 34px; gap: 10px; align-items: center; margin: 9px 0; font-size: 13px; }
+.comp .k { color: var(--text-2); }
+.comp .k small { color: var(--muted); }
+.comp .bar { height: 6px; background: var(--surface-3); border-radius: 3px; overflow: hidden; }
+.comp .bar i { display: block; height: 100%; background: var(--accent); border-radius: 3px; }
+.comp .bar.na { background: repeating-linear-gradient(45deg, var(--surface-3) 0 4px, transparent 4px 8px); }
+.comp .x { text-align: right; font-variant-numeric: tabular-nums; color: var(--text-2); }
+.flags { display: grid; gap: 6px; margin-top: 14px; }
+.flag { display: flex; gap: 8px; align-items: flex-start; padding: 8px 10px; border-radius: 8px; font-size: 12.5px; background: var(--surface-2); color: var(--text-2); }
+.flag.pos { background: var(--good-soft); color: var(--good); }
+.flag.warn { background: var(--warn-soft); color: var(--warn); }
+.flag::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; margin-top: 6px; flex: none; }
+
+.charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+.chart { padding: 14px 16px 10px; }
+.chart .h { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+.chart .h b { font-size: 12px; font-weight: 500; color: var(--text-2); }
+.chart .h span { font-size: 15px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.chart svg { width: 100%; height: 110px; display: block; overflow: visible; }
+.chart .na { height: 110px; display: grid; place-items: center; color: var(--muted); font-size: 12px; text-align: center; padding: 0 12px;
+  background: var(--surface-2); border-radius: 8px; }
+
+.rel { display: grid; grid-template-columns: 1fr auto auto; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--grid); font-size: 13px; align-items: center; }
+.rel:last-child { border-bottom: 0; }
+.rel .t { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rel .ty { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.rel .dt { color: var(--muted); font-variant-numeric: tabular-nums; }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip { border: 1px solid var(--border); background: var(--surface); border-radius: 999px; padding: 4px 11px; cursor: pointer; font-size: 12.5px; }
+.chip:hover { border-color: var(--border-strong); background: var(--surface-2); }
+.chip small { color: var(--muted); margin-left: 4px; }
+.note { padding: 10px 0; border-bottom: 1px solid var(--grid); font-size: 13px; }
+.note:last-of-type { border-bottom: 0; }
+.note time { display: block; font-size: 11px; color: var(--muted); margin-bottom: 2px; }
+textarea.input { width: 100%; min-height: 72px; resize: vertical; margin-top: 10px; }
+.errors { margin-top: 16px; font-size: 12px; color: var(--muted); }
+
+/* ---------- discover */
+.disc-form { display: grid; grid-template-columns: 220px 1fr 110px 110px 80px auto; gap: 12px; align-items: end; padding: 16px; margin-bottom: 16px; }
+.progress { height: 2px; background: var(--surface-3); overflow: hidden; border-radius: 2px; margin: -16px 0 14px; }
+.progress i { display: block; height: 100%; width: 30%; background: var(--accent); animation: slide 1.2s ease-in-out infinite; }
+@keyframes slide { from { transform: translateX(-100%); } to { transform: translateX(400%); } }
+
+/* ---------- misc */
+.skeleton { background: linear-gradient(90deg, var(--surface-2), var(--surface-3), var(--surface-2)); background-size: 200% 100%;
+  animation: shimmer 1.4s infinite; border-radius: 6px; }
+@keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+.tooltip { position: fixed; pointer-events: none; background: var(--surface); border: 1px solid var(--border);
+  border-radius: 8px; padding: 7px 10px; font-size: 12px; box-shadow: var(--shadow-lg); display: none; z-index: 50; }
+.tooltip strong { font-size: 14px; display: block; font-variant-numeric: tabular-nums; }
+.tooltip .tip-rel { display: block; margin-top: 4px; color: var(--warn); font-weight: 500; }
+.toast { position: fixed; bottom: 24px; left: 50%; transform: translate(-50%, 20px); opacity: 0; background: var(--text); color: var(--bg);
+  padding: 9px 16px; border-radius: 8px; font-size: 13px; font-weight: 500; transition: .2s; z-index: 60; pointer-events: none; }
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+@media (max-width: 1100px) {
+  .layout { grid-template-columns: 1fr; }
+  .stats { grid-template-columns: repeat(2, 1fr); }
+  .disc-form { grid-template-columns: 1fr 1fr; }
+  .disc-form .q { grid-column: 1 / -1; }
+}
+@media (max-width: 760px) {
+  .app { grid-template-columns: 1fr; }
+  .sidebar { position: fixed; z-index: 40; width: 260px; transform: translateX(-100%); transition: transform .2s; box-shadow: var(--shadow-lg); }
+  .sidebar.open { transform: none; }
+  .menu-btn { display: inline-flex; }
+  .topbar { padding: 10px 16px; }
+  .content { padding: 20px 16px 48px; }
+  .kbd { display: none; }
+  .hero img, .hero .avatar { width: 72px; height: 72px; }
+  .hero h1 { font-size: 24px; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <div class="brand-mark">AR</div>
+      <div><div class="brand-name">AR Scout</div><div class="brand-sub">A&amp;R research</div></div>
+    </div>
+    <nav class="nav">
+      <a href="#/" data-nav="leaderboard">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 13.5h12M4 11V7M8 11V3M12 11V5.5"/></svg>
+        Leaderboard <span class="count" id="cntAll"></span></a>
+      <a href="#/movers" data-nav="movers">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1.5 12 6 7.5l3 3 5.5-6"/><path d="M10.5 4.5h4v4"/></svg>
+        Movers this week</a>
+      <a href="#/watchlist" data-nav="watchlist">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1.5 8s2.4-4.5 6.5-4.5S14.5 8 14.5 8s-2.4 4.5-6.5 4.5S1.5 8 1.5 8Z"/><circle cx="8" cy="8" r="2"/></svg>
+        Watchlist <span class="count" id="cntWatch"></span></a>
+      <a href="#/discover" data-nav="discover">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6.5"/><path d="m10.5 5.5-1.6 3.4-3.4 1.6 1.6-3.4z"/></svg>
+        Discover</a>
+      <a href="#/review" data-nav="review">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 1.5 14.5 13h-13z"/><path d="M8 6v3.2M8 11.2v.3"/></svg>
+        Needs review <span class="count warn-count" id="cntReview"></span></a>
+      <a href="#/help" data-nav="help">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6.5"/><path d="M6.3 6.2a1.8 1.8 0 1 1 2.4 1.7c-.5.2-.7.6-.7 1.1v.4M8 11.3v.2"/></svg>
+        Help</a>
+    </nav>
+    <div class="sources">
+      <h5>Data sources</h5>
+      <div id="srcList"></div>
+      <div class="health" id="health"></div>
+      <div class="theme-toggle" role="group" aria-label="Theme">
+        <button data-theme-set="light">Light</button><button data-theme-set="auto">Auto</button><button data-theme-set="dark">Dark</button>
+      </div>
+      <label class="admin-toggle" title="Shows refresh, linking, account changes, delete and system status. Hides them again when off.">
+        <input type="checkbox" id="adminToggle"> Admin tools</label>
+    </div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="btn ghost menu-btn" id="menuBtn" aria-label="Menu">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 4h12M2 8h12M2 12h12"/></svg></button>
+      <form class="search" id="searchForm">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="5"/><path d="m11 11 3.5 3.5"/></svg>
+        <input id="searchInput" placeholder="Look up any artist…" aria-label="Look up artist" autocomplete="off">
+        <span class="kbd">⌘K</span>
+      </form>
+    </header>
+    <main class="content" id="view"></main>
+  </div>
+</div>
+<div class="tooltip" id="tip"></div>
+<div class="toast" id="toast"></div>
+<div class="cmpbar" id="cmpbar" hidden></div>
+
+<script>window.AR_DEMO = true;</script>
+<script>
+// ============================================================ helpers
+const $ = (s, root = document) => root.querySelector(s);
+const el = (tag, attrs = {}, ...kids) => {
+  const n = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === "class") n.className = v;
+    else if (k === "style") n.style.cssText = v;
+    else if (k.startsWith("on")) n.addEventListener(k.slice(2), v);
+    else if (v !== null && v !== undefined && v !== false) n.setAttribute(k, v);
+  }
+  for (const k of kids.flat()) if (k !== null && k !== undefined && k !== false) n.append(k instanceof Node ? k : document.createTextNode(String(k)));
+  return n;
+};
+const svgEl = (html) => { const t = document.createElement("template"); t.innerHTML = html.trim(); return t.content.firstChild; };
+const fmt = v => v == null ? "–" : Math.abs(v) >= 1e9 ? (v / 1e9).toFixed(1) + "B" : Math.abs(v) >= 1e6 ? (v / 1e6).toFixed(1) + "M"
+  : Math.abs(v) >= 1e4 ? Math.round(v / 1e3) + "k" : Math.abs(v) >= 1e3 ? (v / 1e3).toFixed(1) + "k" : Math.round(v).toString();
+const pct = v => v == null ? "–" : (v >= 0 ? "+" : "") + (v * 100).toFixed(1) + "%";
+const ago = iso => {
+  if (!iso) return "–";
+  const days = Math.round((Date.now() - new Date(iso)) / 864e5);
+  if (days < 0) return "upcoming";
+  if (days < 1) return "today";
+  if (days < 14) return days + "d ago";
+  if (days < 60) return Math.round(days / 7) + "w ago";
+  if (days < 730) return Math.round(days / 30) + "mo ago";
+  return Math.round(days / 365) + "y ago";
+};
+const initials = n => n.replace(/^the\s+/i, "").split(/\s+/).slice(0, 2).map(w => w[0] || "").join("").toUpperCase();
+const avatar = (url, name, cls = "avatar") => url ? el("img", { class: cls, src: url, alt: "", loading: "lazy" }) : el("div", { class: cls }, initials(name));
+// ---------- demo mode: `ar-scout export-demo` builds a static, read-only copy that reads snapshot files
+const DEMO = !!window.AR_DEMO;
+let demoBoard = null;
+const demoLoad = async () => demoBoard ||= await fetch("demo-data/board.json").then(r => r.json());
+async function demoApi(path, opts) {
+  if (opts?.method && opts.method !== "GET") throw new Error("This is a read-only demo, so changes are turned off.");
+  const d = await demoLoad(), u = new URL(path, location.origin), q = u.searchParams, at = u.pathname;
+  if (at === "/api/status") return d.status;
+  if (at === "/api/health") return d.health;
+  if (at === "/api/review") return d.review;
+  if (at === "/api/leaderboard") {
+    if (q.get("watchlist") === "true" || q.get("archived") === "true") return [];  // private to the team
+    const max = +q.get("max_audience") || 0, plat = q.get("platform") || "any", genre = (q.get("genre") || "").toLowerCase();
+    return d.rows.filter(r => {
+      if (genre && !r._genres.some(g => g.toLowerCase().includes(genre))) return false;
+      if (!max) return true;
+      const v = plat === "any" ? Math.max(0, ...Object.values(r._audience).map(x => x || 0)) : r._audience[plat];
+      return v != null && v <= max;
+    }).slice(0, +q.get("limit") || 25);
+  }
+  if (at.startsWith("/api/artist/")) {
+    const name = decodeURIComponent(at.slice("/api/artist/".length)).toLowerCase();
+    const row = d.rows.find(r => r.name.toLowerCase() === name);
+    if (!row) throw new Error("This demo only includes the artists in its snapshot. Try one from the leaderboard.");
+    return fetch(`demo-data/artists/${row.id}.json`).then(r => r.json());
+  }
+  throw new Error("Not available in the demo.");
+}
+const api = async (path, opts) => {
+  if (DEMO) return demoApi(path, opts);
+  const r = await fetch(path, opts);
+  if (r.status === 401) { location.href = "/login"; throw new Error("Sign in first"); }  // session expired
+  if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || r.statusText);
+  return r.json();
+};
+const post = (path, body) => api(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+const toast = msg => { const t = $("#toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("show"), 2400); };
+const STATUSES = ["watching", "contacted", "meeting", "signed", "passed"];  // pipeline order
+const METRICS = {
+  "youtube.views": "YouTube views", "youtube.subscribers": "YouTube subscribers",
+  "lastfm.listeners": "Last.fm listeners", "lastfm.playcount": "Last.fm plays",
+  "instagram.followers": "Instagram followers",
+  "spotify.monthly_listeners": "Spotify monthly listeners", "tiktok.followers": "TikTok followers",
+  "deezer.fans": "Deezer fans", "wikipedia.pageviews_30d": "Wikipedia views (30d)", "spotify.followers": "Spotify followers",
+};
+// Short labels for score flags shown inline in tables; anything unlisted only appears on the artist page.
+const FLAG_SHORT = [
+  [/^accelerating/, "Accelerating", "hot"],
+  [/^deep fandom/, "Deep fandom", "pos"], [/DIY distributor/, "Likely unsigned", "pos"],
+  [/^YouTube count looks off/, "Check YT", "warn"], [/^score capped/, "Capped", ""], [/^already established/, "Established", ""],
+];
+const PLATFORMS = [["any", "any platform"], ["youtube", "YouTube subs"], ["instagram", "Instagram followers"], ["lastfm", "Last.fm listeners"], ["deezer", "Deezer fans"]];
+const STAR = '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 1.3l2 4.3 4.6.5-3.4 3.2.9 4.6L8 11.6l-4.1 2.3.9-4.6L1.4 6.1 6 5.6z"/></svg>';
+const COMP = { momentum: ["Momentum", 40], engagement: ["Engagement", 20], headroom: ["Headroom", 20], activity: ["Activity", 10], signability: ["Signability", 10] };
+
+// ============================================================ theme
+function applyTheme(t) {
+  if (t === "auto") document.documentElement.removeAttribute("data-theme"); else document.documentElement.dataset.theme = t;
+  document.querySelectorAll("[data-theme-set]").forEach(b => b.classList.toggle("on", b.dataset.themeSet === t));
+  try { localStorage.setItem("ars-theme", t); } catch {}
+}
+let savedTheme = "auto"; try { savedTheme = localStorage.getItem("ars-theme") || "auto"; } catch {}
+applyTheme(savedTheme);
+document.querySelectorAll("[data-theme-set]").forEach(b => b.onclick = () => applyTheme(b.dataset.themeSet));
+
+// ============================================================ routing
+const view = $("#view");
+function route() {
+  const h = decodeURIComponent(location.hash.slice(1) || "/");
+  $("#sidebar").classList.remove("open");
+  const [, page, arg] = h.split("/");
+  document.querySelectorAll("[data-nav]").forEach(a => a.classList.toggle("active",
+    a.dataset.nav === (page || "leaderboard") || (page === "artist" && a.dataset.nav === lastList)));
+  window.scrollTo(0, 0);
+  if (page === "artist" && arg) return renderArtist(arg);
+  if (page === "watchlist") { lastList = "watchlist"; return renderWatchlist(); }
+  if (page === "discover") { lastList = "discover"; return renderDiscover(); }
+  if (page === "review") { lastList = "review"; return renderReview(); }
+  if (page === "movers") { lastList = "movers"; return renderMovers(); }
+  if (page === "compare") return renderCompare();
+  if (page === "help") { lastList = "help"; return renderHelp(); }
+  lastList = "leaderboard"; return renderLeaderboard();
+}
+let lastList = "leaderboard";
+window.addEventListener("hashchange", route);
+const go = name => location.hash = "/artist/" + encodeURIComponent(name);
+
+$("#searchForm").onsubmit = e => { e.preventDefault(); const n = $("#searchInput").value.trim(); if (n) { go(n); $("#searchInput").blur(); } };
+document.addEventListener("keydown", e => { if ((e.metaKey || e.ctrlKey) && e.key === "k") { e.preventDefault(); $("#searchInput").focus(); $("#searchInput").select(); } });
+$("#menuBtn").onclick = () => $("#sidebar").classList.toggle("open");
+
+// ============================================================ shared table
+const COLS = [
+  { key: "score", label: "Breakout", r: false, get: r => r.score },
+  { key: "deezer_fans", label: "Deezer fans", r: true, get: r => r.deezer_fans },
+  { key: "lastfm_listeners", label: "Last.fm listeners", r: true, get: r => r.lastfm_listeners },
+  { key: "depth", label: "Plays / listener", r: true, get: r => r.lastfm_listeners ? r.lastfm_playcount / r.lastfm_listeners : null },
+  { key: "youtube_subscribers", label: "YT subs", r: true, get: r => r.youtube_subscribers },
+  { key: "youtube_views", label: "YT views", r: true, get: r => r.youtube_views },
+  { key: "instagram_followers", label: "IG followers", r: true, get: r => r.instagram_followers },
+  { key: "growth", label: "Growth / mo", r: true, get: r => { const v = Object.values(r.monthly_growth || {}); return v.length ? Math.max(...v) : null; } },
+  { key: "snapshot_days", label: "Days tracked", r: true, get: r => r.snapshot_days },
+  { key: "latest_release", label: "Last release", r: false, get: r => r.latest_release },
+];
+
+function scoreCell(r) {
+  const low = r.confidence < 0.7;
+  return el("span", { class: "score" + (low ? " low" : ""), title: `Confidence ${Math.round(r.confidence * 100)}% — share of the model that had data` },
+    el("b", {}, Math.round(r.score)), el("span", { class: "meter" }, el("i", { style: `width:${r.score}%` })));
+}
+
+function dataTable(rows, { empty, showStatus = true, sort = { key: "score", dir: -1 }, onSort } = {}) {
+  if (!rows.length) return el("div", { class: "card" }, el("div", { class: "empty" }, el("h4", {}, empty[0]), empty[1]));
+  const col = COLS.find(c => c.key === sort.key) || COLS[0];
+  rows = [...rows].sort((a, b) => {
+    const x = col.get(a), y = col.get(b);
+    if (x == null && y == null) return 0; if (x == null) return 1; if (y == null) return -1;
+    return (x > y ? 1 : x < y ? -1 : 0) * sort.dir;
+  });
+  const head = el("tr", {}, el("th", { title: "Compare" }, ""), el("th", {}, "#"), el("th", {}, "Artist"),
+    ...COLS.map(c => el("th", { class: "sortable" + (c.r ? " r" : "") + (c.key === sort.key ? " sorted" : ""),
+      onclick: () => onSort && onSort({ key: c.key, dir: c.key === sort.key ? -sort.dir : -1 }) },
+      c.label + (c.key === sort.key ? (sort.dir < 0 ? " ↓" : " ↑") : ""))),
+    el("th", {}, "Label"), showStatus ? el("th", {}, "Status") : null, el("th", {}, ""));
+  const body = el("tbody", {}, rows.map((r, i) => {
+    const depth = COLS[3].get(r), growth = COLS.find(c => c.key === "growth").get(r), label = r.label || "";
+    const minis = FLAG_SHORT.filter(([re]) => r.flags.some(f => re.test(f)))
+      .map(([re, t, c]) => el("span", { class: "mini " + c, title: r.flags.find(f => re.test(f)) }, t));
+    const ms = r.management?.status;
+    if (ms === "managed" || ms === "listed") minis.push(el("span", { class: "mini", title: r.management.evidence || r.management.label }, "Managed"));
+    else if (ms === "unmanaged" || ms === "not_listed") minis.push(el("span", { class: "mini pos", title: r.management.label + (r.management.source ? ` (${r.management.source})` : "") }, "No mgmt"));
+    if (r.verified) minis.unshift(el("span", { class: "mini ok", title: "Linked accounts checked by a person" }, "✓ Verified"));
+    else if (r.review?.length) minis.unshift(el("span", { class: "mini warn", title: r.review.join("\n") }, "Review"));
+    return el("tr", { class: "row", onclick: () => go(r.name) },
+      el("td", {}, cmpBox(r)),
+      el("td", { class: "rank" }, i + 1),
+      el("td", {}, el("div", { class: "who" }, avatar(r.image_url, r.name),
+        el("div", {}, el("div", { class: "n" }, r.name, minis), el("div", { class: "g" }, [r.country, ...(r.genres || [])].filter(Boolean).join(" · ") || "—"),
+          r.tags?.length ? el("div", { class: "t" }, r.tags.map(t => el("span", { class: "pill tag" }, t))) : null))),
+      el("td", {}, scoreCell(r)),
+      el("td", { class: "r num" }, fmt(r.deezer_fans)),
+      el("td", { class: "r num" }, fmt(r.lastfm_listeners)),
+      el("td", { class: "r num" + (depth > 30 ? " up" : "") }, depth == null ? "–" : depth.toFixed(1)),
+      ytCell(r),
+      el("td", { class: "r num" + (r.youtube_views == null ? " dim" : "") }, fmt(r.youtube_views)),
+      el("td", { class: "r num" + (r.instagram_followers == null ? " dim" : ""),
+        title: r.instagram_followers == null ? "No count: Instagram not set up, no account linked, or a personal/private account" : "" }, fmt(r.instagram_followers)),
+      el("td", { class: "r num " + (growth == null ? "dim" : growth > 0.005 ? "up" : growth < -0.005 ? "down" : ""),
+        title: growth == null ? "A growth rate needs a week of snapshots" : "" }, growth == null ? "–" : pct(growth)),
+      el("td", { class: "r num" + (r.snapshot_days < 7 ? " dim" : ""), title: r.last_snapshot ? "Last snapshot " + new Date(r.last_snapshot).toLocaleString() : "" }, r.snapshot_days || "–"),
+      el("td", { class: "dim", title: r.latest_release || "" }, ago(r.latest_release)),
+      el("td", {}, label ? labelPill(label, r.label_class) : el("span", { class: "dim" }, "–")),
+      showStatus ? el("td", {}, r.status ? el("span", { class: "pill st-" + r.status }, r.status) : "") : null,
+      el("td", {}, starBtn(r)));
+  }));
+  return el("div", { class: "card" }, el("div", { class: "table-wrap" }, el("table", {}, el("thead", {}, head), body)),
+    el("div", { class: "foot" }, el("span", {}, `${rows.length} artist${rows.length === 1 ? "" : "s"}`),
+      el("span", {}, "Scores in grey have under 70% confidence · Plays / listener over 30 = deep fandom · Growth rates need a week of snapshots")));
+}
+
+// YouTube: tell "never looked up" apart from "looked up, no channel" and "channel numbers don't add up".
+// Label type decides signability: self-released and DIY look unsigned, a major is already taken.
+const LABEL_CLASS = { self: ["Self-released", "lc-self"], diy: ["DIY", "lc-self"], indie: ["Indie", "lc-indie"], major: ["Major", "lc-major"] };
+function labelPill(label, cls) {
+  const [tag, css] = LABEL_CLASS[cls] || [];
+  return el("span", { class: "label-cell", title: label },
+    tag ? el("span", { class: "mini " + css, style: "margin:0 6px 0 0" }, tag) : null,
+    el("span", { class: "pill" }, label));
+}
+
+function ytCell(r) {
+  if (r.youtube_subscribers == null)
+    return el("td", { class: "r dim yt-note", title: r.linked ? "Full lookup found no YouTube channel" : "Added by discovery, which skips YouTube. Use Link missing data." },
+      r.linked ? "none" : "not linked");
+  const off = r.flags.some(f => /^YouTube count looks off/.test(f));
+  return el("td", { class: "r num" + (off ? " down" : ""), title: off ? "Too small for this act's Last.fm audience: probably a Topic channel or a different artist" : "" },
+    fmt(r.youtube_subscribers) + (off ? " ?" : ""));
+}
+
+function starBtn(r) {
+  const b = el("button", { class: "star demo-hide" + (r.status ? " on" : ""), title: r.status ? "On watchlist (click to remove)" : "Add to watchlist", "aria-label": r.status ? "Remove from watchlist" : "Add to watchlist" });
+  b.innerHTML = STAR;
+  b.onclick = async e => {
+    e.stopPropagation(); b.disabled = true;
+    try {
+      if (r.status) { await api("/api/watch/" + r.id, { method: "DELETE" }); r.status = null; toast(`Removed ${r.name}`); }
+      else { const w = await post("/api/watch", { name: r.name }); r.status = w.status; toast(`Watching ${r.name}`); }
+      b.classList.toggle("on", !!r.status); loadCounts();
+    } catch (err) { toast("Error: " + err.message); }
+    b.disabled = false;
+  };
+  return b;
+}
+
+function loadingCard(n = 6) {
+  return el("div", { class: "card", style: "padding:8px 14px" },
+    Array.from({ length: n }, () => el("div", { style: "display:flex;gap:12px;align-items:center;padding:10px 0" },
+      el("div", { class: "skeleton", style: "width:34px;height:34px;border-radius:50%" }),
+      el("div", { class: "skeleton", style: "height:12px;width:30%" }), el("div", { class: "skeleton", style: "height:12px;flex:1" }))));
+}
+
+async function refreshBtn(scope, after) {
+  const b = el("button", { class: "btn admin-only" }, svgEl('<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9M13.5 2.5v3h-3"/></svg>'), "Refresh data");
+  b.onclick = async () => {
+    b.disabled = true; b.lastChild.textContent = "Refreshing…";
+    try {
+      const r = await api("/api/snapshot?scope=" + scope, { method: "POST" });
+      toast(`Updated ${r.snapshotted ?? 0}` + (r.skipped_fresh ? ` · skipped ${r.skipped_fresh} snapshotted in the last 6h` : ""));
+      after(); loadHealth();
+    }
+    catch (e) { toast("Refresh failed: " + e.message); }
+    b.disabled = false; b.lastChild.textContent = "Refresh data";
+  };
+  return b;
+}
+
+// ============================================================ leaderboard
+// Each viewer's filters are remembered in their own browser. Storage can be missing (private windows), so every
+// read and write is guarded and the defaults always work.
+function remembered(name, defaults, skip = []) {
+  const key = "ars-filters-" + name;
+  let saved = {};
+  try { saved = JSON.parse(localStorage.getItem(key) || "{}") || {}; } catch {}
+  const state = { ...defaults };
+  for (const k of Object.keys(defaults)) if (k in saved && !skip.includes(k)) state[k] = saved[k];
+  const save = () => { try { localStorage.setItem(key, JSON.stringify(Object.fromEntries(Object.entries(state).filter(([k]) => !skip.includes(k))))); } catch {} };
+  return new Proxy(state, {
+    set(t, k, v) { t[k] = v; save(); return true; },
+  });
+}
+const resetTo = (state, defaults) => Object.assign(state, structuredClone(defaults));
+
+// First visit opens on small acts by YouTube size, the view scouting starts from.
+const LB_DEFAULTS = { genre: "", max: "20000", platform: "youtube", mgmt: "", archived: false, hideReview: true, window: "30", sort: { key: "score", dir: -1 } };
+// Artists whose linked accounts are under review don't lead rankings until someone checks them.
+const underReview = r => r.review?.length && !r.verified;
+const lb = remembered("leaderboard", LB_DEFAULTS);
+let lbRows = null, mvRows = [], wlRows = [];
+// Management filter shared by the leaderboard and Movers. "Unknown" counts as possibly unmanaged.
+const MGMT_FILTERS = [["", "Any"], ["open", "No manager known"], ["none", "No management (confirmed)"], ["has", "Has management"]];
+const mgmtPass = (r, f) => {
+  const st = r.management?.status;
+  if (f === "open") return st !== "managed" && st !== "listed";
+  if (f === "none") return st === "unmanaged" || st === "not_listed";
+  if (f === "has") return st === "managed" || st === "listed";
+  return true;
+};
+const mgmtSelect = (state, onchange) => {
+  const sel = el("select", { class: "input" }, MGMT_FILTERS.map(([v, t]) => el("option", { value: v, selected: v === state.mgmt }, t)));
+  sel.onchange = () => { state.mgmt = sel.value; onchange(); };
+  return el("label", { class: "field" }, el("span", {}, "Management"), sel);
+};
+async function renderLeaderboard() {
+  const tableSlot = el("div", {}, loadingCard());
+  const statsSlot = el("div", { class: "stats" });
+  const genre = el("input", { class: "input", placeholder: "Any genre", value: lb.genre, style: "width:160px" });
+  const max = el("select", { class: "input" }, [["", "Any size"], ["10000", "Under 10k"], ["20000", "Under 20k"], ["50000", "Under 50k"], ["250000", "Under 250k"], ["1000000", "Under 1M"]]
+    .map(([v, t]) => el("option", { value: v, selected: v === lb.max }, t)));
+  const win = el("div", { class: "segmented" }, ["7", "30", "90"].map(w =>
+    el("button", { class: w === lb.window ? "on" : "", onclick: () => { lb.window = w; load(); win.querySelectorAll("button").forEach(b => b.classList.toggle("on", b.textContent === w + "d")); } }, w + "d")));
+  const plat = el("select", { class: "input" }, PLATFORMS.map(([v, t]) => el("option", { value: v, selected: v === lb.platform }, t)));
+  const bannerSlot = el("div");
+  genre.onchange = () => { lb.genre = genre.value.trim(); load(); };
+  max.onchange = () => { lb.max = max.value; load(); };
+  plat.onchange = () => { lb.platform = plat.value; load(); };
+
+  view.replaceChildren(
+    el("div", { class: "page-head" },
+      el("div", {}, el("h1", {}, "Leaderboard"), el("p", {}, "Every tracked artist, ranked by breakout score.")),
+      el("div", { class: "head-actions" },
+        el("button", { class: "btn ghost", onclick: () => { resetTo(lb, LB_DEFAULTS); renderLeaderboard(); } }, "Reset filters"),
+        csvBtn(() => (lbRows || []).filter(r => mgmtPass(r, lb.mgmt) && !(lb.hideReview && underReview(r))), "leaderboard"),
+        await refreshBtn("all", () => load()))),
+    bannerSlot, statsSlot,
+    el("div", { class: "toolbar" },
+      el("label", { class: "field" }, el("span", {}, "Genre"), genre),
+      el("label", { class: "field" }, el("span", {}, "Audience"), max),
+      el("label", { class: "field" }, el("span", {}, "Measured on"), plat),
+      mgmtSelect(lb, () => draw && draw()),
+      el("label", { class: "field check" }, el("span", {}, "Accounts under review"), el("span", { class: "check-row" },
+        el("input", { type: "checkbox", id: "lb-hide-review", checked: lb.hideReview, onchange: e => { lb.hideReview = e.target.checked; draw && draw(); } }), " Hide")),
+      el("label", { class: "field check" }, el("span", {}, "Archived"), el("span", { class: "check-row" },
+        el("input", { type: "checkbox", id: "lb-archived", checked: lb.archived, onchange: e => { lb.archived = e.target.checked; load(); } }), " Show only archived")),
+      el("div", { class: "field" }, el("span", {}, "Growth window"), win)),
+    tableSlot);
+
+  let seq = 0;
+  async function load() {
+    const mine = ++seq;  // filters can change while a load is in flight; only the newest one may render
+    const p = new URLSearchParams({ limit: 200, window: lb.window });
+    if (lb.archived) p.set("archived", "true");
+    if (lb.genre) p.set("genre", lb.genre);
+    if (lb.max) { p.set("max_audience", lb.max); p.set("platform", lb.platform); }
+    let rows, h;
+    try { [rows, h] = await Promise.all([api("/api/leaderboard?" + p), api("/api/health")]); }
+    catch (e) { if (mine === seq) tableSlot.replaceChildren(errorCard(e)); return; }
+    if (mine !== seq) return;
+    // Stats describe exactly the rows in the table, so they follow every filter.
+    const drawStats = shown => {
+      const withGrowth = shown.filter(r => Object.keys(r.monthly_growth || {}).length).length;
+      const watched = shown.filter(r => r.status).length;
+      const top = shown[0];
+      const filtered = lb.genre || lb.max || lb.mgmt || lb.hideReview;
+      statsSlot.replaceChildren(
+        stat("Artists", shown.length, filtered ? `matching filters, of ${h.artists}` : "in the database"),
+        stat("On watchlist", watched, filtered ? "in this view" : "snapshotted daily"),
+        stat("With growth data", withGrowth, withGrowth ? `${Math.round(withGrowth / Math.max(shown.length, 1) * 100)}% of artists` : `needs ${h.min_growth_days}+ days of snapshots`),
+        stat("Top score", top ? Math.round(top.score) : "–", top ? top.name : "—"));
+    };
+    const ytFilter = lb.max && lb.platform === "youtube";
+    bannerSlot.replaceChildren(h.unlinked ? relinkBanner(h.unlinked, ytFilter, load) : "");
+    lbRows = rows;
+    draw = () => {
+      const shown = rows.filter(r => mgmtPass(r, lb.mgmt) && !(lb.hideReview && underReview(r)));
+      drawStats(shown);
+      tableSlot.replaceChildren(dataTable(shown, {
+        empty: ["No artists match", "Loosen the filters above, or look up an artist with the search bar."], sort: lb.sort, onSort: s => { lb.sort = s; draw(); } }));
+    };
+    draw();
+  }
+  let draw = null;
+  load();
+}
+function relinkBanner(n, ytFilter, after) {
+  const b = el("button", { class: "btn" }, "Link missing data");
+  b.onclick = async () => {
+    if (!confirm(`Look up MusicBrainz, YouTube and Wikipedia for ${n} artist${n === 1 ? "" : "s"}?\n\nArtists without a MusicBrainz YouTube link cost 100 YouTube quota units each (10,000/day), so this can use up to ${(n * 100).toLocaleString()} units. It takes a few seconds per artist.`)) return;
+    b.disabled = true; b.textContent = `Linking ${n}…`;
+    try { const r = await post("/api/relink", {}); toast(`Linked ${r.relinked} artist${r.relinked === 1 ? "" : "s"}` + (r.errors.length ? ` · ${r.errors.length} source issues` : "")); after(); loadHealth(); }
+    catch (e) { toast("Linking failed: " + e.message); b.disabled = false; b.textContent = "Link missing data"; }
+  };
+  return el("div", { class: "banner admin-only" },
+    el("span", {}, el("b", {}, `${n} artist${n === 1 ? "" : "s"} added by discovery ${n === 1 ? "has" : "have"} no YouTube or MusicBrainz lookup yet. `,),
+      ytFilter ? "They're left out of this YouTube filter until they're linked." : "Their YouTube columns read “not linked”."), b);
+}
+const stat = (l, v, d) => el("div", { class: "card stat" }, el("div", { class: "l" }, l), el("div", { class: "v" }, v), el("div", { class: "d" }, d));
+const errorCard = e => el("div", { class: "card" }, el("div", { class: "empty" }, el("h4", {}, "Something went wrong"), e.message));
+
+// ============================================================ watchlist
+const wl = remembered("watchlist", { view: "board", status: "", tag: "", sort: { key: "score", dir: -1 } });
+const STATUS_LABEL = s => s[0].toUpperCase() + s.slice(1);
+const today = () => new Date().toLocaleDateString("en-CA");
+const patchWatch = (id, body) => api(`/api/watch/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+
+async function renderWatchlist() {
+  const slot = el("div", {}, loadingCard(4));
+  const seg = el("div", { class: "segmented" });
+  const tagSel = el("select", { class: "input", id: "wl-tag" });
+  const viewSeg = el("div", { class: "segmented" }, [["board", "Board"], ["table", "Table"]].map(([v, t]) =>
+    el("button", { class: wl.view === v ? "on" : "", onclick: () => { wl.view = v; renderWatchlist(); } }, t)));
+  view.replaceChildren(
+    el("div", { class: "page-head" },
+      el("div", {}, el("h1", {}, "Watchlist"), el("p", {}, "Your pipeline. Move artists along as you work them; each one gets a fresh snapshot every day.")),
+      el("div", { class: "head-actions" }, csvBtn(() => wlRows, "watchlist"), await refreshBtn("watchlist", () => renderWatchlist()))),
+    el("div", { class: "toolbar" }, el("div", { class: "field" }, el("span", {}, "View"), viewSeg),
+      wl.view === "table" ? el("div", { class: "field" }, el("span", {}, "Stage"), seg) : null,
+      el("label", { class: "field" }, el("span", {}, "Tag"), tagSel)), slot);
+  let rows;
+  try { rows = await api("/api/leaderboard?watchlist=true&limit=1000"); } catch (e) { slot.replaceChildren(errorCard(e)); return; }
+  const tags = [...new Set(rows.flatMap(r => r.tags || []))].sort();
+  if (wl.tag && !tags.includes(wl.tag)) wl.tag = "";
+  tagSel.replaceChildren(el("option", { value: "" }, tags.length ? "All tags" : "No tags yet"), ...tags.map(t => el("option", { value: t, selected: t === wl.tag }, t)));
+  tagSel.onchange = () => { wl.tag = tagSel.value; draw(); };
+  const shown = () => (wlRows = rows.filter(r => !wl.tag || (r.tags || []).includes(wl.tag)).filter(r => wl.view === "board" || !wl.status || r.status === wl.status));
+  const draw = () => {
+    if (!rows.length) {
+      slot.replaceChildren(el("div", { class: "card" }, el("div", { class: "empty" }, DEMO
+        ? [el("h4", {}, "The pipeline is private to the team"),
+           "In the full tool this is a board with a column per stage (watching, contacted, meeting, signed, passed), an owner, a next step and a due date for every artist. The demo leaves it out, along with the artists on it."]
+        : [el("h4", {}, "Your watchlist is empty"), "Star an artist in any table, or open one and click Watch, to start tracking them."])));
+      return;
+    }
+    if (wl.view === "board") { slot.replaceChildren(pipelineBoard(shown(), renderWatchlist)); return; }
+    const counts = Object.fromEntries(STATUSES.map(s => [s, rows.filter(r => r.status === s).length]));
+    seg.replaceChildren(...[["", "All", rows.length], ...STATUSES.filter(s => counts[s]).map(s => [s, STATUS_LABEL(s), counts[s]])]
+      .map(([v, t, c]) => el("button", { class: v === wl.status ? "on" : "", onclick: () => { wl.status = v; draw(); } }, t, el("span", { class: "c" }, c))));
+    slot.replaceChildren(dataTable(shown().filter(r => !wl.status || r.status === wl.status), {
+      empty: ["Nothing at this stage", "Pick another stage or tag."], sort: wl.sort, onSort: s => { wl.sort = s; draw(); } }));
+  };
+  draw();
+}
+
+// One column per stage. Cards move by dragging or with their stage menu.
+function pipelineBoard(rows, refresh) {
+  const move = async (r, status) => {
+    if (status === r.status) return;
+    try { await patchWatch(r.id, { status }); toast(`${r.name} → ${STATUS_LABEL(status)}`); loadCounts(); refresh(); }
+    catch (e) { toast("Couldn't move: " + e.message); }
+  };
+  const card = r => {
+    const late = r.next_date && r.next_date < today();
+    const stage = el("select", { class: "input", "aria-label": `Stage for ${r.name}` }, STATUSES.map(s => el("option", { value: s, selected: s === r.status }, STATUS_LABEL(s))));
+    stage.onclick = e => e.stopPropagation();
+    stage.onchange = () => move(r, stage.value);
+    const c = el("div", { class: "pcard", draggable: "true" },
+      el("div", { class: "top" }, avatar(r.image_url, r.name), el("span", { class: "nm", onclick: () => go(r.name) }, r.name),
+        el("b", { class: "num", style: "margin-left:auto;" + (r.confidence < 0.7 ? "color:var(--text-2)" : ""), title: "Breakout score" }, Math.round(r.score))),
+      el("div", { class: "meta-line" },
+        r.accelerating ? el("span", { class: "mini hot", style: "margin:0" }, "Accelerating") : null,
+        r.review?.length && !r.verified ? el("span", { class: "mini warn", style: "margin:0" }, "Review") : null,
+        r.label_class ? el("span", { class: "mini " + (LABEL_CLASS[r.label_class] || [])[1], style: "margin:0" }, (LABEL_CLASS[r.label_class] || [])[0]) : null,
+        r.management?.status ? el("span", { class: "mini" + (r.management.status === "unmanaged" || r.management.status === "not_listed" ? " pos" : ""), style: "margin:0" },
+          r.management.status === "managed" || r.management.status === "listed" ? "Managed" : "No mgmt") : null),
+      r.next_step || r.next_date ? el("div", { class: "next" }, r.next_step || "Next step",
+        r.next_date ? el("span", { class: "due" + (late ? " late" : "") }, ` · ${late ? "overdue " : "due "}${new Date(r.next_date + "T12:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" })}`) : null)
+        : el("div", { class: "next dim" }, "No next step set"),
+      el("div", { class: "meta-line" }, r.owner ? `Owner: ${r.owner}` : el("span", { class: "dim" }, "No owner"), el("span", { style: "margin-left:auto" }, stage)));
+    c.addEventListener("dragstart", e => { e.dataTransfer.setData("text/plain", String(r.id)); e.dataTransfer.effectAllowed = "move"; });
+    return c;
+  };
+  const byId = Object.fromEntries(rows.map(r => [String(r.id), r]));
+  return el("div", { class: "board" }, STATUSES.map(st => {
+    const items = rows.filter(r => r.status === st).sort((a, b) => (a.next_date || "9999") < (b.next_date || "9999") ? -1 : (a.next_date || "9999") > (b.next_date || "9999") ? 1 : b.score - a.score);
+    const lane = el("div", { class: "lane" }, el("h4", {}, STATUS_LABEL(st), el("span", {}, items.length)),
+      items.length ? items.map(card) : el("div", { class: "empty-lane" }, "Drop an artist here"));
+    lane.addEventListener("dragover", e => { e.preventDefault(); lane.classList.add("drop"); });
+    lane.addEventListener("dragleave", () => lane.classList.remove("drop"));
+    lane.addEventListener("drop", e => { e.preventDefault(); lane.classList.remove("drop"); const r = byId[e.dataTransfer.getData("text/plain")]; if (r) move(r, st); });
+    return lane;
+  }));
+}
+
+// Owner, next step and due date for a watched artist, on their page.
+function pipelineEditor(a, w) {
+  const owner = el("input", { class: "input", id: "pl-owner", placeholder: "e.g. Carson", value: w.owner || "" });
+  const next = el("input", { class: "input", id: "pl-next", placeholder: "e.g. Email their manager", value: w.next_step || "" });
+  const due = el("input", { class: "input", id: "pl-due", type: "date", value: w.next_date || "" });
+  const save = el("button", { class: "btn" }, "Save");
+  save.onclick = async () => {
+    save.disabled = true;
+    try { await patchWatch(a.id, { owner: owner.value.trim(), next_step: next.value.trim(), next_date: due.value }); toast("Pipeline saved"); }
+    catch (e) { toast("Couldn't save: " + e.message); }
+    save.disabled = false;
+  };
+  [owner, next].forEach(i => i.addEventListener("keydown", e => { if (e.key === "Enter") save.click(); }));
+  return el("div", { class: "pipeline-edit" },
+    el("label", { class: "field" }, el("span", {}, "Owner"), owner),
+    el("label", { class: "field" }, el("span", {}, "Next step"), next),
+    el("label", { class: "field" }, el("span", {}, "Due"), due), save);
+}
+
+// ============================================================ discover
+const MODES = {
+  tag: ["Scene / genre tag", "e.g. indie rock, uk drill, hyperpop", "Last.fm tag charts — deeper pages surface smaller acts."],
+  similar: ["Similar to artists", "e.g. Fcukers, Magdalena Bay", "Comma-separated reference artists. Finds their neighbours."],
+  playlists: ["Curated playlists", "e.g. fresh indie, new rap, amapiano", "Artists appearing on several matching Deezer playlists."],
+  new: ["New releases", "Deezer genre, e.g. Rap/Hip Hop (blank = all)", "Recent releases from small artists."],
+  country: ["Country", "e.g. United Kingdom, Nigeria", "Last.fm country charts, filtered to emerging acts."],
+};
+const disc = remembered("discover", { mode: "tag", query: "", min: 300, max: 50000, limit: 20, rows: null, sort: { key: "score", dir: -1 } }, ["rows"]);
+// ============================================================ movers this week
+const MOVER_PLATFORMS = [["best", "Best platform"], ["youtube", "YouTube subscribers"], ["lastfm", "Last.fm listeners"],
+  ["deezer", "Deezer fans"], ["instagram", "Instagram followers"], ["tiktok", "TikTok followers"], ["spotify", "Spotify listeners"]];
+const MOVER_COLS = [["youtube", "YouTube"], ["lastfm", "Last.fm"], ["deezer", "Deezer"], ["instagram", "Instagram"]];
+// A gain counts only from a base of 200+ and by 20+ people, so tiny accounts can't post huge percentages.
+const MOVER_MIN_BASE = 200, MOVER_MIN_GAIN = 20;
+const MV_DEFAULTS = { platform: "best", max: "20000", sizeOn: "youtube", mgmt: "", hideReview: true };
+const mv = remembered("movers", MV_DEFAULTS);
+const counts = c => c && c.start >= MOVER_MIN_BASE && c.delta >= MOVER_MIN_GAIN && c.pct != null;
+function moverGain(r, platform) {
+  if (platform !== "best") return counts(r.change_7d?.[platform]) ? { key: platform, ...r.change_7d[platform] } : null;
+  let best = null;
+  for (const [k] of MOVER_PLATFORMS.slice(1)) { const c = r.change_7d?.[k]; if (counts(c) && (!best || c.pct > best.pct)) best = { key: k, ...c }; }
+  return best;
+}
+async function renderMovers() {
+  const slot = el("div", {}, loadingCard(6));
+  const plat = el("select", { class: "input", id: "mv-platform" }, MOVER_PLATFORMS.map(([v, t]) => el("option", { value: v, selected: v === mv.platform }, t)));
+  const max = el("select", { class: "input", id: "mv-max" }, [["", "Any size"], ["10000", "Under 10k"], ["20000", "Under 20k"], ["50000", "Under 50k"], ["250000", "Under 250k"]]
+    .map(([v, t]) => el("option", { value: v, selected: v === mv.max }, t)));
+  const hide = el("input", { type: "checkbox", id: "mv-hide", checked: mv.hideReview });
+  const sizeOn = el("select", { class: "input", id: "mv-size-on" }, PLATFORMS.map(([v, t]) => el("option", { value: v, selected: v === mv.sizeOn }, t)));
+  view.replaceChildren(
+    el("div", { class: "page-head" }, el("div", {}, el("h1", {}, "Movers this week"),
+      el("p", {}, "Artists ranked by real growth over the last 7 days. Gains count from a base of 200+ and by 20+ people.")),
+      el("div", { class: "head-actions" },
+        el("button", { class: "btn ghost", onclick: () => { resetTo(mv, MV_DEFAULTS); renderMovers(); } }, "Reset filters"),
+        csvBtn(() => mvRows, "movers"))),
+    el("div", { class: "toolbar" },
+      el("label", { class: "field" }, el("span", {}, "Rank by"), plat),
+      el("label", { class: "field" }, el("span", {}, "Audience"), max),
+      el("label", { class: "field" }, el("span", {}, "Measured on"), sizeOn),
+      mgmtSelect(mv, () => draw()),
+      el("label", { class: "field check" }, el("span", {}, "Accounts under review"), el("span", { class: "check-row" }, hide, " Hide"))),
+    slot);
+  let rows;
+  try { rows = await api("/api/leaderboard?limit=100000" + (mv.max ? `&max_audience=${mv.max}&platform=${mv.sizeOn}` : "")); } catch (e) { slot.replaceChildren(errorCard(e)); return; }
+  const draw = () => {
+    const list = rows.filter(r => !(mv.hideReview && r.review?.length && !r.verified) && mgmtPass(r, mv.mgmt))
+      .map(r => ({ r, g: moverGain(r, mv.platform) })).filter(x => x.g).sort((a, b) => b.g.pct - a.g.pct);
+    mvRows = list.map(x => x.r);
+    if (!list.length) { slot.replaceChildren(el("div", { class: "card" }, el("div", { class: "empty" }, el("h4", {}, "No movers yet"), "Movers need a week of daily snapshots on that platform."))); return; }
+    const recent = d => d && (Date.now() - new Date(d + "T12:00:00")) / 864e5 <= 14 && (Date.now() - new Date(d + "T12:00:00")) >= -864e5;
+    const head = el("tr", {}, el("th", { title: "Compare" }, ""), el("th", {}, "#"), el("th", {}, "Artist"), el("th", { class: "r" }, mv.platform === "best" ? "Best 7-day gain" : "7-day gain"),
+      ...MOVER_COLS.map(([, t]) => el("th", { class: "r" }, t)), el("th", {}, "Breakout"), el("th", {}, "Label"), el("th", {}, "Last release"), el("th", {}, ""));
+    const cell = c => !c ? el("td", { class: "r dim" }, "–")
+      : el("td", { class: "r num " + (c.delta > 0 ? "up" : c.delta < 0 ? "down" : "") }, `${c.delta > 0 ? "+" : ""}${fmt(c.delta)} (${pct(c.pct)})`);
+    const body = el("tbody", {}, list.map(({ r, g }, i) => el("tr", { class: "row", onclick: () => go(r.name) },
+      el("td", {}, cmpBox(r)),
+      el("td", { class: "rank" }, i + 1),
+      el("td", {}, el("div", { class: "who" }, avatar(r.image_url, r.name), el("div", {},
+        el("div", { class: "n" }, r.name, r.accelerating ? el("span", { class: "mini hot" }, "Accelerating") : null,
+          r.review?.length && !r.verified ? el("span", { class: "mini warn", title: r.review.join("\n") }, "Review") : null),
+        el("div", { class: "g" }, [r.country, ...(r.genres || [])].filter(Boolean).join(" · ") || "—")))),
+      el("td", { class: "r num up" }, el("b", {}, pct(g.pct)), el("div", { class: "dim", style: "font-size:11.5px" }, `+${fmt(g.delta)} ${MOVER_PLATFORMS.find(p => p[0] === g.key)[1]}`)),
+      ...MOVER_COLS.map(([k]) => cell(r.change_7d?.[k])),
+      el("td", {}, scoreCell(r)),
+      el("td", {}, r.label ? labelPill(r.label, r.label_class) : el("span", { class: "dim" }, "–")),
+      el("td", { title: r.latest_release || "" }, recent(r.latest_release) ? el("span", { class: "mini hot", style: "margin:0" }, "New: " + ago(r.latest_release)) : el("span", { class: "dim" }, ago(r.latest_release))),
+      el("td", {}, starBtn(r)))));
+    slot.replaceChildren(el("div", { class: "card" }, el("div", { class: "table-wrap" }, el("table", {}, el("thead", {}, head), body)),
+      el("div", { class: "foot" }, el("span", {}, `${list.length} artist${list.length === 1 ? "" : "s"} grew this week`),
+        el("span", {}, "Gains are actual changes over 7 days, not projections"))));
+  };
+  plat.onchange = () => { mv.platform = plat.value; draw(); };
+  max.onchange = () => { mv.max = max.value; renderMovers(); };
+  sizeOn.onchange = () => { mv.sizeOn = sizeOn.value; if (mv.max) renderMovers(); };
+  hide.onchange = () => { mv.hideReview = hide.checked; draw(); };
+  draw();
+}
+
+// ============================================================ compare
+const CMP_MAX = 4, CMP_COLORS = ["var(--s1)", "var(--s2)", "var(--s3)", "var(--s4)"];
+let compareSel = [];
+try { compareSel = JSON.parse(localStorage.getItem("ars-compare") || "[]"); } catch {}
+const saveCompare = () => { try { localStorage.setItem("ars-compare", JSON.stringify(compareSel)); } catch {} drawCompareBar(); };
+const inCompare = name => compareSel.some(x => x.name === name);
+function toggleCompare(name) {
+  if (inCompare(name)) compareSel = compareSel.filter(x => x.name !== name);
+  else if (compareSel.length >= CMP_MAX) { toast(`Compare up to ${CMP_MAX} artists. Remove one first.`); return false; }
+  else compareSel.push({ name });
+  saveCompare(); return true;
+}
+function cmpBox(r) {
+  const b = el("input", { type: "checkbox", class: "cmp-box", "aria-label": `Compare ${r.name}`, title: "Add to compare", checked: inCompare(r.name) });
+  b.onclick = e => { e.stopPropagation(); if (!toggleCompare(r.name)) b.checked = false; };
+  return b;
+}
+function drawCompareBar() {
+  const bar = $("#cmpbar");
+  if (!compareSel.length || location.hash.startsWith("#/compare")) { bar.hidden = true; return; }
+  bar.hidden = false;
+  bar.replaceChildren(el("b", {}, `${compareSel.length} to compare`), el("span", { class: "who-list" }, compareSel.map(x => x.name).join(", ")),
+    el("button", { class: "btn primary", onclick: () => location.hash = "/compare" }, "Compare"),
+    el("button", { class: "btn ghost", onclick: () => { compareSel = []; saveCompare(); document.querySelectorAll(".cmp-box").forEach(b => b.checked = false); } }, "Clear"));
+}
+
+const CMP_METRICS = [["youtube.subscribers", "YouTube subscribers"], ["lastfm.listeners", "Last.fm listeners"], ["deezer.fans", "Deezer fans"],
+  ["spotify.monthly_listeners", "Spotify monthly listeners"], ["instagram.followers", "Instagram followers"], ["tiktok.followers", "TikTok followers"]];
+let cmpMetric = "youtube.subscribers";
+async function renderCompare() {
+  drawCompareBar();
+  const slot = el("div", {}, loadingCard(4));
+  view.replaceChildren(el("a", { class: "back", href: lastList === "leaderboard" ? "#/" : "#/" + lastList }, "← Back"),
+    el("div", { class: "page-head" }, el("div", {}, el("h1", {}, "Compare"), el("p", {}, "Side by side. The best value in each row is green."))), slot);
+  if (!compareSel.length) {
+    slot.replaceChildren(el("div", { class: "card" }, el("div", { class: "empty" }, el("h4", {}, "Nothing to compare yet"),
+      "Tick the box next to up to four artists in any table, or click Compare on an artist's page.")));
+    return;
+  }
+  let reps;
+  try { reps = await Promise.all(compareSel.map(x => api(`/api/artist/${encodeURIComponent(x.name)}?refresh=false`))); }
+  catch (e) { slot.replaceChildren(errorCard(e)); return; }
+  const m = rp => rp.score.metrics, c7 = (rp, k) => rp.changes?.[k]?.["7"];
+  const depth = rp => m(rp)["lastfm.listeners"] ? m(rp)["lastfm.playcount"] / m(rp)["lastfm.listeners"] : null;
+  // [label, value used to pick the best (null: no ranking), cell text]
+  const rows = [
+    ["Breakout score", rp => rp.score.score, rp => `${Math.round(rp.score.score)} (${Math.round(rp.score.confidence * 100)}% confidence)`],
+    ["Momentum", rp => rp.score.components.momentum, rp => rp.score.components.momentum == null ? "not enough history" : Math.round(rp.score.components.momentum * 100)],
+    ...CMP_METRICS.map(([k, label]) => [label + " (7d %)", rp => c7(rp, k)?.pct ?? null, rp => m(rp)[k] == null ? "–"
+      : `${fmt(m(rp)[k])}` + (c7(rp, k) ? ` · 7d ${c7(rp, k).delta >= 0 ? "+" : "−"}${fmt(Math.abs(c7(rp, k).delta))} (${pct(c7(rp, k).pct)})` : "")]),
+    ["Plays per listener", rp => depth(rp), rp => depth(rp) == null ? "–" : depth(rp).toFixed(1)],
+    ["Label", null, rp => rp.artist.latest_label ? `${(LABEL_CLASS[rp.artist.label_class] || ["?"])[0]} · ${rp.artist.latest_label}` : "–"],
+    ["Management", null, rp => rp.artist.management_info?.label || "Unknown"],
+    ["Last release", null, rp => rp.releases?.latest_release ? `${ago(rp.releases.latest_release)} · ${rp.releases.latest_title || ""}` : "–"],
+    ["Signals", null, rp => rp.score.flags.filter(f => !/^no growth/.test(f)).join(" · ") || "–"],
+    ["Accounts", null, rp => rp.score.review?.length && !rp.artist.verified_at ? "Needs review: " + rp.score.review.join("; ") : rp.artist.verified_at ? "✓ Checked" : "No problems found"],
+  ];
+  const head = el("tr", {}, el("th", { class: "metric" }, ""), reps.map((rp, i) => el("th", {},
+    el("div", { class: "cmp-head" }, el("span", { class: "swatch", style: `background:${CMP_COLORS[i]}` }), avatar(rp.artist.image_url, rp.artist.name),
+      el("span", { class: "n", style: "cursor:pointer", onclick: () => go(rp.artist.name) }, rp.artist.name)),
+    el("button", { class: "btn ghost", style: "padding:2px 6px;margin-top:4px;font-size:12px", onclick: () => { toggleCompare(rp.artist.name); renderCompare(); } }, "Remove"))));
+  const body = el("tbody", {}, rows.map(([label, val, text]) => {
+    const vals = val ? reps.map(val) : [];
+    const known = vals.filter(v => v != null);
+    const best = known.length > 1 ? Math.max(...known) : null;
+    return el("tr", {}, el("th", { class: "metric" }, label), reps.map((rp, i) =>
+      el("td", { class: best != null && vals[i] === best ? "best" : "" }, String(text(rp)))));
+  }));
+  const sel = el("select", { class: "input", id: "cmp-metric" }, CMP_METRICS.map(([k, t]) => el("option", { value: k, selected: k === cmpMetric }, t)));
+  const chartBox = el("div", { class: "cmp-chart" });
+  sel.onchange = () => { cmpMetric = sel.value; drawCompareChart(chartBox, reps); };
+  slot.replaceChildren(
+    el("div", { class: "card" }, el("div", { class: "table-wrap" }, el("table", { class: "cmp-table" }, el("thead", {}, head), body))),
+    el("div", { class: "card card-pad", style: "margin-top:16px" },
+      el("h3", {}, "Growth since each artist's first snapshot", el("span", { class: "aside" }, "percent change, so sizes compare fairly")),
+      el("div", { class: "toolbar", style: "margin-bottom:8px" }, el("label", { class: "field" }, el("span", {}, "Platform"), sel)), chartBox));
+  drawCompareChart(chartBox, reps);
+}
+
+function drawCompareChart(box, reps) {
+  const series = reps.map((rp, i) => {
+    const pts = rp.history.filter(h => h.metric === cmpMetric);
+    if (pts.length < 2) return null;
+    const base = pts[0].value;
+    return { name: rp.artist.name, color: CMP_COLORS[i], pts: pts.map(h => ({ t: new Date(h.taken_at).getTime(), v: base ? (h.value - base) / base : 0, raw: h.value })) };
+  }).filter(Boolean);
+  if (!series.length) { box.replaceChildren(el("div", { class: "dim", style: "padding:24px 0;text-align:center" }, "No artist here has two days of this number yet.")); return; }
+  const all = series.flatMap(s => s.pts);
+  const W = 640, H = 260, P = { l: 52, r: 12, t: 12, b: 26 };
+  const x0 = Math.min(...all.map(p => p.t)), x1 = Math.max(...all.map(p => p.t));
+  let y0 = Math.min(0, ...all.map(p => p.v)), y1 = Math.max(0.001, ...all.map(p => p.v));
+  const pad = (y1 - y0) * 0.1; y1 += pad; if (y0 < 0) y0 -= pad;
+  const sx = t => P.l + (t - x0) / (x1 - x0 || 1) * (W - P.l - P.r), sy = v => H - P.b - (v - y0) / (y1 - y0) * (H - P.t - P.b);
+  const ns = "http://www.w3.org/2000/svg", svg = document.createElementNS(ns, "svg");
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`); svg.setAttribute("role", "img"); svg.setAttribute("aria-label", "Growth comparison");
+  const add = (tag, attrs, text) => { const n = document.createElementNS(ns, tag); for (const k in attrs) n.setAttribute(k, attrs[k]); if (text != null) n.textContent = text; svg.append(n); return n; };
+  for (let i = 0; i <= 4; i++) {
+    const v = y0 + (y1 - y0) * i / 4, y = sy(v);
+    add("line", { x1: P.l, x2: W - P.r, y1: y, y2: y, stroke: "var(--grid)", "stroke-width": 1 });
+    add("text", { x: P.l - 8, y: y + 4, "text-anchor": "end", "font-size": 11, fill: "var(--muted)" }, (v >= 0 ? "+" : "") + (v * 100).toFixed(1) + "%");
+  }
+  const fmtD = t => new Date(t).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  add("text", { x: P.l, y: H - 6, "font-size": 11, fill: "var(--muted)" }, fmtD(x0));
+  add("text", { x: W - P.r, y: H - 6, "font-size": 11, fill: "var(--muted)", "text-anchor": "end" }, fmtD(x1));
+  for (const s of series) {
+    add("path", { d: s.pts.map((p, i) => (i ? "L" : "M") + sx(p.t) + " " + sy(p.v)).join(""), fill: "none", stroke: s.color, "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round" });
+    const last = s.pts.at(-1);
+    add("circle", { cx: sx(last.t), cy: sy(last.v), r: 3.5, fill: s.color });
+  }
+  box.replaceChildren(svg, el("div", { class: "cmp-legend" }, series.map(s => el("span", {},
+    el("i", { style: `display:inline-block;width:10px;height:10px;border-radius:3px;background:${s.color}` }),
+    `${s.name}: ${pct(s.pts.at(-1).v)} (${fmt(s.pts.at(-1).raw)})`))));
+}
+
+// ============================================================ help
+function renderHelp() {
+  const h2 = t => el("h2", { class: "help-h" }, t);
+  const p = (...k) => el("p", {}, ...k);
+  const dl = rows => el("dl", { class: "help-dl" }, rows.flatMap(([t, d]) => [el("dt", {}, t), el("dd", {}, d)]));
+  const badge = (text, cls) => el("span", { class: "mini " + cls, style: "margin:0" }, text);
+  view.replaceChildren(el("article", { class: "help" },
+    el("h1", {}, "How to use AR Scout"),
+    p("AR Scout tracks emerging artists every day across free music data sources and ranks who is worth a look. It's a scouting filter: it tells you where to point your ears, not who will make it."),
+
+    h2("A 10-minute weekly routine"),
+    el("ol", {},
+      el("li", {}, el("b", {}, "Movers this week."), " See who grew the most in the last 7 days. Look for the ", badge("Accelerating", "hot"), " badge and a new release."),
+      el("li", {}, el("b", {}, "Needs review."), " Check any artist whose linked accounts look wrong, so bad numbers don't mislead you."),
+      el("li", {}, el("b", {}, "Watchlist."), " Move artists along the pipeline and set the next step and due date."),
+      el("li", {}, el("b", {}, "Spotify and TikTok."), " For your watchlist, type in this week's Spotify monthly listeners and TikTok followers from their profiles (Update on each tile). Weekly entries build a trend.")),
+
+    h2("Where the numbers come from"),
+    dl([
+      ["Deezer fans", "Followers on Deezer. Much smaller than Spotify numbers, so compare them with each other, not with other platforms."],
+      ["Last.fm listeners and plays", "People who scrobble the artist. Plays per listener shows how loyal the audience is: over 30 is a deep fanbase."],
+      ["YouTube subscribers and views", "From the artist's channel. Channels are matched automatically and sometimes wrong; those get flagged for review."],
+      ["Instagram followers", "From Instagram once it's connected, for public professional accounts only. Until then, typed in by hand."],
+      ["Spotify monthly listeners, TikTok followers", "No free source, so these are typed in from the public profile. Each entry is dated and builds a trend."],
+      ["Wikipedia views", "Page views in the last 30 days. Heavy traffic means the artist is already mainstream."],
+      ["Releases and label", "From Deezer: the latest release, how many in the past year, and the label it came out on."],
+    ]),
+    p("Numbers update every morning at 9:00 (the daily snapshot) and whenever you press Refresh data."),
+
+    h2("The breakout score (0–100)"),
+    p("Five parts, then adjusted for size. Every artist page explains its score in plain words under “Working for them” and “Working against them”."),
+    dl([
+      ["Momentum (40%)", "How fast they're growing across platforms. Needs a week of daily snapshots before it counts."],
+      ["Fandom depth (20%)", "Plays per listener and views per subscriber: loyal fans, not passing listeners."],
+      ["Room to grow (20%)", "Real traction but not big yet. Being big on any one platform counts as big, and big acts are scored lower."],
+      ["Release activity (10%)", "Released recently and often."],
+      ["Signs of being unsigned (10%)", "Self-released or through a DIY distributor scores highest; an independent label in the middle; a major label lowest."],
+    ]),
+    p("Confidence is how much of the score had data behind it. A grey score is provisional."),
+
+    h2("Badges and what they mean"),
+    dl([
+      [badge("Accelerating", "hot"), "Daily gains at least 1.5× faster than the week before on two or more platforms. The strongest early signal."],
+      [badge("Deep fandom", "pos"), "More than 30 Last.fm plays per listener."],
+      [badge("Review", "warn"), "A linked account may belong to someone else. Check it before trusting the numbers."],
+      [badge("✓ Verified", "ok"), "Someone checked that every linked account is the right artist."],
+      [badge("Self-released", "lc-self"), " ", badge("Indie", "lc-indie"), " ", badge("Major", "lc-major"), "Who puts out their music. Self-released or DIY usually means unsigned."],
+      [badge("No mgmt", "pos"), " ", badge("Managed", ""), "Whether they have a manager: set by you, or read from their Instagram bio."],
+      [badge("Capped", ""), "Already big, so the score is reduced for size."],
+      [badge("Check YT", "warn"), "The YouTube channel looks too small for this act."],
+    ]),
+
+    h2("Everyday actions"),
+    dl([
+      ["Look up any artist", "Type a name in the search bar. Every lookup is saved and tracked from then on."],
+      ["Find new artists", "Discover searches by similar artists, scene, playlists, new releases or country."],
+      ["Watch", "The star in any table, or Watch on an artist's page. Watched artists appear on the pipeline board."],
+      ["Compare", "Tick up to four artists in any table, then Compare in the bar at the bottom."],
+      ["Fix a wrong account", "Change on the YouTube or Instagram tile, then paste the right profile link."],
+      ["Archive", "On an artist's page under Manage artist. Hides them everywhere and stops their daily snapshot; history is kept."],
+    ]),
+
+    h2("What AR Scout can't see"),
+    el("ul", {},
+      el("li", {}, "TikTok and Spotify numbers unless someone types them in."),
+      el("li", {}, "Playlist adds, radio, streams and sales."),
+      el("li", {}, "Mainstream US acts are undercounted by these sources, so a missing number can hide a big act."),
+      el("li", {}, "Growth is only as old as tracking: one week of data is an early signal, not a trend.")),
+  ));
+}
+
+// ============================================================ needs review
+async function renderReview() {
+  const slot = el("div", {}, loadingCard(4));
+  view.replaceChildren(
+    el("div", { class: "page-head" }, el("div", {}, el("h1", {}, "Needs review"),
+      el("p", {}, "Artists whose linked accounts look wrong. Open each one and compare its links with the real artist. Fix a wrong account with Change on its tile. Click “Links are correct” only once every account is right; until then, leave it here so its numbers stay out of rankings."))),
+    slot);
+  let rows;
+  try { rows = await api("/api/review"); } catch (e) { slot.replaceChildren(errorCard(e)); return; }
+  if (!rows.length) {
+    slot.replaceChildren(el("div", { class: "card" }, el("div", { class: "empty" }, el("h4", {}, "Nothing to review"),
+      "Every artist's linked accounts either look right or have been checked.")));
+    return;
+  }
+  slot.replaceChildren(el("div", { class: "review-list" }, rows.map(r => {
+    const btn = el("button", { class: "btn demo-hide", title: "Only after you've checked: every linked account is this artist" }, "Links are correct");
+    btn.onclick = async () => {
+      btn.disabled = true;
+      try { await post(`/api/artist/${r.id}/verify`, { verified: true }); toast(`${r.name}: links confirmed`); loadCounts(); renderReview(); }
+      catch (e) { toast("Couldn't save: " + e.message); btn.disabled = false; }
+    };
+    return el("div", { class: "card review-item" }, avatar(r.image_url, r.name),
+      el("div", { style: "min-width:0" },
+        el("div", {}, el("span", { class: "n", onclick: () => go(r.name) }, r.name), r.status ? el("span", { class: "pill st-" + r.status, style: "margin-left:8px" }, r.status) : null),
+        el("ul", {}, r.review.map(i => el("li", {}, i)))),
+      el("div", { class: "acts" }, el("button", { class: "btn ghost", onclick: () => go(r.name) }, "Open"), btn));
+  })));
+}
+
+function reviewBanner(a, s) {
+  const toggle = (verified) => async (e) => {
+    e.target.disabled = true;
+    try { await post(`/api/artist/${a.id}/verify`, { verified }); toast(verified ? "Links confirmed" : "Back in the review queue"); loadCounts(); renderArtist(a.name); }
+    catch (err) { toast("Couldn't save: " + err.message); e.target.disabled = false; }
+  };
+  if (a.verified_at) return el("div", { class: "review-banner ok" }, el("div", { class: "row" },
+    el("span", {}, `✓ Linked accounts checked on ${new Date(a.verified_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}.`),
+    el("button", { class: "btn ghost demo-hide", onclick: toggle(false) }, "Undo: send back to review")));
+  if (!s.review?.length) return null;
+  return el("div", { class: "review-banner" },
+    el("div", { class: "row" }, el("b", {}, "Check this artist's linked accounts"),
+      el("button", { class: "btn demo-hide", onclick: toggle(true), title: "Only after you've checked: every linked account is this artist" }, "Links are correct")),
+    el("ul", {}, s.review.map(i => el("li", {}, i))),
+    el("span", {}, "Compare the links above with the artist's real profiles. Fix a wrong YouTube or Instagram account with Change on its tile below."));
+}
+
+function renderDiscover() {
+  if (DEMO) {
+    view.replaceChildren(el("div", { class: "page-head" }, el("div", {}, el("h1", {}, "Discover"))),
+      el("div", { class: "card" }, el("div", { class: "empty" }, el("h4", {}, "Discovery searches live music data"),
+        "In the full tool this finds new artists by similar acts, scene tags, curated playlists, new releases and country charts, and adds them to the leaderboard. The demo is a fixed snapshot, so it's switched off here.")));
+    return;
+  }
+  const mode = el("select", { class: "input" }, Object.entries(MODES).map(([k, [t]]) => el("option", { value: k, selected: k === disc.mode }, t)));
+  const q = el("input", { class: "input", placeholder: MODES[disc.mode][1], value: disc.query });
+  const mn = el("input", { class: "input num", type: "number", value: disc.min });
+  const mx = el("input", { class: "input num", type: "number", value: disc.max });
+  const lim = el("input", { class: "input num", type: "number", value: disc.limit });
+  const hint = el("p", {}, MODES[disc.mode][2]);
+  const goBtn = el("button", { class: "btn primary", type: "submit" }, "Search");
+  const slot = el("div", {});
+  mode.onchange = () => { disc.mode = mode.value; q.placeholder = MODES[disc.mode][1]; hint.textContent = MODES[disc.mode][2]; };
+  const draw = () => slot.replaceChildren(disc.rows ? dataTable(disc.rows, {
+    empty: ["No candidates in that range", "Widen the Deezer fan bounds or try a different query."], showStatus: false, sort: disc.sort, onSort: s => { disc.sort = s; draw(); } })
+    : el("div", { class: "card" }, el("div", { class: "empty" }, el("h4", {}, "Find new artists"), "Pick a method, enter a query and search. Every candidate is saved so you can track it.")));
+  const form = el("form", { class: "card disc-form" },
+    el("label", { class: "field" }, el("span", {}, "Method"), mode),
+    el("label", { class: "field q" }, el("span", {}, "Query"), q),
+    el("label", { class: "field" }, el("span", {}, "Min Deezer fans"), mn),
+    el("label", { class: "field" }, el("span", {}, "Max Deezer fans"), mx),
+    el("label", { class: "field" }, el("span", {}, "Limit"), lim),
+    goBtn);
+  form.onsubmit = async e => {
+    e.preventDefault();
+    Object.assign(disc, { query: q.value.trim(), min: +mn.value, max: +mx.value, limit: +lim.value });
+    goBtn.disabled = true; goBtn.textContent = "Searching…";
+    slot.replaceChildren(el("div", { class: "progress" }, el("i")), loadingCard(5));
+    try { disc.rows = await post("/api/discover", { mode: disc.mode, query: disc.query, min_fans: disc.min, max_fans: disc.max, limit: disc.limit }); draw(); toast(`${disc.rows.length} candidates saved`); loadCounts(); }
+    catch (err) { slot.replaceChildren(errorCard(err)); }
+    goBtn.disabled = false; goBtn.textContent = "Search";
+  };
+  view.replaceChildren(
+    el("div", { class: "page-head" }, el("div", {}, el("h1", {}, "Discover"), hint)),
+    form, slot);
+  draw();
+}
+
+// ============================================================ artist
+// releases: [{title, date, type}] from the artist's release list; each one in range gets a dashed marker.
+function lineChart(points, label, releases = []) {
+  const last = points.at(-1)?.value;
+  const wrap = el("div", { class: "card chart" }, el("div", { class: "h" }, el("b", {}, label), el("span", {}, fmt(last))));
+  const days = new Set(points.map(p => p.taken_at.slice(0, 10))).size;
+  if (days < 2) {
+    wrap.append(el("div", { class: "na" }, "Trend line appears after snapshots on two different days."));
+    return wrap;
+  }
+  const W = 300, H = 110, P = { l: 4, r: 4, t: 8, b: 18 };
+  const xs = points.map(p => new Date(p.taken_at).getTime()), ys = points.map(p => p.value);
+  const x0 = Math.min(...xs), x1 = Math.max(...xs);
+  let y0 = Math.min(...ys), y1 = Math.max(...ys);
+  if (y0 === y1) { y0 *= 0.98; y1 = y1 * 1.02 || 1; }
+  const pad = (y1 - y0) * 0.15; y0 -= pad; y1 += pad;
+  const sx = x => P.l + (x - x0) / (x1 - x0 || 1) * (W - P.l - P.r);
+  const sy = y => H - P.b - (y - y0) / (y1 - y0) * (H - P.t - P.b);
+  const ns = "http://www.w3.org/2000/svg", svg = document.createElementNS(ns, "svg");
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`); svg.setAttribute("preserveAspectRatio", "none");
+  svg.setAttribute("role", "img"); svg.setAttribute("aria-label", `${label}: ${fmt(ys[0])} to ${fmt(ys.at(-1))}`);
+  const add = (tag, attrs) => { const n = document.createElementNS(ns, tag); for (const k in attrs) n.setAttribute(k, attrs[k]); svg.append(n); return n; };
+  const line = points.map((p, i) => (i ? "L" : "M") + sx(xs[i]) + " " + sy(p.value)).join("");
+  const id = "g" + Math.random().toString(36).slice(2);
+  const defs = add("defs", {});
+  defs.innerHTML = `<linearGradient id="${id}" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="var(--accent)" stop-opacity=".18"/><stop offset="1" stop-color="var(--accent)" stop-opacity="0"/></linearGradient>`;
+  add("path", { d: `${line}L${sx(x1)} ${H - P.b}L${sx(x0)} ${H - P.b}Z`, fill: `url(#${id})` });
+  add("path", { d: line, fill: "none", stroke: "var(--accent)", "stroke-width": 2, "stroke-linejoin": "round", "vector-effect": "non-scaling-stroke" });
+  const fmtD = t => new Date(t).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  add("text", { x: P.l, y: H - 3, "font-size": 10, fill: "var(--muted)" }).textContent = fmtD(x0);
+  add("text", { x: W - P.r, y: H - 3, "font-size": 10, fill: "var(--muted)", "text-anchor": "end" }).textContent = fmtD(x1);
+  const DAY = 864e5;
+  const marks = releases.map(r => ({ ...r, t: new Date(r.date + "T12:00:00Z").getTime() }))
+    .filter(r => r.t >= x0 - DAY / 2 && r.t <= x1 + DAY / 2);
+  for (const r of marks) {
+    const rx = Math.max(P.l, Math.min(W - P.r, sx(r.t)));
+    add("line", { x1: rx, x2: rx, y1: P.t, y2: H - P.b, stroke: "var(--warn)", "stroke-width": 1, "stroke-dasharray": "3 3",
+      "vector-effect": "non-scaling-stroke", opacity: .8 });
+  }
+  const hair = add("line", { y1: P.t, y2: H - P.b, stroke: "var(--border-strong)", "stroke-width": 1, "vector-effect": "non-scaling-stroke", visibility: "hidden" });
+  const dot = add("circle", { r: 3.5, fill: "var(--accent)", stroke: "var(--surface)", "stroke-width": 2, visibility: "hidden" });
+  const hit = add("rect", { x: 0, y: 0, width: W, height: H, fill: "transparent" });
+  const tip = $("#tip");
+  hit.addEventListener("pointermove", ev => {
+    const rect = svg.getBoundingClientRect(), mx = (ev.clientX - rect.left) / rect.width * W;
+    let b = 0; xs.forEach((x, i) => { if (Math.abs(sx(x) - mx) < Math.abs(sx(xs[b]) - mx)) b = i; });
+    const cx = sx(xs[b]), cy = sy(ys[b]);
+    hair.setAttribute("visibility", "visible"); dot.setAttribute("visibility", "visible");
+    hair.setAttribute("x1", cx); hair.setAttribute("x2", cx); dot.setAttribute("cx", cx); dot.setAttribute("cy", cy);
+    const near = marks.filter(r => Math.abs(r.t - xs[b]) <= 1.5 * DAY);
+    tip.replaceChildren(el("strong", {}, Math.round(ys[b]).toLocaleString()), el("span", { class: "dim" }, new Date(xs[b]).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })),
+      ...near.map(r => el("span", { class: "tip-rel" }, `Release: ${r.title} (${r.type}, ${fmtD(r.t)})`)));
+    tip.style.display = "block"; tip.style.left = Math.min(ev.clientX + 12, innerWidth - 180) + "px"; tip.style.top = ev.clientY - 48 + "px";
+  });
+  hit.addEventListener("pointerleave", () => { tip.style.display = "none"; hair.setAttribute("visibility", "hidden"); dot.setAttribute("visibility", "hidden"); });
+  wrap.append(svg);
+  return wrap;
+}
+
+function ring(score, conf) {
+  const C = 2 * Math.PI * 36, low = conf < 0.7;
+  const r = el("div", { class: "ring", title: `Confidence ${Math.round(conf * 100)}%` });
+  r.innerHTML = `<svg viewBox="0 0 84 84"><circle cx="42" cy="42" r="36" fill="none" stroke="var(--surface-3)" stroke-width="7"/>
+    <circle cx="42" cy="42" r="36" fill="none" stroke="${low ? "var(--muted)" : "var(--accent)"}" stroke-width="7" stroke-linecap="round"
+    stroke-dasharray="${C * score / 100} ${C}"/></svg>`;
+  r.append(el("div", { class: "val" }, Math.round(score)));
+  return r;
+}
+
+const YT_SOURCE = { musicbrainz: "via MusicBrainz", search: "via search", manual: "set by you" };
+function ytChannelLine(a) {
+  const change = el("button", { class: "linkish" }, a.youtube_channel ? "Change" : "Set channel");
+  change.onclick = async () => {
+    const url = prompt(`YouTube channel for ${a.name}\n\nPaste a youtube.com/@handle or youtube.com/channel/UC… link. Old YouTube history for this artist is deleted so the switch doesn't read as growth.`);
+    if (!url || !url.trim()) return;
+    change.disabled = true; change.textContent = "Saving…";
+    try {
+      const r = await post(`/api/artist/${a.id}/youtube`, { url: url.trim() });
+      toast(`${r.title}: ${fmt(r.subscribers)} subscribers`); renderArtist(a.name);
+    } catch (e) { toast("Couldn't set channel: " + e.message); change.disabled = false; change.textContent = "Change"; }
+  };
+  return el("div", { class: "d yt-src" },
+    a.youtube_channel ? el("a", { href: "https://www.youtube.com/channel/" + a.youtube_channel, target: "_blank", rel: "noopener" }, "Channel ↗") : null,
+    a.youtube_channel && YT_SOURCE[a.youtube_source] ? " " + YT_SOURCE[a.youtube_source] : null,
+    el("span", { class: "admin-only" }, a.youtube_channel ? " · " : "", change));
+}
+
+// "12.5k", "1.2M", "12,500" or "1.2 million" -> a number; null if it isn't one.
+function parseCount(text) {
+  const t = String(text || "").trim().toLowerCase().replace(/,/g, "").replace(/\s+/g, "");
+  const m = t.match(/^(\d+(?:\.\d+)?)(k|thousand|m|million|b|billion)?$/);
+  if (!m) return null;
+  const mult = { k: 1e3, thousand: 1e3, m: 1e6, million: 1e6, b: 1e9, billion: 1e9 }[m[2]] || 1;
+  return Math.round(parseFloat(m[1]) * mult);
+}
+
+// A button that saves a number read off a public profile as today's snapshot.
+function manualButton(a, metric, label, where) {
+  const b = el("button", { class: "linkish demo-hide" }, "Update");
+  b.onclick = async () => {
+    const text = prompt(`${label} for ${a.name}\n\n${where}\nType the number shown, e.g. 12,500 or 12.5K. It's saved with today's date.`);
+    if (text == null || !text.trim()) return;
+    const value = parseCount(text);
+    if (value == null) { toast(`“${text}” isn't a number. Try something like 12,500 or 12.5K`); return; }
+    b.disabled = true; b.textContent = "Saving…";
+    try { await post(`/api/artist/${a.id}/manual`, { metric, value }); toast(`${label}: ${value.toLocaleString()} saved`); renderArtist(a.name); }
+    catch (e) { toast("Couldn't save: " + e.message); b.disabled = false; b.textContent = "Update"; }
+  };
+  return b;
+}
+
+function igKpi(a, m) {
+  const sub = !igOn ? "Instagram not set up" : !a.instagram_username ? "no account linked" : "not readable: personal or private account?";
+  const tile = el("div", { class: "card kpi" }, el("div", { class: "l" }, "Instagram followers"), el("div", { class: "v" }, fmt(m["instagram.followers"])),
+    el("div", { class: "d" }, m["instagram.followers"] != null ? `${fmt(m["instagram.media_count"])} posts` : sub));
+  const change = el("button", { class: "linkish" }, a.instagram_username ? "Change" : "Set account");
+  change.onclick = async () => {
+    const h = prompt(`Instagram account for ${a.name}\n\nPaste an instagram.com link or @username. Counts only work for public professional (Business/Creator) accounts.`);
+    if (!h || !h.trim()) return;
+    change.disabled = true; change.textContent = "Saving…";
+    try {
+      const r = await post(`/api/artist/${a.id}/instagram`, { handle: h.trim() });
+      toast(r.followers != null ? `@${r.username}: ${fmt(r.followers)} followers` : `Saved @${r.username}`); renderArtist(a.name);
+    } catch (e) { toast("Couldn't set account: " + e.message); change.disabled = false; change.textContent = "Change"; }
+  };
+  tile.append(el("div", { class: "d yt-src" },
+    a.instagram_username ? el("a", { href: `https://www.instagram.com/${a.instagram_username}/`, target: "_blank", rel: "noopener" }, "@" + a.instagram_username + " ↗") : null,
+    a.instagram_username && a.instagram_source === "manual" ? " set by you" : null,
+    el("span", { class: "admin-only" }, a.instagram_username ? " · " : "", change),
+    // until the Instagram API is connected, the count can be typed in from the profile
+    !igOn ? " · " : null, !igOn ? manualButton(a, "instagram.followers", "Instagram followers", "On the Instagram profile, it's the number above “followers”.") : null));
+  return tile;
+}
+
+function managementCard(a) {
+  const info = a.management_info || { label: "Unknown" };
+  const sel = el("select", { class: "input demo-hide", id: "mgmt-status", "aria-label": "Management status" },
+    [["", info.source === "instagram bio" ? "Use Instagram bio" : "Unknown"], ["unmanaged", "No management"], ["managed", "Has management"]]
+      .map(([v, t]) => el("option", { value: v, selected: v === (a.management || "") }, t)));
+  sel.onchange = async () => {
+    sel.disabled = true;
+    try { const r = await post(`/api/artist/${a.id}/management`, { status: sel.value || null }); toast(`Management: ${r.label}`); renderArtist(a.name); }
+    catch (e) { toast("Couldn't save: " + e.message); sel.disabled = false; }
+  };
+  const tone = info.status === "unmanaged" || info.status === "not_listed" ? "flag pos" : info.status ? "flag" : "flag warn";
+  return el("div", { class: "card card-pad" },
+    el("h3", {}, "Management", el("span", { class: "aside" }, info.source ? `from ${info.source}` : "")),
+    el("div", { class: tone }, info.label),
+    info.evidence ? el("div", { class: "dim", style: "font-size:12.5px;margin-top:8px" }, "Bio says: “", info.evidence, "”") : null,
+    !info.status ? el("div", { class: "dim", style: "font-size:12.5px;margin-top:8px" },
+      igOn ? "Their Instagram bio doesn't say, or isn't readable." : "Connect Instagram to read this from their bio, or set it here.") : null,
+    el("div", { style: "margin-top:10px" }, sel));
+}
+
+// Plain-language reasons behind the score, built from the same numbers. Each line is for or against the artist.
+function explainScore(r) {
+  const s = r.score, c = s.components, m = s.metrics, a = r.artist, rel = r.releases || {};
+  const pro = [], con = [];
+  const acc = s.acceleration;
+  if (acc?.accelerating) {
+    const best = acc.faster.map(k => acc.platforms[k]).sort((x, y) => (y.ratio || 0) - (x.ratio || 0))[0];
+    pro.push(`Growth sped up recently: daily gains ${best.ratio ? best.ratio.toFixed(1) + "× faster" : "started"} on ${best.platform}${acc.faster.length > 1 ? ` and ${acc.faster.length - 1} other platform${acc.faster.length > 2 ? "s" : ""}` : ""}.`);
+  }
+  if (c.momentum == null) con.push("Not enough history yet to measure growth (needs a week of daily snapshots), so the score leans on the other parts.");
+  else if (c.momentum >= 0.6) pro.push("Growing fast across platforms.");
+  else if (c.momentum >= 0.3) pro.push("Growing steadily.");
+  else con.push("Little growth recently.");
+  const depth = m["lastfm.listeners"] ? m["lastfm.playcount"] / m["lastfm.listeners"] : null;
+  if (depth != null) {
+    if (depth >= 30) pro.push(`Very loyal listeners: about ${Math.round(depth)} plays each on Last.fm.`);
+    else if (depth < 8) con.push(`Mostly casual listening: about ${depth.toFixed(1)} plays per listener on Last.fm.`);
+  }
+  const biggest = Object.entries({ "YouTube subscribers": m["youtube.subscribers"], "Last.fm listeners": m["lastfm.listeners"],
+    "Spotify monthly listeners": m["spotify.monthly_listeners"], "Instagram followers": m["instagram.followers"], "TikTok followers": m["tiktok.followers"] })
+    .filter(([, v]) => v != null).sort((x, y) => y[1] - x[1])[0];
+  if (c.headroom != null) {
+    if (c.headroom >= 1) pro.push("Still small enough to have plenty of room to grow.");
+    else if (c.headroom < 0.5) con.push(`Already big${biggest ? ` (${fmt(biggest[1])} ${biggest[0]})` : ""}, so the score is reduced for size.`);
+    else con.push(`Getting big${biggest ? ` (${fmt(biggest[1])} ${biggest[0]})` : ""}, so the score is trimmed a little for size.`);
+  }
+  if (c.activity != null) {
+    if (c.activity >= 0.8) pro.push(`Releasing actively: latest ${rel.latest_type || "release"} ${ago(rel.latest_release)}${rel.releases_last_year ? `, ${rel.releases_last_year} in the past year` : ""}.`);
+    else if (c.activity < 0.3) con.push(`No recent releases${rel.latest_release ? ` (latest ${ago(rel.latest_release)})` : ""}.`);
+  }
+  const lc = a.label_class;
+  if (lc === "self" || lc === "diy") pro.push("Releases their own music, so likely unsigned.");
+  else if (lc === "major") con.push(`On a major label (${a.latest_label}), so probably not available.`);
+  else if (lc === "indie") con.push(`On an independent label (${a.latest_label}).`);
+  const mg = a.management_info?.status;
+  if (mg === "unmanaged" || mg === "not_listed") pro.push(`No management ${mg === "unmanaged" ? "(you checked)" : "listed in their Instagram bio"}.`);
+  else if (mg === "managed" || mg === "listed") con.push("Already has management.");
+  if (s.excluded?.length) con.push(`${s.excluded.map(p => ({ youtube: "YouTube", lastfm: "Last.fm", deezer: "Deezer", instagram: "Instagram" })[p] || p).join(" and ")} left out of the score until someone checks the linked account.`);
+  else if (s.review?.length && !a.verified_at) con.push("Some linked accounts may belong to someone else, so treat these numbers with care.");
+  const list = (items, cls) => el("ul", { class: "why " + cls }, items.map(t => el("li", {}, t)));
+  return el("div", { class: "explain" },
+    pro.length ? [el("div", { class: "why-h pos" }, "Working for them"), list(pro, "pos")] : null,
+    con.length ? [el("div", { class: "why-h neg" }, "Working against them"), list(con, "neg")] : null);
+}
+
+function archivedBanner(a) {
+  if (!a.archived_at) return null;
+  const b = el("button", { class: "btn" }, "Restore");
+  b.onclick = async () => { b.disabled = true; await post(`/api/artist/${a.id}/archive`, { archived: false }); toast(`${a.name} restored`); loadCounts(); renderArtist(a.name); };
+  return el("div", { class: "review-banner" }, el("div", { class: "row" },
+    el("span", {}, el("b", {}, "Archived "), `on ${new Date(a.archived_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}. Hidden from rankings and daily snapshots; history is kept.`), b));
+}
+
+// Archive is the everyday choice; delete is for mistakes and asks twice, in the page.
+function manageCard(a) {
+  const arch = el("button", { class: "btn" }, a.archived_at ? "Restore" : "Archive");
+  arch.onclick = async () => {
+    arch.disabled = true;
+    try { await post(`/api/artist/${a.id}/archive`, { archived: !a.archived_at }); toast(a.archived_at ? `${a.name} restored` : `${a.name} archived`); loadCounts(); renderArtist(a.name); }
+    catch (e) { toast("Couldn't save: " + e.message); arch.disabled = false; }
+  };
+  const del = el("button", { class: "btn ghost danger admin-only" }, "Delete permanently");
+  const confirmRow = el("div", { class: "confirm-row", hidden: true },
+    el("span", {}, `Delete ${a.name} and all their history? This can't be undone here (the nightly backup still has it).`),
+    el("div", { class: "head-actions" },
+      el("button", { class: "btn ghost", onclick: () => { confirmRow.hidden = true; del.hidden = false; } }, "Cancel"),
+      el("button", { class: "btn danger-solid", onclick: async (e) => {
+        e.target.disabled = true;
+        try { await api(`/api/artist/${a.id}`, { method: "DELETE" }); toast(`${a.name} deleted`); compareSel = compareSel.filter(x => x.name !== a.name); saveCompare(); loadCounts(); location.hash = lastList === "leaderboard" ? "/" : "/" + lastList; }
+        catch (err) { toast("Couldn't delete: " + err.message); e.target.disabled = false; }
+      } }, "Yes, delete")));
+  del.onclick = () => { del.hidden = true; confirmRow.hidden = false; };
+  return el("div", { class: "card card-pad demo-hide" },
+    el("h3", {}, "Manage artist"),
+    el("p", { class: "dim", style: "font-size:12.5px;margin:0 0 10px" }, a.archived_at
+      ? "Restoring brings them back into rankings and daily snapshots."
+      : "Archive dead ends and passes: they leave every ranking and stop using API quota, and discovery won't bring them back."),
+    el("div", { class: "head-actions" }, arch, del), confirmRow);
+}
+
+// Last.fm and Deezer matches: a link to the profile, and (admin) a way to point at the right one.
+const ACCOUNTS = {
+  lastfm: { label: "Last.fm", field: "lastfm_source",
+    href: a => a.lastfm_name ? "https://www.last.fm/music/" + encodeURIComponent(a.lastfm_name).replace(/%20/g, "+") : null,
+    ask: a => `Last.fm artist for ${a.name}\n\nPaste their last.fm/music/... link. The old Last.fm history for this artist is deleted so the switch doesn't read as growth.` },
+  deezer: { label: "Deezer", field: "deezer_source",
+    href: a => a.deezer_id ? `https://www.deezer.com/artist/${a.deezer_id}` : null,
+    ask: a => `Deezer artist for ${a.name}\n\nPaste their deezer.com/artist/... link. The old Deezer history for this artist is deleted so the switch doesn't read as growth.` },
+};
+function accountLine(a, kind) {
+  const k = ACCOUNTS[kind], href = k.href(a);
+  const change = el("button", { class: "linkish" }, "Change");
+  change.onclick = async () => {
+    const link = prompt(k.ask(a));
+    if (!link || !link.trim()) return;
+    change.disabled = true; change.textContent = "Saving…";
+    try { await post(`/api/artist/${a.id}/${kind}`, { link: link.trim() }); toast(`${k.label} updated`); renderArtist(a.name); }
+    catch (e) { toast(`Couldn't change ${k.label}: ` + e.message); change.disabled = false; change.textContent = "Change"; }
+  };
+  return el("div", { class: "d yt-src" },
+    href ? el("a", { href, target: "_blank", rel: "noopener" }, k.label + " ↗") : null,
+    a[k.field] === "manual" ? " set by you" : null,
+    el("span", { class: "admin-only" }, href ? " · " : "", change));
+}
+
+const parseTags = v => [...new Set(v.split(",").map(t => t.trim()).filter(Boolean))];
+
+function flagClass(f) {
+  if (/accelerating|deep fandom|DIY|unsigned|self-released|growing|surging/i.test(f)) return "flag pos";
+  if (/no growth|only|missing|established|stale|no youtube|looks off|capped/i.test(f)) return "flag warn";
+  return "flag";
+}
+
+async function renderArtist(name) {
+  const back = el("a", { class: "back", href: lastList === "leaderboard" ? "#/" : "#/" + lastList }, "← Back");
+  view.replaceChildren(back,
+    el("div", { class: "hero" }, el("div", { class: "skeleton", style: "width:96px;height:96px;border-radius:50%" }),
+      el("div", { class: "hero-main" }, el("div", { class: "skeleton", style: "height:28px;width:260px" }),
+        el("div", { class: "skeleton", style: "height:14px;width:340px;margin-top:10px" }))),
+    el("p", { class: "dim" }, `Pulling ${name} from Deezer, Last.fm, YouTube, MusicBrainz and Wikipedia…`));
+  let r;
+  try { r = await api("/api/artist/" + encodeURIComponent(name)); }
+  catch (e) { view.replaceChildren(back, el("div", { class: "card" }, el("div", { class: "empty" }, el("h4", {}, `Couldn't find “${name}”`), e.message))); return; }
+  const a = r.artist, s = r.score, m = s.metrics, rel = r.releases || {}, g = s.growth || {};
+  document.title = `${a.name} · AR Scout`;
+
+  // actions
+  const watched = r.watchlist;
+  const tagInput = el("input", { class: "input", placeholder: "Tags, comma-separated (e.g. uk indie, similar:The K's)", value: (watched?.tags || []).join(", ") });
+  tagInput.addEventListener("keydown", e => { if (e.key === "Enter") watchBtn.click(); });
+  const statusSel = el("select", { class: "input" }, STATUSES.map(o => el("option", { value: o, selected: watched?.status === o }, o[0].toUpperCase() + o.slice(1))));
+  const watchBtn = el("button", { class: "btn primary" }, watched ? "Update" : "Watch");
+  watchBtn.onclick = async () => {
+    watchBtn.disabled = true;
+    try { await post("/api/watch", { name: a.name, status: statusSel.value, tags: parseTags(tagInput.value) }); toast(watched ? "Watchlist updated" : `Now watching ${a.name}`); loadCounts(); renderArtist(a.name); }
+    catch (e) { toast("Error: " + e.message); watchBtn.disabled = false; }
+  };
+  const unwatch = watched ? el("button", { class: "btn ghost", onclick: async () => {
+    await api("/api/watch/" + a.id, { method: "DELETE" }); toast("Removed from watchlist"); loadCounts(); renderArtist(a.name); } }, "Unwatch") : null;
+
+  const newest = r.history.length ? r.history[r.history.length - 1].taken_at : null;
+  const meta = [a.country, (a.genres || []).slice(0, 4).join(", "), rel.first_release && `releasing since ${rel.first_release.slice(0, 4)}`,
+    newest && `numbers as of ${new Date(newest).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}`].filter(Boolean);
+  const hero = el("div", { class: "hero" }, avatar(a.image_url, a.name),
+    el("div", { class: "hero-main" },
+      el("h1", {}, a.name),
+      el("div", { class: "meta" }, meta.map(x => el("span", {}, x))),
+      Object.keys(a.links || {}).length ? el("div", { class: "links" },
+        Object.entries(a.links).filter(([k]) => k !== "wikidata").map(([k, u]) => el("a", { href: u, target: "_blank", rel: "noopener" }, k[0].toUpperCase() + k.slice(1) + " ↗"))) : null),
+    el("div", { class: "hero-actions" }, watched ? el("span", { class: "pill st-" + watched.status }, "On watchlist") : null,
+      el("span", { class: "demo-hide head-actions" }, statusSel, watchBtn, unwatch),
+      (() => { const b = el("button", { class: "btn ghost" }, inCompare(a.name) ? "✓ In compare" : "Compare");
+        b.onclick = () => { if (toggleCompare(a.name)) b.textContent = inCompare(a.name) ? "✓ In compare" : "Compare"; }; return b; })()),
+    el("div", { class: "tag-edit demo-hide", style: "flex-basis:100%" }, el("span", { class: "dim", style: "font-size:12px" }, "Tags"), tagInput),
+    watched ? pipelineEditor(a, watched) : null);
+
+  // KPIs
+  // Real changes over the last 7 and 28 days, not a projected monthly rate.
+  const changeLine = (key, days) => {
+    const c = r.changes?.[key]?.[String(days)];
+    if (!c) {
+      const from = r.changes?.[key]?.["28_from"];
+      return el("div", { class: "d" }, days === 28 && from ? `28d: from ${new Date(from + "T12:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" })}` : `${days}d: not enough history`);
+    }
+    const cls = Math.abs(c.pct ?? 0) < 0.0005 ? "" : c.delta > 0 ? "up" : "down";
+    const sign = c.delta > 0 ? "+" : c.delta < 0 ? "−" : "±";
+    return el("div", { class: "d " + cls }, `${days}d: ${sign}${fmt(Math.abs(c.delta))}` + (c.pct != null ? ` (${pct(c.pct)})` : ""));
+  };
+  const uncounted = key => (s.excluded || []).includes(key.split(".")[0]);
+  // Where each number comes from, and when it was last collected.
+  const SOURCE = { youtube: "YouTube", lastfm: "Last.fm", deezer: "Deezer", wikipedia: "Wikipedia", instagram: "Instagram", spotify: "typed in", tiktok: "typed in" };
+  const lastAt = {}; for (const h of r.history) lastAt[h.metric] = h.taken_at;
+  const sourceLine = key => {
+    const at = lastAt[key];
+    if (!at) return null;
+    const src = key === "instagram.followers" && !igOn ? "typed in" : SOURCE[key.split(".")[0]] || "";
+    const d = new Date(at);
+    return el("span", { class: "src-at", title: `${src === "typed in" ? "Entered by hand from the public profile" : "From " + src} · ${d.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}` },
+      `${src} · ${d.toLocaleDateString(undefined, { month: "short", day: "numeric" })}`);
+  };
+  const kpi = (label, key, sub) => el("div", { class: "card kpi" + (uncounted(key) ? " uncounted" : "") },
+    el("div", { class: "l" }, label, uncounted(key) ? el("span", { class: "mini warn", style: "margin-left:6px", title: "Flagged for review, so left out of the score until someone fixes or checks it" }, "Not in score") : null),
+    el("div", { class: "v" }, fmt(m[key])),
+    m[key] == null ? el("div", { class: "d" }, sub || "not linked") : [changeLine(key, 7), changeLine(key, 28)], sourceLine(key));
+  const depth = m["lastfm.listeners"] ? m["lastfm.playcount"] / m["lastfm.listeners"] : null;
+  // Numbers with no API: the tile links to the profile and takes a typed-in count. Shows when it was last entered.
+  const lastEntered = metric => { const h = r.history.filter(x => x.metric === metric).at(-1); return h ? new Date(h.taken_at).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : null; };
+  const manualTile = (metric, label, link, linkText, where) => {
+    const entered = lastEntered(metric);
+    const t = kpi(label, metric, "not entered yet");
+    t.append(el("div", { class: "d yt-src" },
+      link ? el("a", { href: link, target: "_blank", rel: "noopener" }, linkText + " ↗") : null, link ? " · " : null,
+      manualButton(a, metric, label, where), entered ? ` · entered ${entered}` : null));
+    return t;
+  };
+  const ytOff = s.flags.some(f => /^YouTube count looks off/.test(f));
+  const ytKpi = kpi("YouTube subscribers", "youtube.subscribers", a.resolved_at ? "no channel found" : "not looked up yet");
+  if (ytOff) ytKpi.append(el("div", { class: "d down" }, "Doesn't look like their main channel"));
+  ytKpi.append(ytChannelLine(a));
+  const kpis = el("div", { class: "kpis" },
+    ytKpi,
+    kpi("YouTube views", "youtube.views", a.resolved_at ? "no channel found" : "not looked up yet"),
+    igKpi(a, m),
+    manualTile("spotify.monthly_listeners", "Spotify monthly listeners", a.links?.spotify, "Spotify",
+      "On the artist's Spotify page, it's the number under their name: “monthly listeners”."),
+    manualTile("tiktok.followers", "TikTok followers", a.links?.tiktok, "TikTok",
+      "On the TikTok profile, it's the number above “Followers”."),
+    (() => { const t = kpi("Last.fm listeners", "lastfm.listeners"); t.append(accountLine(a, "lastfm")); return t; })(),
+    el("div", { class: "card kpi" }, el("div", { class: "l" }, "Plays per listener"),
+      el("div", { class: "v" }, depth == null ? "–" : depth.toFixed(1)), el("div", { class: "d" }, depth > 30 ? "deep fandom" : "fandom depth")),
+    (() => { const t = kpi("Deezer fans", "deezer.fans"); t.append(accountLine(a, "deezer")); return t; })(),
+    kpi("Wikipedia views (30d)", "wikipedia.pageviews_30d", "no article"));
+
+  // charts
+  const byMetric = {};
+  for (const h of r.history) (byMetric[h.metric] ||= []).push(h);
+  const charts = el("div", { class: "charts" }, Object.keys(METRICS).filter(k => byMetric[k]).map(k => lineChart(byMetric[k], METRICS[k], rel.recent || [])));
+  const snapDays = new Set(r.history.map(h => h.taken_at.slice(0, 10))).size;
+
+  // score card
+  const scoreCard = el("div", { class: "card card-pad" },
+    el("h3", {}, "Breakout score", el("span", { class: "aside" }, `${Math.round(s.confidence * 100)}% confidence`)),
+    el("div", { class: "score-card" }, ring(s.score, s.confidence),
+      el("div", { class: "dim", style: "font-size:12.5px" },
+        s.confidence < 0.7 ? "Provisional. Some inputs are missing, so the score uses only the parts that have data." : "Built from all five inputs.",
+        s.components.headroom != null && s.components.headroom < 1
+          ? el("div", { style: "margin-top:6px" }, `Size cap: total × ${(0.3 + 0.7 * s.components.headroom).toFixed(2)} because the audience is already ${s.components.headroom < 0.5 ? "large" : "growing past the sweet spot"}.`) : null)),
+    explainScore(r),
+    el("div", { class: "dim", style: "font-size:11.5px;margin:12px 0 2px;text-transform:uppercase;letter-spacing:.05em" }, "The parts of the score"),
+    Object.entries(COMP).map(([k, [label, w]]) => {
+      const v = s.components[k];
+      return el("div", { class: "comp" },
+        el("span", { class: "k" }, label, " ", el("small", {}, w + "%")),
+        el("span", { class: "bar" + (v == null ? " na" : "") }, v == null ? null : el("i", { style: `width:${v * 100}%` })),
+        el("span", { class: "x" }, v == null ? "n/a" : Math.round(v * 100)));
+    }),
+    s.flags.length ? el("div", { class: "flags" }, s.flags.map(f => el("div", { class: flagClass(f) }, f))) : null);
+
+  // releases
+  const releases = el("div", { class: "card card-pad" },
+    el("h3", {}, "Releases", el("span", { class: "aside" }, `${rel.releases_last_year ?? 0} in the last 12 months`)),
+    rel.latest_label ? el("div", { style: "margin-bottom:8px;font-size:13px;color:var(--text-2)" }, "Latest label ",
+      labelPill(rel.latest_label, a.label_class)) : null,
+    (rel.recent || []).length ? (rel.recent || []).map(x => el("div", { class: "rel" },
+      el("span", { class: "t", title: x.title }, x.title), el("span", { class: "ty" }, x.type), el("span", { class: "dt" }, x.date)))
+      : el("div", { class: "dim" }, "No releases found on Deezer."));
+
+  const similar = el("div", { class: "card card-pad" }, el("h3", {}, "Similar artists", el("span", { class: "aside" }, "Deezer fans")),
+    r.similar_artists.length ? el("div", { class: "chips" }, r.similar_artists.map(x => el("button", { class: "chip", onclick: () => go(x.name) }, x.name, el("small", {}, fmt(x.deezer_fans)))))
+      : el("div", { class: "dim" }, "None found."));
+
+  const noteBox = el("textarea", { class: "input", placeholder: "Add a scouting note — show report, contact, gut feel…" });
+  const notes = el("div", { class: "card card-pad demo-hide" }, el("h3", {}, "Notes", el("span", { class: "aside" }, r.notes.length || "")),
+    r.notes.length ? r.notes.map(n => el("div", { class: "note" }, el("time", {}, n.created_at.slice(0, 10)), n.body)) : el("div", { class: "dim", style: "font-size:13px" }, "No notes yet."),
+    noteBox, el("div", { style: "display:flex;justify-content:flex-end;margin-top:8px" }, el("button", { class: "btn", onclick: async () => {
+      if (!noteBox.value.trim()) return;
+      await post("/api/note", { name: a.name, body: noteBox.value.trim() }); toast("Note saved"); renderArtist(a.name);
+    } }, "Save note")));
+
+  view.replaceChildren(back, hero, archivedBanner(a) || reviewBanner(a, s) || "",
+    el("div", { class: "layout" },
+      el("div", { class: "stack" }, kpis,
+        el("div", {}, el("div", { class: "page-head", style: "margin:8px 0 10px" },
+          el("h3", { style: "margin:0;font-size:13px;font-weight:600" }, "Trends"),
+          el("span", { class: "dim", style: "font-size:12px" }, `${snapDays} day${snapDays === 1 ? "" : "s"} of snapshots · `,
+            el("span", { style: "color:var(--warn)" }, "┆"), " release")), charts),
+        releases),
+      el("div", { class: "stack" }, scoreCard, managementCard(a), similar, notes, manageCard(a))),
+    r.errors.length ? el("div", { class: "errors" }, "Source issues: " + r.errors.join("; ")) : null);
+}
+
+// ============================================================ CSV export
+// Exactly the rows on screen, with every number a spreadsheet would want.
+const CSV_COLUMNS = [
+  ["Artist", r => r.name], ["Country", r => r.country], ["Genres", r => (r.genres || []).join("; ")],
+  ["Breakout score", r => r.score], ["Confidence", r => r.confidence],
+  ["Momentum", r => r.components?.momentum == null ? "" : Math.round(r.components.momentum * 100)],
+  ["Accelerating", r => r.accelerating ? "yes" : ""],
+  ["Deezer fans", r => r.deezer_fans], ["Last.fm listeners", r => r.lastfm_listeners],
+  ["Plays per listener", r => r.lastfm_listeners ? (r.lastfm_playcount / r.lastfm_listeners).toFixed(1) : ""],
+  ["YouTube subscribers", r => r.youtube_subscribers], ["YouTube views", r => r.youtube_views],
+  ["Instagram followers", r => r.instagram_followers],
+  ...[["youtube", "YouTube"], ["lastfm", "Last.fm"], ["deezer", "Deezer"], ["instagram", "Instagram"], ["spotify", "Spotify"], ["tiktok", "TikTok"]]
+    .map(([k, t]) => [`${t} 7-day change`, r => r.change_7d?.[k] ? r.change_7d[k].delta : ""]),
+  ["Days tracked", r => r.snapshot_days], ["Latest release", r => r.latest_release], ["Label", r => r.label],
+  ["Label type", r => (LABEL_CLASS[r.label_class] || [""])[0]], ["Management", r => r.management?.label],
+  ["Watchlist stage", r => r.status], ["Owner", r => r.owner], ["Next step", r => r.next_step], ["Due", r => r.next_date],
+  ["Tags", r => (r.tags || []).join("; ")], ["Signals", r => (r.flags || []).join("; ")],
+  ["Account issues", r => r.verified ? "" : (r.review || []).join("; ")],
+];
+const csvCell = v => { const t = v == null ? "" : String(v); return /[",\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t; };
+function downloadCsv(rows, name) {
+  const lines = [CSV_COLUMNS.map(([h]) => h), ...rows.map(r => CSV_COLUMNS.map(([, f]) => f(r)))].map(l => l.map(csvCell).join(","));
+  const blob = new Blob(["\ufeff" + lines.join("\r\n")], { type: "text/csv;charset=utf-8" });  // BOM so Excel reads accents
+  const a = el("a", { href: URL.createObjectURL(blob), download: `ar-scout-${name}-${new Date().toLocaleDateString("en-CA")}.csv` });
+  document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  toast(`Downloaded ${rows.length} artist${rows.length === 1 ? "" : "s"}`);
+}
+const csvBtn = (getRows, name) => el("button", { class: "btn ghost", onclick: () => downloadCsv(getRows(), name) }, "Download CSV");
+
+// ============================================================ admin tools
+// Hides controls that cost API quota, rewrite linked accounts or delete data. This is for simplicity, not
+// security: the password login is what protects them.
+const adminOnly = node => { node.classList.add("admin-only"); return node; };
+let adminOn = false;
+try { adminOn = localStorage.getItem("ars-admin") === "1"; } catch {}
+document.body.classList.toggle("admin", adminOn);
+$("#adminToggle").checked = adminOn;
+$("#adminToggle").onchange = e => {
+  adminOn = e.target.checked;
+  document.body.classList.toggle("admin", adminOn);
+  try { localStorage.setItem("ars-admin", adminOn ? "1" : "0"); } catch {}
+  toast(adminOn ? "Admin tools shown" : "Admin tools hidden");
+};
+
+// ============================================================ demo banner
+if (DEMO) {
+  document.body.classList.add("demo");
+  adminOn = false; document.body.classList.remove("admin");
+  demoLoad().then(d => {
+    const m = d.meta || {};
+    const bar = el("div", { class: "demo-banner" },
+      el("b", {}, "Read-only demo"), ` · data snapshot from ${new Date(m.snapshot + "T12:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}`,
+      m.credit ? ` · ${m.credit}` : null,
+      m.repo ? [" · ", el("a", { href: m.repo, target: "_blank", rel: "noopener" }, "Code on GitHub ↗")] : null);
+    $(".main").prepend(bar);
+  }).catch(() => {});
+}
+
+// ============================================================ boot
+let igOn = false;
+async function loadHealth() {
+  try {
+    const h = await api("/api/health");
+    const row = (k, v, warn) => el("div", { class: "row" }, el("span", {}, k), el("span", { class: warn ? "warn" : "" }, v));
+    $("#health").replaceChildren(...[
+      row("Last snapshot", h.last_snapshot ? ago(h.last_snapshot) === "today" ? new Date(h.last_snapshot).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : ago(h.last_snapshot) : "never", !h.last_snapshot),
+      adminOnly(row("Daily job", h.daily_job ? `on · ${h.daily_job_at || "09:00"}` : "off", !h.daily_job)),
+      row("With growth data", `${h.with_growth} / ${h.artists}`),
+      adminOnly(row("Last backup", !h.last_backup ? "none yet" : h.last_backup === new Date().toLocaleDateString("en-CA") ? "today" : ago(h.last_backup + "T12:00:00"), !h.last_backup)),
+      h.unlinked ? adminOnly(row("Not linked", h.unlinked, true)) : null].filter(Boolean));
+    $("#health").title = h.daily_job ? "" : "Run scripts/install-daily-snapshot.sh to snapshot every day";
+  } catch {}
+}
+async function loadCounts() {
+  try {
+    const [all, watch] = await Promise.all([api("/api/leaderboard?limit=10000"), api("/api/leaderboard?watchlist=true&limit=10000")]);
+    $("#cntAll").textContent = all.length || ""; $("#cntWatch").textContent = watch.length || "";
+    $("#cntReview").textContent = all.filter(r => r.review?.length && !r.verified).length || "";
+  } catch {}
+}
+api("/api/status").then(st => {
+  igOn = !!st.instagram;
+  // Team sign-ins can't run admin actions (the server refuses them), so they don't get the switch.
+  if (st.role === "team") {
+    adminOn = false; document.body.classList.remove("admin");
+    $(".admin-toggle").hidden = true;
+  }
+  if (st.login) {
+    const out = el("button", { class: "linkish signout", onclick: async () => { await fetch("/api/logout", { method: "POST" }); location.href = "/login"; } },
+      `Sign out${st.role === "admin" ? " (admin)" : ""}`);
+    $(".sources").append(out);
+  }
+  const names = { deezer: "Deezer", lastfm: "Last.fm", youtube: "YouTube", instagram: "Instagram", musicbrainz: "MusicBrainz", wikipedia: "Wikipedia", spotify: "Spotify" };
+  $("#srcList").replaceChildren(...Object.entries(names).map(([k, n]) =>
+    el("div", { class: "src", title: st[k] ? "Connected" : "Not configured — add a key to .env" }, el("span", { class: "dot" + (st[k] ? "" : " off") }), n,
+      st[k] ? null : el("span", { class: "dim", style: "margin-left:auto;font-size:11px" }, "off"))));
+}).catch(() => {});
+loadCounts();
+loadHealth();
+route();
+drawCompareBar();
+window.addEventListener("hashchange", drawCompareBar);
+</script>
+</body>
+</html>

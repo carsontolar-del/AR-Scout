@@ -56,6 +56,10 @@ Reported beside the score, not in it:
 - Name thin or missing data plainly (e.g. "no YouTube channel linked", "only 1 snapshot").
 - MusicBrainz YouTube links are community-edited and sometimes wrong. On a "YouTube count looks off" flag, run
   `recheck_youtube`, or `set_youtube_channel` with the right URL; both delete the old channel's YouTube history.
+- Last.fm's autocorrect can swap in a different artist (it turned "Ratboys" into "Ratboy", 2.8k listeners instead of
+  201k). Fix a wrong match with `set_lastfm_artist` (looked up exactly, no autocorrect) or `set_deezer_artist`.
+- A platform flagged in `review` is left out of the score (`excluded` in the row) until it's fixed or the artist is
+  verified. Say which numbers aren't counted when you discuss such an artist.
 
 ## Dev
 - `uv sync` installs; `uv run pytest` runs the tests; `uv run ar-scout --help` lists the CLI commands;
