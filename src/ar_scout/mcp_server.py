@@ -158,6 +158,26 @@ def record_manual_metric(name: str, metric: str, value: int) -> dict:
 
 
 @mcp.tool()
+def update_pipeline(name: str, status: str | None = None, owner: str | None = None, next_step: str | None = None,
+                    next_date: str | None = None) -> dict:
+    """Move a watchlist artist through the pipeline (watching | contacted | meeting | signed | passed) and record
+    who owns it, the next step and its due date (YYYY-MM-DD). Pass "" to clear a field; omit to leave it."""
+    a = service.resolve(name, deep=False)
+    fields = {k: v for k, v in (("owner", owner), ("next_step", next_step), ("next_date", next_date)) if v is not None}
+    return service.update_pipeline(a["id"], status, **fields)
+
+
+@mcp.tool()
+def archive_artist(name: str, archived: bool = True) -> dict:
+    """Hide an artist from rankings, the review queue and daily snapshots (history kept), or restore them with
+    archived=False. Use for dead ends and passes; there is deliberately no delete tool."""
+    a = db.find_artist(name)
+    if not a:
+        return {"error": f"'{name}' isn't tracked"}
+    return service.set_archived(a["id"], archived)
+
+
+@mcp.tool()
 def set_management(name: str, status: str | None) -> dict:
     """Record whether an artist already has a manager: 'managed', 'unmanaged', or null to go back to what their
     Instagram bio says. Each leaderboard row's `management` shows the result and where it came from."""

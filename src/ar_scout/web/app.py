@@ -39,6 +39,17 @@ class VerifyIn(BaseModel):
     verified: bool = True
 
 
+class PipelineIn(BaseModel):
+    status: str | None = None
+    owner: str | None = None
+    next_step: str | None = None
+    next_date: str | None = None
+
+
+class ArchiveIn(BaseModel):
+    archived: bool = True
+
+
 class ManagementIn(BaseModel):
     status: str | None = None
 
@@ -62,6 +73,12 @@ def index():
     return FileResponse(STATIC / "index.html", headers={"Cache-Control": "no-cache"})
 
 
+@app.get("/favicon.svg")
+@app.get("/favicon.ico")
+def favicon():
+    return FileResponse(STATIC / "favicon.svg", media_type="image/svg+xml", headers={"Cache-Control": "max-age=86400"})
+
+
 @app.get("/api/status")
 def status():
     return service.source_status()
@@ -74,9 +91,9 @@ def health():
 
 @app.get("/api/leaderboard")
 def leaderboard(limit: int = 50, watchlist: bool = False, genre: str | None = None,
-                max_audience: int | None = None, window: int = 30, platform: str = "any"):
+                max_audience: int | None = None, window: int = 30, platform: str = "any", archived: bool = False):
     try:
-        return service.leaderboard(limit, watchlist, window, max_audience, genre or None, platform)
+        return service.leaderboard(limit, watchlist, window, max_audience, genre or None, platform, archived)
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
 
@@ -123,6 +140,22 @@ def set_management(artist_id: int, body: ManagementIn):
         raise HTTPException(400, str(exc)) from exc
 
 
+@app.post("/api/artist/{artist_id}/archive")
+def archive(artist_id: int, body: ArchiveIn):
+    try:
+        return service.set_archived(artist_id, body.archived)
+    except SourceError as exc:
+        raise HTTPException(404, str(exc)) from exc
+
+
+@app.delete("/api/artist/{artist_id}")
+def delete(artist_id: int):
+    try:
+        return service.delete_artist(artist_id)
+    except SourceError as exc:
+        raise HTTPException(404, str(exc)) from exc
+
+
 @app.get("/api/review")
 def review():
     return service.review_queue()
@@ -145,6 +178,15 @@ def watch(body: WatchIn):
     if not db.history(a["id"]):
         service.snapshot(a["id"])
     return db.watch_entry(a["id"])
+
+
+@app.patch("/api/watch/{artist_id}")
+def update_pipeline(artist_id: int, body: PipelineIn):
+    fields = {k: getattr(body, k) for k in ("owner", "next_step", "next_date") if k in body.model_fields_set}
+    try:
+        return service.update_pipeline(artist_id, body.status, **fields)
+    except (ValueError, SourceError) as exc:
+        raise HTTPException(400, str(exc)) from exc
 
 
 @app.delete("/api/watch/{artist_id}")

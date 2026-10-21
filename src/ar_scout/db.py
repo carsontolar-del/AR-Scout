@@ -41,6 +41,7 @@ CREATE TABLE IF NOT EXISTS artists (
     mgmt_auto       TEXT,           -- listed | not_listed, read from the Instagram bio
     mgmt_evidence   TEXT,           -- the bio line that mentions management
     management      TEXT,           -- managed | unmanaged, set by a person (wins over mgmt_auto)
+    archived_at     TEXT,           -- hidden from rankings and daily snapshots, history kept
     created_at      TEXT NOT NULL,
     updated_at      TEXT NOT NULL
 );
@@ -58,7 +59,11 @@ CREATE TABLE IF NOT EXISTS watchlist (
     artist_id  INTEGER PRIMARY KEY REFERENCES artists(id) ON DELETE CASCADE,
     status     TEXT NOT NULL DEFAULT 'watching',  -- watching | contacted | meeting | passed | signed
     tags       TEXT DEFAULT '[]',
-    added_at   TEXT NOT NULL
+    added_at   TEXT NOT NULL,
+    status_since TEXT,          -- when the status last changed
+    owner      TEXT,            -- who is handling this artist
+    next_step  TEXT,            -- e.g. "Email their manager"
+    next_date  TEXT             -- YYYY-MM-DD the next step is due
 );
 
 CREATE TABLE IF NOT EXISTS notes (
@@ -109,20 +114,24 @@ def _prepare(conn: sqlite3.Connection) -> None:
         _prepared.add(key)
 
 
-_ADDED_COLUMNS = ("resolved_at", "youtube_source", "instagram_username", "instagram_source", "youtube_title",
-                  "verified_at", "instagram_bio", "mgmt_auto", "mgmt_evidence", "management")
+_ADDED_COLUMNS = {
+    "artists": ("resolved_at", "youtube_source", "instagram_username", "instagram_source", "youtube_title",
+                "verified_at", "instagram_bio", "mgmt_auto", "mgmt_evidence", "management", "archived_at"),
+    "watchlist": ("status_since", "owner", "next_step", "next_date"),
+}
 
 
 def _migrate(conn: sqlite3.Connection) -> None:
-    cols = {r["name"] for r in conn.execute("PRAGMA table_info(artists)")}
-    for col in _ADDED_COLUMNS:
-        if col in cols:
-            continue
-        try:
-            conn.execute(f"ALTER TABLE artists ADD COLUMN {col} TEXT")
-        except sqlite3.OperationalError as exc:  # another process (e.g. the daily job) added it first
-            if "duplicate column" not in str(exc):
-                raise
+    for table, added in _ADDED_COLUMNS.items():
+        cols = {r["name"] for r in conn.execute(f"PRAGMA table_info({table})")}
+        for col in added:
+            if col in cols:
+                continue
+            try:
+                conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} TEXT")
+            except sqlite3.OperationalError as exc:  # another process (e.g. the daily job) added it first
+                if "duplicate column" not in str(exc):
+                    raise
 
 
 def _row(row: sqlite3.Row | None) -> dict | None:
@@ -186,6 +195,19 @@ def history(artist_id: int, metric: str | None = None) -> list[dict]:
         return [dict(r) for r in c.execute(q + " ORDER BY taken_at", args)]
 
 
+def set_archived(artist_id: int, when: str | None) -> None:
+    with connect() as c:
+        c.execute("UPDATE artists SET archived_at = ?, updated_at = ? WHERE id = ?", (when, now(), artist_id))
+
+
+def delete_artist(artist_id: int) -> None:
+    """Permanently remove an artist with their snapshots, watchlist entry and notes."""
+    with connect() as c:
+        for table in ("snapshots", "watchlist", "notes"):
+            c.execute(f"DELETE FROM {table} WHERE artist_id = ?", (artist_id,))
+        c.execute("DELETE FROM artists WHERE id = ?", (artist_id,))
+
+
 def set_management(artist_id: int, status: str | None) -> None:
     with connect() as c:
         c.execute("UPDATE artists SET management = ?, updated_at = ? WHERE id = ?", (status, now(), artist_id))
@@ -236,9 +258,12 @@ def snapshot_summary() -> dict[int, dict]:
     return {r["artist_id"]: {"days": r["days"], "first": r["first"], "last": r["last"]} for r in rows}
 
 
-def all_artists(watchlist_only: bool = False) -> list[dict]:
-    q = ("SELECT a.*, w.status, w.tags AS watch_tags FROM artists a "
-         + ("JOIN" if watchlist_only else "LEFT JOIN") + " watchlist w ON w.artist_id = a.id")
+def all_artists(watchlist_only: bool = False, include_archived: bool = False) -> list[dict]:
+    """Archived artists are left out unless asked for: they don't rank, snapshot or get relinked."""
+    q = ("SELECT a.*, w.status, w.tags AS watch_tags, w.owner, w.next_step, w.next_date, w.status_since, "
+         "w.added_at AS watch_added FROM artists a "
+         + ("JOIN" if watchlist_only else "LEFT JOIN") + " watchlist w ON w.artist_id = a.id"
+         + ("" if include_archived else " WHERE a.archived_at IS NULL"))
     with connect() as c:
         return [_row(r) for r in c.execute(q)]
 
@@ -246,10 +271,25 @@ def all_artists(watchlist_only: bool = False) -> list[dict]:
 def watch(artist_id: int, status: str = "watching", tags: list[str] | None = None) -> None:
     with connect() as c:
         c.execute(
-            "INSERT INTO watchlist (artist_id, status, tags, added_at) VALUES (?, ?, ?, ?) "
-            "ON CONFLICT(artist_id) DO UPDATE SET status = excluded.status, "
+            "INSERT INTO watchlist (artist_id, status, tags, added_at, status_since) VALUES (?, ?, ?, ?, ?) "
+            "ON CONFLICT(artist_id) DO UPDATE SET "
+            "status_since = CASE WHEN watchlist.status = excluded.status THEN watchlist.status_since "
+            "ELSE excluded.status_since END, status = excluded.status, "
             "tags = CASE WHEN excluded.tags = '[]' THEN watchlist.tags ELSE excluded.tags END",
-            (artist_id, status, json.dumps(tags or []), now()))
+            (artist_id, status, json.dumps(tags or []), now(), now()))
+
+
+PIPELINE_FIELDS = ("owner", "next_step", "next_date")
+
+
+def update_pipeline(artist_id: int, **fields: str | None) -> None:
+    """Set owner / next_step / next_date on a watched artist; an empty string clears a field."""
+    fields = {k: (v or None) for k, v in fields.items() if k in PIPELINE_FIELDS}
+    if not fields:
+        return
+    sets = ", ".join(f"{k} = ?" for k in fields)
+    with connect() as c:
+        c.execute(f"UPDATE watchlist SET {sets} WHERE artist_id = ?", [*fields.values(), artist_id])
 
 
 def unwatch(artist_id: int) -> None:

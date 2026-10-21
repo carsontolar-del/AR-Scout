@@ -396,6 +396,7 @@ def data_health() -> dict:
         "min_growth_days": scoring.MIN_GROWTH_DAYS,
         "last_snapshot": max((c["last"] for c in coverage.values()), default=None),
         "daily_job": DAILY_JOB_PLIST.exists(),
+        "archived": len(db.all_artists(include_archived=True)) - len(artists),
         "last_backup": last_backup(),
     }
 
@@ -517,6 +518,45 @@ def window_changes(artist_id: int, history: dict | None = None) -> dict:
     return out
 
 
+PIPELINE_STATUSES = ("watching", "contacted", "meeting", "signed", "passed")
+
+
+def update_pipeline(artist_id: int, status: str | None = None, **fields: str | None) -> dict:
+    """Move a watched artist to another stage and/or set owner, next_step, next_date (YYYY-MM-DD)."""
+    entry = db.watch_entry(artist_id)
+    if not entry:
+        raise SourceError("Add this artist to the watchlist first")
+    if status is not None:
+        if status not in PIPELINE_STATUSES:
+            raise ValueError(f"status must be one of: {', '.join(PIPELINE_STATUSES)}")
+        db.watch(artist_id, status, [])
+    due = fields.get("next_date")
+    if due:
+        try:
+            date.fromisoformat(due)
+        except ValueError:
+            raise ValueError("next_date must look like 2026-11-03") from None
+    db.update_pipeline(artist_id, **fields)
+    return db.watch_entry(artist_id)
+
+
+def set_archived(artist_id: int, archived: bool = True) -> dict:
+    """Archive (hide from rankings, review and daily snapshots; keep history) or restore an artist."""
+    if not db.get_artist(artist_id):
+        raise SourceError(f"No artist with id {artist_id}")
+    db.set_archived(artist_id, db.now() if archived else None)
+    return {"artist_id": artist_id, "archived_at": db.get_artist(artist_id).get("archived_at")}
+
+
+def delete_artist(artist_id: int) -> dict:
+    """Permanently delete an artist and all their history. The nightly backup is the only way back."""
+    a = db.get_artist(artist_id)
+    if not a:
+        raise SourceError(f"No artist with id {artist_id}")
+    db.delete_artist(artist_id)
+    return {"deleted": a["name"]}
+
+
 def set_management(artist_id: int, status: str | None) -> dict:
     """status: 'managed', 'unmanaged', or None to go back to what the Instagram bio says."""
     if status not in (None, "managed", "unmanaged"):
@@ -559,6 +599,7 @@ def report(name: str, refresh: bool = True) -> dict:
     artist["instagram_username"] = _instagram_username(artist)
     artist["label_class"] = labels.classify(artist.get("latest_label"), artist["name"])
     artist["management_info"] = management_info(artist)
+    artist["watching"] = bool(db.watch_entry(artist["id"]))
     rel = snap["releases"] if snap else (_release_info(artist["deezer_id"]) if artist.get("deezer_id") else {})
 
     similar = []
@@ -581,7 +622,7 @@ def report(name: str, refresh: bool = True) -> dict:
 
 def leaderboard(limit: int = 25, watchlist_only: bool = False, window_days: int = 30,
                 max_audience: float | None = None, genre: str | None = None,
-                audience_platform: str = "any") -> list[dict]:
+                audience_platform: str = "any", archived: bool = False) -> list[dict]:
     """audience_platform: 'any' applies max_audience to the largest of Deezer fans, Last.fm listeners,
     YouTube subscribers and Instagram followers; 'youtube' / 'lastfm' / 'deezer' / 'instagram' apply it to that
     platform only and drop artists with no data there (unknown size isn't 'under')."""
@@ -589,7 +630,8 @@ def leaderboard(limit: int = 25, watchlist_only: bool = False, window_days: int 
         raise ValueError(f"audience_platform must be 'any' or one of {', '.join(AUDIENCE_METRICS)}")
     coverage = db.snapshot_summary()
     rows = []
-    for a in db.all_artists(watchlist_only=watchlist_only):
+    pool = db.all_artists(watchlist_only=watchlist_only, include_archived=archived)
+    for a in (x for x in pool if not archived or x.get("archived_at")):
         if genre and not any(genre.lower() in g.lower() for g in a.get("genres") or []):
             continue
         s = score_artist(a, window_days)
@@ -616,8 +658,10 @@ def leaderboard(limit: int = 25, watchlist_only: bool = False, window_days: int 
             "label_class": labels.classify(a.get("latest_label"), a.get("name")),
             "flags": s["flags"], "discovered_via": a.get("discovered_via"),
             "tags": json.loads(a.get("watch_tags") or "[]"),
+            "owner": a.get("owner"), "next_step": a.get("next_step"), "next_date": a.get("next_date"),
+            "status_since": a.get("status_since") or a.get("watch_added"),
             "review": s["review"], "verified": bool(a.get("verified_at")), "verified_at": a.get("verified_at"),
-            "accelerating": s["acceleration"]["accelerating"],
+            "accelerating": s["acceleration"]["accelerating"], "archived_at": a.get("archived_at"),
             "management": management_info(a),
             "change_7d": {k: ({"delta": c["delta"], "pct": c["pct"], "start": c["start"]} if c else None)
                           for k, c in s["change_7d"].items()},
@@ -642,6 +686,9 @@ def _filter_track(candidates: list[dict], via: str, min_fans: int, max_fans: int
             dz = deezer.artist(dz["id"]) or dz
             fans = dz.get("nb_fan", 0)
         if not (min_fans <= fans <= max_fans):
+            continue
+        known = db.find_by_deezer(dz["id"])
+        if known and known.get("archived_at"):  # archived on purpose: don't bring them back
             continue
         if progress:
             progress(dz["name"])

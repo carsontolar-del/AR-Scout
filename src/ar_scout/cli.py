@@ -175,6 +175,17 @@ def record(name: str, metric: str = typer.Argument(..., help="tiktok.followers |
     console.print(f"{a['name']}: {res['label']} = {res['value']:,}")
 
 
+@app.command()
+def archive(name: str, restore: bool = typer.Option(False, "--restore", help="Bring an archived artist back")):
+    """Hide an artist from rankings and daily snapshots (history kept), or --restore them."""
+    a = db.find_artist(name)
+    if not a:
+        console.print(f"[red]'{name}' isn't tracked[/]")
+        raise typer.Exit(1)
+    service.set_archived(a["id"], not restore)
+    console.print(f"{a['name']} {'restored' if restore else 'archived'}")
+
+
 @app.command("set-youtube")
 def set_youtube(name: str, url: str):
     """Set an artist's YouTube channel by hand (channel URL, @handle URL or UC… ID)."""

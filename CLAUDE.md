@@ -49,6 +49,10 @@ Reported beside the score, not in it:
 - For discovery requests, combine methods: `discover_similar` from reference artists, `discover_by_tag` for the
   scene, `discover_playlists` for curator support, then `leaderboard` filtered by `max_audience`.
 - When you shortlist someone, offer to `watchlist_add` them with tags so they're tracked daily.
+- The watchlist is a pipeline (watching → contacted → meeting → signed / passed). Use `update_pipeline` for stage,
+  owner, next step and due date. Use `archive_artist` for dead ends: it hides them everywhere, stops their daily
+  snapshot and keeps discovery from re-adding them. There is no delete tool on purpose; deleting is done by a
+  person on the dashboard.
 - Name thin or missing data plainly (e.g. "no YouTube channel linked", "only 1 snapshot").
 - MusicBrainz YouTube links are community-edited and sometimes wrong. On a "YouTube count looks off" flag, run
   `recheck_youtube`, or `set_youtube_channel` with the right URL; both delete the old channel's YouTube history.
