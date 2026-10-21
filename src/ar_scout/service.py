@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import time
 from collections import Counter
 from datetime import date, datetime, timedelta, timezone
@@ -380,6 +381,28 @@ def backup_database(keep: int = BACKUPS_KEPT) -> dict:
     return {"path": str(dest), "kept": min(len(copies), keep), "size_mb": round(dest.stat().st_size / 1e6, 1)}
 
 
+UPLOAD_MAX_BYTES = 500 * 1024 * 1024
+
+
+def import_database(data: bytes) -> dict:
+    """Replace this server's database with an uploaded copy (e.g. a laptop's, when first hosting). The current
+    database is backed up first."""
+    if len(data) > UPLOAD_MAX_BYTES:
+        raise ValueError("That file is larger than 500 MB")
+    if not data.startswith(b"SQLite format 3\x00"):
+        raise ValueError("That file isn't a SQLite database")
+    backup = backup_database() if settings.db_path.exists() else None
+    tmp = settings.db_path.with_name(settings.db_path.name + ".upload")
+    tmp.parent.mkdir(parents=True, exist_ok=True)
+    tmp.write_bytes(data)
+    try:
+        counts = db.replace_with(tmp)
+    finally:
+        tmp.unlink(missing_ok=True)
+    _score_cache.clear()  # the new file's version counter may match the old one's
+    return counts | {"previous_backup": backup["path"] if backup else None}
+
+
 def last_backup() -> str | None:
     copies = sorted(settings.backup_dir.glob("ar_scout-????-??-??.db"))
     return copies[-1].stem.removeprefix("ar_scout-") if copies else None
@@ -395,7 +418,8 @@ def data_health() -> dict:
         "with_growth": sum(1 for c in coverage.values() if _span_days(c) >= scoring.MIN_GROWTH_DAYS),
         "min_growth_days": scoring.MIN_GROWTH_DAYS,
         "last_snapshot": max((c["last"] for c in coverage.values()), default=None),
-        "daily_job": DAILY_JOB_PLIST.exists(),
+        "daily_job": DAILY_JOB_PLIST.exists() or bool(os.getenv("AR_SCOUT_DAILY_AT")),
+        "daily_job_at": os.getenv("AR_SCOUT_DAILY_AT") or ("09:00" if DAILY_JOB_PLIST.exists() else None),
         "archived": len(db.all_artists(include_archived=True)) - len(artists),
         "last_backup": last_backup(),
     }
@@ -628,22 +652,41 @@ def leaderboard(limit: int = 25, watchlist_only: bool = False, window_days: int 
     platform only and drop artists with no data there (unknown size isn't 'under')."""
     if audience_platform != "any" and audience_platform not in AUDIENCE_METRICS:
         raise ValueError(f"audience_platform must be 'any' or one of {', '.join(AUDIENCE_METRICS)}")
-    coverage = db.snapshot_summary()
     rows = []
-    pool = db.all_artists(watchlist_only=watchlist_only, include_archived=archived)
-    for a in (x for x in pool if not archived or x.get("archived_at")):
-        if genre and not any(genre.lower() in g.lower() for g in a.get("genres") or []):
+    for row, metrics, genres in _scored(watchlist_only, window_days, archived):
+        if genre and not any(genre.lower() in g.lower() for g in genres):
             continue
-        s = score_artist(a, window_days)
         if max_audience:
             if audience_platform == "any":
-                audience = max((s["metrics"].get(k) or 0) for k in AUDIENCE_METRICS.values())
+                audience = max((metrics.get(k) or 0) for k in AUDIENCE_METRICS.values())
             else:
-                audience = s["metrics"].get(AUDIENCE_METRICS[audience_platform])
+                audience = metrics.get(AUDIENCE_METRICS[audience_platform])
             if audience is None or audience > max_audience:
                 continue
+        rows.append(row)
+    return rows[:limit]
+
+
+# Scoring every artist is the slow part of a page load, so it's cached until the data changes (db.data_version,
+# bumped by triggers from any process) or the day turns over (release recency depends on today's date).
+_score_cache: dict[tuple, list] = {}
+
+
+def _scored(watchlist_only: bool, window_days: int, archived: bool) -> list[tuple[dict, dict, list[str]]]:
+    """(row, latest metrics, all genres) for every artist in scope, best score first."""
+    version = db.data_version()
+    key = (str(settings.db_path), version, date.today().isoformat(), watchlist_only, window_days, archived)
+    if key in _score_cache:
+        return _score_cache[key]
+    for old in [k for k in _score_cache if k[:3] != key[:3]]:
+        del _score_cache[old]
+    coverage = db.snapshot_summary()
+    out = []
+    pool = db.all_artists(watchlist_only=watchlist_only, include_archived=archived)
+    for a in (x for x in pool if not archived or x.get("archived_at")):
+        s = score_artist(a, window_days)
         cov = coverage.get(a["id"], {})
-        rows.append({
+        out.append(({
             "id": a["id"], "name": a["name"], "status": a.get("status"), "genres": (a.get("genres") or [])[:3],
             "country": a.get("country"), "score": s["score"], "confidence": s["confidence"],
             "components": s["components"], "deezer_fans": s["metrics"].get("deezer.fans"),
@@ -667,9 +710,10 @@ def leaderboard(limit: int = 25, watchlist_only: bool = False, window_days: int 
                           for k, c in s["change_7d"].items()},
             "linked": bool(a.get("resolved_at")), "youtube_linked": bool(a.get("youtube_channel")),
             "snapshot_days": cov.get("days", 0), "last_snapshot": cov.get("last"),
-        })
-    rows.sort(key=lambda r: r["score"], reverse=True)
-    return rows[:limit]
+        }, s["metrics"], a.get("genres") or []))
+    out.sort(key=lambda x: x[0]["score"], reverse=True)
+    _score_cache[key] = out
+    return out
 
 
 # --------------------------------------------------------------------------- discovery

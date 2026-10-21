@@ -72,6 +72,20 @@ CREATE TABLE IF NOT EXISTS notes (
     body       TEXT NOT NULL,
     created_at TEXT NOT NULL
 );
+
+-- A counter bumped by triggers on every change to the data scores depend on, from any process (dashboard, daily
+-- job, MCP server). Cached leaderboards are reused while it stays the same.
+CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v INTEGER NOT NULL);
+INSERT OR IGNORE INTO meta (k, v) VALUES ('version', 0);
+CREATE TRIGGER IF NOT EXISTS bump_artists_insert AFTER INSERT ON artists BEGIN UPDATE meta SET v = v + 1 WHERE k = 'version'; END;
+CREATE TRIGGER IF NOT EXISTS bump_artists_update AFTER UPDATE ON artists BEGIN UPDATE meta SET v = v + 1 WHERE k = 'version'; END;
+CREATE TRIGGER IF NOT EXISTS bump_artists_delete AFTER DELETE ON artists BEGIN UPDATE meta SET v = v + 1 WHERE k = 'version'; END;
+CREATE TRIGGER IF NOT EXISTS bump_snapshots_insert AFTER INSERT ON snapshots BEGIN UPDATE meta SET v = v + 1 WHERE k = 'version'; END;
+CREATE TRIGGER IF NOT EXISTS bump_snapshots_update AFTER UPDATE ON snapshots BEGIN UPDATE meta SET v = v + 1 WHERE k = 'version'; END;
+CREATE TRIGGER IF NOT EXISTS bump_snapshots_delete AFTER DELETE ON snapshots BEGIN UPDATE meta SET v = v + 1 WHERE k = 'version'; END;
+CREATE TRIGGER IF NOT EXISTS bump_watchlist_insert AFTER INSERT ON watchlist BEGIN UPDATE meta SET v = v + 1 WHERE k = 'version'; END;
+CREATE TRIGGER IF NOT EXISTS bump_watchlist_update AFTER UPDATE ON watchlist BEGIN UPDATE meta SET v = v + 1 WHERE k = 'version'; END;
+CREATE TRIGGER IF NOT EXISTS bump_watchlist_delete AFTER DELETE ON watchlist BEGIN UPDATE meta SET v = v + 1 WHERE k = 'version'; END;
 """
 
 JSON_FIELDS = ("genres", "links")
@@ -248,6 +262,28 @@ def backup(dest: Path) -> None:
     finally:
         src.close()
     tmp.replace(dest)
+
+
+def replace_with(upload: Path) -> dict:
+    """Swap in an uploaded database file (after checking it's an AR Scout database). Returns its counts."""
+    with sqlite3.connect(upload) as c:
+        tables = {r[0] for r in c.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
+        if not {"artists", "snapshots"} <= tables:
+            raise ValueError("That file isn't an AR Scout database")
+        if c.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
+            raise ValueError("That database file is damaged")
+        counts = {"artists": c.execute("SELECT count(*) FROM artists").fetchone()[0],
+                  "snapshots": c.execute("SELECT count(*) FROM snapshots").fetchone()[0]}
+    settings.db_path.parent.mkdir(parents=True, exist_ok=True)
+    upload.replace(settings.db_path)
+    _prepared.discard(str(settings.db_path))  # upgrade the uploaded file's schema on next use
+    return counts
+
+
+def data_version() -> int:
+    with connect() as c:
+        row = c.execute("SELECT v FROM meta WHERE k = 'version'").fetchone()
+    return row["v"] if row else 0
 
 
 def snapshot_summary() -> dict[int, dict]:

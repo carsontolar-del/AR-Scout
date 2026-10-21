@@ -38,6 +38,19 @@ Momentum, the heaviest part of the score, comes from comparing snapshots over ti
 
 All results are saved and scored; `ar-scout top --max-audience 50000` ranks everything you've found.
 
+## Hosting for a team (Render)
+
+`render.yaml` describes the whole service: a Starter web service with a 1 GB disk for the database, the daily
+snapshot at 09:00 inside the app, and the secrets Render will ask for (API keys, team and admin passwords).
+
+1. Push this repo to GitHub, then in Render choose **New → Blueprint** and pick the repo.
+2. Fill in the values it asks for. Use long passphrases for the passwords.
+3. When it's live, copy your laptop's history to it: `uv run ar-scout upload-db https://<your-service>.onrender.com`
+4. Turn off the laptop's daily job if the host now does it: `launchctl unload ~/Library/LaunchAgents/com.ar-scout.snapshot.plist`
+
+The team password allows everything for scouting; the admin password also allows bulk refresh, linking,
+changing linked accounts and deleting artists.
+
 ## Limits worth knowing
 
 - Spotify Dev Mode apps no longer receive followers or popularity (Feb 2026), so Spotify is used only for IDs, genres and releases.

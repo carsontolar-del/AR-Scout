@@ -1,18 +1,56 @@
-"""Local web dashboard: `ar-scout serve` then open http://127.0.0.1:8787."""
+"""Web dashboard: `ar-scout serve` then open http://127.0.0.1:8787. Set AR_SCOUT_TEAM_PASSWORD /
+AR_SCOUT_ADMIN_PASSWORD to require sign-in (see web/auth.py); without them there is no login."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse
+from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from pydantic import BaseModel
 
-from .. import db, service
+from contextlib import asynccontextmanager
+
+from .. import db, scheduler, service
 from ..http import SourceError
+from . import auth
 
 STATIC = Path(__file__).parent / "static"
-app = FastAPI(title="AR Scout")
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    scheduler.start()  # only when AR_SCOUT_DAILY_AT is set (on a host); a laptop uses its own scheduler
+    yield
+
+
+app = FastAPI(title="AR Scout", lifespan=lifespan)
+
+# Reachable without signing in.
+PUBLIC = {"/login", "/api/login", "/favicon.svg", "/favicon.ico"}
+
+
+@app.middleware("http")
+async def require_sign_in(request: Request, call_next):
+    if not auth.enabled():
+        request.state.role = "admin"  # local use: no login, everything allowed
+        return await call_next(request)
+    request.state.role = auth.read_token(request.cookies.get(auth.COOKIE))
+    if request.state.role or request.url.path in PUBLIC:
+        return await call_next(request)
+    if request.url.path.startswith("/api/"):
+        return JSONResponse({"detail": "Sign in first"}, status_code=401)
+    return RedirectResponse("/login", status_code=303)
+
+
+def admin_only(request: Request) -> None:
+    """Actions that spend API quota, rewrite linked accounts or delete data."""
+    if request.state.role != "admin":
+        raise HTTPException(403, "Only an admin can do that. Sign in with the admin password.")
+
+
+class LoginIn(BaseModel):
+    password: str
 
 
 class WatchIn(BaseModel):
@@ -79,9 +117,37 @@ def favicon():
     return FileResponse(STATIC / "favicon.svg", media_type="image/svg+xml", headers={"Cache-Control": "max-age=86400"})
 
 
+@app.get("/login")
+def login_page():
+    return FileResponse(STATIC / "login.html", headers={"Cache-Control": "no-cache"})
+
+
+@app.post("/api/login")
+def login(body: LoginIn, request: Request):
+    addr = request.client.host if request.client else "?"
+    if auth.too_many_failures(addr):
+        raise HTTPException(429, "Too many wrong passwords. Wait 15 minutes and try again.")
+    role = auth.check_password(body.password)
+    if not role:
+        auth.record_failure(addr)
+        raise HTTPException(401, "That password isn't right.")
+    resp = JSONResponse({"role": role})
+    https = request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https"
+    resp.set_cookie(auth.COOKIE, auth.make_token(role), max_age=auth.SESSION_DAYS * 86400,
+                    httponly=True, samesite="lax", secure=https)
+    return resp
+
+
+@app.post("/api/logout")
+def logout():
+    resp = JSONResponse({"ok": True})
+    resp.delete_cookie(auth.COOKIE)
+    return resp
+
+
 @app.get("/api/status")
-def status():
-    return service.source_status()
+def status(request: Request):
+    return service.source_status() | {"role": request.state.role if auth.enabled() else "local", "login": auth.enabled()}
 
 
 @app.get("/api/health")
@@ -108,7 +174,7 @@ def artist(name: str, refresh: bool = True):
     return r
 
 
-@app.post("/api/artist/{artist_id}/youtube")
+@app.post("/api/artist/{artist_id}/youtube", dependencies=[Depends(admin_only)])
 def set_youtube(artist_id: int, body: YouTubeIn):
     try:
         return service.set_youtube_channel(artist_id, body.url)
@@ -116,7 +182,7 @@ def set_youtube(artist_id: int, body: YouTubeIn):
         raise HTTPException(400, str(exc)) from exc
 
 
-@app.post("/api/artist/{artist_id}/instagram")
+@app.post("/api/artist/{artist_id}/instagram", dependencies=[Depends(admin_only)])
 def set_instagram(artist_id: int, body: InstagramIn):
     try:
         return service.set_instagram_account(artist_id, body.handle)
@@ -148,7 +214,7 @@ def archive(artist_id: int, body: ArchiveIn):
         raise HTTPException(404, str(exc)) from exc
 
 
-@app.delete("/api/artist/{artist_id}")
+@app.delete("/api/artist/{artist_id}", dependencies=[Depends(admin_only)])
 def delete(artist_id: int):
     try:
         return service.delete_artist(artist_id)
@@ -218,11 +284,20 @@ def discover(body: DiscoverIn):
     raise HTTPException(400, f"unknown mode {body.mode}")
 
 
-@app.post("/api/snapshot")
+@app.post("/api/snapshot", dependencies=[Depends(admin_only)])
 def snapshot(scope: str = "watchlist"):
     return service.snapshot_many(scope)
 
 
-@app.post("/api/relink")
+@app.post("/api/admin/database", dependencies=[Depends(admin_only)])
+async def upload_database(request: Request):
+    """Body: the raw .db file. Used by `ar-scout upload-db` to move a laptop's history to a host."""
+    try:
+        return service.import_database(await request.body())
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@app.post("/api/relink", dependencies=[Depends(admin_only)])
 def relink():
     return service.relink_all()

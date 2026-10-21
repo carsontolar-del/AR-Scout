@@ -221,6 +221,7 @@ tr.row:hover td { background: var(--surface-2); }
 body:not(.admin) .admin-only { display: none !important; }
 .admin-toggle { display: flex; align-items: center; gap: 6px; margin-top: 10px; font-size: 12px; color: var(--muted); cursor: pointer; }
 .admin-toggle input { accent-color: var(--accent); }
+.signout { display: block; margin-top: 8px; font-size: 12px; }
 /* form fields in grids must be allowed to shrink, or they push the page wider than a phone */
 .disc-form > *, .pipeline-edit > *, .toolbar > .field { min-width: 0; }
 .disc-form .input, .pipeline-edit .input { width: 100%; }
@@ -458,6 +459,7 @@ const initials = n => n.replace(/^the\s+/i, "").split(/\s+/).slice(0, 2).map(w =
 const avatar = (url, name, cls = "avatar") => url ? el("img", { class: cls, src: url, alt: "", loading: "lazy" }) : el("div", { class: cls }, initials(name));
 const api = async (path, opts) => {
   const r = await fetch(path, opts);
+  if (r.status === 401) { location.href = "/login"; throw new Error("Sign in first"); }  // session expired
   if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || r.statusText);
   return r.json();
 };
@@ -1635,7 +1637,7 @@ async function loadHealth() {
     const row = (k, v, warn) => el("div", { class: "row" }, el("span", {}, k), el("span", { class: warn ? "warn" : "" }, v));
     $("#health").replaceChildren(...[
       row("Last snapshot", h.last_snapshot ? ago(h.last_snapshot) === "today" ? new Date(h.last_snapshot).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : ago(h.last_snapshot) : "never", !h.last_snapshot),
-      adminOnly(row("Daily job", h.daily_job ? "on · 09:00" : "off", !h.daily_job)),
+      adminOnly(row("Daily job", h.daily_job ? `on · ${h.daily_job_at || "09:00"}` : "off", !h.daily_job)),
       row("With growth data", `${h.with_growth} / ${h.artists}`),
       adminOnly(row("Last backup", !h.last_backup ? "none yet" : h.last_backup === new Date().toLocaleDateString("en-CA") ? "today" : ago(h.last_backup + "T12:00:00"), !h.last_backup)),
       h.unlinked ? adminOnly(row("Not linked", h.unlinked, true)) : null].filter(Boolean));
@@ -1651,6 +1653,16 @@ async function loadCounts() {
 }
 api("/api/status").then(st => {
   igOn = !!st.instagram;
+  // Team sign-ins can't run admin actions (the server refuses them), so they don't get the switch.
+  if (st.role === "team") {
+    adminOn = false; document.body.classList.remove("admin");
+    $(".admin-toggle").hidden = true;
+  }
+  if (st.login) {
+    const out = el("button", { class: "linkish signout", onclick: async () => { await fetch("/api/logout", { method: "POST" }); location.href = "/login"; } },
+      `Sign out${st.role === "admin" ? " (admin)" : ""}`);
+    $(".sources").append(out);
+  }
   const names = { deezer: "Deezer", lastfm: "Last.fm", youtube: "YouTube", instagram: "Instagram", musicbrainz: "MusicBrainz", wikipedia: "Wikipedia", spotify: "Spotify" };
   $("#srcList").replaceChildren(...Object.entries(names).map(([k, n]) =>
     el("div", { class: "src", title: st[k] ? "Connected" : "Not configured — add a key to .env" }, el("span", { class: "dot" + (st[k] ? "" : " off") }), n,

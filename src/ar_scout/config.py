@@ -24,6 +24,9 @@ class Settings:
     contact_email: str
     db_path: Path
     backup_dir: Path
+    team_password: str | None = None    # sign-in for colleagues: everything except admin actions
+    admin_password: str | None = None   # sign-in that also allows refresh, relinking, account changes, delete
+    session_secret: str | None = None   # signs sign-in cookies; generated and saved next to the database if unset
 
     @property
     def user_agent(self) -> str:
@@ -59,6 +62,9 @@ def load_settings() -> Settings:
         contact_email=_env("CONTACT_EMAIL") or "",
         db_path=Path(db) if db else PROJECT_ROOT / "data" / "ar_scout.db",
         backup_dir=Path(_env("AR_SCOUT_BACKUP_DIR") or PROJECT_ROOT / "data" / "backups").expanduser(),
+        team_password=_env("AR_SCOUT_TEAM_PASSWORD"),
+        admin_password=_env("AR_SCOUT_ADMIN_PASSWORD"),
+        session_secret=_env("AR_SCOUT_SECRET"),
     )
 
 

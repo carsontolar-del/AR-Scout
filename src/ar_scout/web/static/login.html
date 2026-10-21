@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sign in · AR Scout</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<style>
+:root { color-scheme: light; --bg: #f7f7f5; --surface: #ffffff; --border: #e4e4df; --text: #16161a; --text-2: #55555c;
+  --accent: #3b5bdb; --accent-soft: #e8edfd; --bad: #c9372c; }
+@media (prefers-color-scheme: dark) { :root { color-scheme: dark; --bg: #0f0f11; --surface: #17171a; --border: #2a2a2f;
+  --text: #f2f2f4; --text-2: #b4b4bb; --accent: #6b8afd; --accent-soft: #1d2547; --bad: #f07067; } }
+* { box-sizing: border-box; }
+body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: var(--bg); color: var(--text);
+  font: 14px/1.5 Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; padding: 16px; }
+form { width: min(100%, 360px); background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 28px; display: grid; gap: 14px; }
+.brand { display: flex; align-items: center; gap: 10px; }
+.mark { width: 32px; height: 32px; border-radius: 8px; background: var(--text); color: var(--bg); display: grid; place-items: center; font-weight: 700; font-size: 13px; }
+h1 { margin: 0; font-size: 18px; }
+p { margin: 0; color: var(--text-2); font-size: 13px; }
+label { display: grid; gap: 6px; font-size: 12.5px; color: var(--text-2); }
+input { font: inherit; color: inherit; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 9px 11px; outline: none; }
+input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+button { font: inherit; font-weight: 600; border: 0; border-radius: 8px; padding: 10px; background: var(--accent); color: #fff; cursor: pointer; }
+button:disabled { opacity: .6; }
+.err { color: var(--bad); font-size: 13px; min-height: 1.2em; }
+</style>
+</head>
+<body>
+<form id="f">
+  <div class="brand"><div class="mark">AR</div><h1>AR Scout</h1></div>
+  <p>Enter the password you were given.</p>
+  <label>Password <input id="pw" type="password" autocomplete="current-password" required autofocus></label>
+  <div class="err" id="err" role="alert"></div>
+  <button id="go" type="submit">Sign in</button>
+</form>
+<script>
+document.getElementById("f").onsubmit = async e => {
+  e.preventDefault();
+  const go = document.getElementById("go"), err = document.getElementById("err");
+  go.disabled = true; err.textContent = "";
+  try {
+    const r = await fetch("/api/login", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password: document.getElementById("pw").value }) });
+    if (r.ok) { location.href = "/"; return; }
+    err.textContent = (await r.json().catch(() => ({}))).detail || "Sign-in failed";
+  } catch { err.textContent = "Can't reach the server. Check your connection and try again."; }
+  go.disabled = false;
+};
+</script>
+</body>
+</html>

@@ -1,0 +1,41 @@
+# Render blueprint: New > Blueprint > pick this repo. Render reads this file and asks for the values marked
+# `sync: false` (API keys and passwords), which stay in Render and never in the code.
+services:
+  - type: web
+    name: ar-scout
+    runtime: python
+    plan: starter            # needed for the disk; the free plan can't keep the database
+    buildCommand: pip install uv && uv sync --frozen --no-dev
+    startCommand: .venv/bin/ar-scout serve --host 0.0.0.0
+    healthCheckPath: /login
+    disk:
+      name: data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.7"
+      - key: AR_SCOUT_DB
+        value: /var/data/ar_scout.db
+      - key: AR_SCOUT_BACKUP_DIR
+        value: /var/data/backups
+      - key: AR_SCOUT_DAILY_AT
+        value: "09:00"
+      - key: AR_SCOUT_TZ
+        value: America/Denver
+      - key: AR_SCOUT_SECRET
+        generateValue: true
+      - key: AR_SCOUT_TEAM_PASSWORD
+        sync: false
+      - key: AR_SCOUT_ADMIN_PASSWORD
+        sync: false
+      - key: LASTFM_API_KEY
+        sync: false
+      - key: YOUTUBE_API_KEY
+        sync: false
+      - key: CONTACT_EMAIL
+        sync: false
+      - key: INSTAGRAM_ACCESS_TOKEN
+        sync: false
+      - key: INSTAGRAM_BUSINESS_ID
+        sync: false

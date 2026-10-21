@@ -125,6 +125,37 @@ def backup():
     console.print(f"Backed up to {b['path']} ({b['size_mb']} MB, keeping {b['kept']})")
 
 
+@app.command("upload-db")
+def upload_db(url: str = typer.Argument(..., help="The hosted dashboard, e.g. https://ar-scout.onrender.com")):
+    """Copy this computer's database (all history) to a hosted dashboard. Replaces the host's data; it backs
+    its own copy up first."""
+    import tempfile
+    from pathlib import Path
+
+    import httpx
+
+    url = url.rstrip("/")
+    password = typer.prompt("Admin password for that dashboard", hide_input=True)
+    with tempfile.TemporaryDirectory() as tmp:
+        copy = Path(tmp) / "ar_scout.db"
+        db.backup(copy)  # a consistent copy, even if the dashboard is running here
+        size = copy.stat().st_size / 1e6
+        if not typer.confirm(f"Replace the data at {url} with this computer's ({size:.1f} MB)?"):
+            raise typer.Exit()
+        with httpx.Client(timeout=300, follow_redirects=True) as client:
+            r = client.post(f"{url}/api/login", json={"password": password})
+            if r.status_code != 200:
+                console.print(f"[red]Sign-in failed: {r.json().get('detail', r.text)}[/]")
+                raise typer.Exit(1)
+            r = client.post(f"{url}/api/admin/database", content=copy.read_bytes(),
+                            headers={"Content-Type": "application/octet-stream"})
+    if r.status_code != 200:
+        console.print(f"[red]Upload failed: {r.json().get('detail', r.text)}[/]")
+        raise typer.Exit(1)
+    res = r.json()
+    console.print(f"Uploaded {res['artists']} artists and {res['snapshots']:,} snapshots to {url}")
+
+
 @app.command()
 def relink():
     """Link YouTube/Wikipedia/MusicBrainz for artists added by discovery that never had a full lookup."""
@@ -261,11 +292,15 @@ def note(name: str, body: str):
 
 
 @app.command()
-def serve(host: str = "127.0.0.1", port: int = 8787):
-    """Run the web dashboard."""
+def serve(host: str = typer.Option("127.0.0.1", envvar="AR_SCOUT_HOST", help="0.0.0.0 to accept other devices"),
+          port: int = typer.Option(8787, envvar="PORT", help="Hosts like Render set PORT")):
+    """Run the web dashboard (and the daily snapshot, if AR_SCOUT_DAILY_AT is set)."""
+    import logging
+
     import uvicorn
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(message)s")
     console.print(f"Dashboard at http://{host}:{port}")
-    uvicorn.run("ar_scout.web.app:app", host=host, port=port)
+    uvicorn.run("ar_scout.web.app:app", host=host, port=port, proxy_headers=True, forwarded_allow_ips="*")
 
 
 if __name__ == "__main__":

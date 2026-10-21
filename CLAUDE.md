@@ -62,5 +62,11 @@ Reported beside the score, not in it:
   `uv run ar-scout serve` starts the dashboard at http://127.0.0.1:8787.
 - The daily job (`ar-scout snapshot all`) skips artists snapshotted in the last 6h, retries network failures once,
   then backs up the database to `data/backups/` (or `AR_SCOUT_BACKUP_DIR`), keeping 14 days.
+- Hosting (Render, `render.yaml`): sign-in turns on when `AR_SCOUT_TEAM_PASSWORD` / `AR_SCOUT_ADMIN_PASSWORD` are set
+  (`web/auth.py`; admin-only routes use `Depends(admin_only)`); `AR_SCOUT_DAILY_AT` runs the daily snapshot inside
+  the app (`scheduler.py`); `ar-scout upload-db URL` moves a laptop's history to the host.
+- Leaderboard scores are cached in `service._scored` until `db.data_version()` changes (triggers bump it on any
+  write to artists, snapshots or watchlist, from any process). New tables that scores read need a trigger too.
+- Tests run on a throwaway database and backup folder (`tests/conftest.py`); keep new settings paths patched there.
 - Code layout: `sources/` (one module per API) → `service.py` (resolve/snapshot/score/discover) →
   `mcp_server.py`, `cli.py`, `web/app.py` (thin front-ends over service).
