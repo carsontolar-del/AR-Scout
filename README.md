@@ -1,5 +1,7 @@
 # AR Scout
 
+[![tests](https://github.com/carsontolar-del/AR-Scout/actions/workflows/tests.yml/badge.svg)](https://github.com/carsontolar-del/AR-Scout/actions/workflows/tests.yml)
+
 **An A&R research tool that tracks emerging artists every day across free music data sources and flags who is
 breaking out.** Built during an internship at an artist management company to answer one weekly question:
 *who's rising, unsigned and unmanaged, and worth a call this week?*
@@ -61,8 +63,8 @@ scheduler.py   daily snapshot + backup inside the app when hosted
 ```
 
 Python 3.12, FastAPI, SQLite, httpx, Typer, vanilla JS. Scores are cached until the data changes (a version
-counter bumped by SQLite triggers, so it's correct across processes). **78 tests**, all run against throwaway
-data. The dashboard works on phones and in dark mode.
+counter bumped by SQLite triggers, so it's correct across processes). **81 tests**, run on every push by GitHub
+Actions against throwaway data. The dashboard works on phones and in dark mode.
 
 Designed and directed by Carson Wilkinson; built with [Claude Code](https://claude.com/claude-code).
 

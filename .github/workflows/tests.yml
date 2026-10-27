@@ -1,0 +1,20 @@
+# Runs the test suite on GitHub's computers for every push and pull request. Needs no API keys or data:
+# tests use a throwaway database (tests/conftest.py) and fake every outside service.
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - name: Install
+        run: uv sync --frozen --python 3.12
+      - name: Run tests
+        run: uv run pytest -q
