@@ -15,8 +15,9 @@ def enwiki_title_from_wikidata(wikidata_url: str) -> str | None:
     return entity.get("sitelinks", {}).get("enwiki", {}).get("title")
 
 
-def pageviews(title: str, days: int = 30) -> int | None:
-    end = date.today() - timedelta(days=1)
+def pageviews(title: str, days: int = 30, end: date | None = None) -> int | None:
+    """Views over the `days` days ending `end` (default: yesterday, the latest full day)."""
+    end = end or date.today() - timedelta(days=1)
     start = end - timedelta(days=days - 1)
     url = (
         "https://wikimedia.org/api/rest_v1/metrics/pageviews/per-article/en.wikipedia/all-access/user/"

@@ -1750,7 +1750,9 @@ async function loadHealth() {
       adminOnly(row("Daily job", h.daily_job ? `on · ${h.daily_job_at || "09:00"}` : "off", !h.daily_job)),
       row("With growth data", `${h.with_growth} / ${h.artists}`),
       adminOnly(row("Last backup", !h.last_backup ? "none yet" : h.last_backup === new Date().toLocaleDateString("en-CA") ? "today" : ago(h.last_backup + "T12:00:00"), !h.last_backup)),
-      h.unlinked ? adminOnly(row("Not linked", h.unlinked, true)) : null].filter(Boolean));
+      h.unlinked ? adminOnly(row("Not linked", h.unlinked, true)) : null,
+      // a whole source failing (expired key, a block, an outage) shows here the same day
+      ...Object.entries(h.source_problems || {}).map(([src, n]) => adminOnly(row(`${{ wikipedia: "Wikipedia", youtube: "YouTube", lastfm: "Last.fm", deezer: "Deezer", instagram: "Instagram", spotify: "Spotify" }[src] || src} failing`, `${n} artists`, true)))].filter(Boolean));
     $("#health").title = h.daily_job ? "" : "Run scripts/install-daily-snapshot.sh to snapshot every day";
   } catch {}
 }

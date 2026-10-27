@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import threading
 import time
 from typing import Any
@@ -31,6 +32,15 @@ class SourceError(RuntimeError):
 
 class TransientSourceError(SourceError):
     """The network or the service hiccupped (no connection, timeout, 5xx/429 after retries): worth retrying later."""
+
+
+def _brief(resp: httpx.Response) -> str:
+    """An error body short enough for a log line: an HTML error page becomes its title and message text."""
+    if "html" not in resp.headers.get("content-type", "") and not resp.text.lstrip().startswith("<"):
+        return resp.text[:200]
+    text = re.sub(r"<(script|style)[^>]*>.*?</\1>", " ", resp.text, flags=re.S | re.I)
+    text = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", text)).strip()
+    return text[:200]
 
 
 def client() -> httpx.Client:
@@ -82,7 +92,7 @@ def get_json(
             return None
         if resp.status_code >= 400:
             kind = TransientSourceError if resp.status_code in (429, 500, 502, 503, 504) else SourceError
-            raise kind(f"{request.url.host} HTTP {resp.status_code}: {resp.text[:200]}")
+            raise kind(f"{request.url.host} HTTP {resp.status_code}: {_brief(resp)}")
         data = resp.json()
         if cache:
             _cache[key] = (time.time(), data)

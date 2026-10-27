@@ -9,6 +9,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+PROJECT_URL = "https://github.com/carsontolar-del/AR-Scout"
 load_dotenv(PROJECT_ROOT / ".env")
 
 
@@ -30,7 +31,10 @@ class Settings:
 
     @property
     def user_agent(self) -> str:
-        return f"ar-scout/0.1 ({self.contact_email or 'no-contact-set'})"
+        """Wikimedia and MusicBrainz require automated clients to say how to reach their owner; without it,
+        Wikimedia started refusing requests outright (Oct 2026). The public repo always counts as contact."""
+        contact = "; ".join(x for x in (PROJECT_URL, self.contact_email) if x)
+        return f"ar-scout/0.1 (+{contact})"
 
     def source_status(self) -> dict[str, bool]:
         return {

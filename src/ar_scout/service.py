@@ -456,6 +456,13 @@ def last_backup() -> str | None:
     return copies[-1].stem.removeprefix("ar_scout-") if copies else None
 
 
+def _source_problems() -> dict[str, int]:
+    run = last_run()
+    if not run or not run.get("snapshotted"):
+        return {}
+    return {src: n for src, n in run["failures"].items() if n / run["snapshotted"] >= SOURCE_PROBLEM_SHARE}
+
+
 def data_health() -> dict:
     """How complete the tracked data is: unlinked artists, growth coverage, last snapshot, daily job."""
     coverage = db.snapshot_summary()
@@ -470,6 +477,7 @@ def data_health() -> dict:
         "daily_job_at": os.getenv("AR_SCOUT_DAILY_AT") or ("09:00" if DAILY_JOB_PLIST.exists() else None),
         "archived": len(db.all_artists(include_archived=True)) - len(artists),
         "last_backup": last_backup(),
+        "source_problems": _source_problems(),
     }
 
 
@@ -511,7 +519,40 @@ def snapshot_many(scope: str = "watchlist", stale_hours: float = STALE_HOURS,
                 errors[a["name"]] = res["errors"]
             else:
                 errors.pop(a["name"], None)
-    return {"snapshotted": done, "skipped_fresh": skipped, "retried": len(again), "errors": errors}
+    result = {"snapshotted": done, "skipped_fresh": skipped, "retried": len(again), "errors": errors}
+    if done:
+        _record_run(result)
+    return result
+
+
+def _source_failures(errors: dict[str, list[str]]) -> dict[str, int]:
+    """How many artists each source failed for, e.g. {"wikipedia": 80}."""
+    per: dict[str, set[str]] = {}
+    for name, msgs in errors.items():
+        for m in msgs:
+            per.setdefault(m.split(":")[0].split()[0].lower(), set()).add(name)
+    return {src: len(names) for src, names in sorted(per.items(), key=lambda x: -len(x[1]))}
+
+
+def _record_run(result: dict) -> None:
+    """Keep the latest run's per-source failures, so a source that stops working shows up on the dashboard."""
+    path = settings.db_path.parent / ".last_snapshot_run.json"
+    try:
+        path.write_text(json.dumps({"finished": db.now(), "snapshotted": result["snapshotted"],
+                                    "failures": _source_failures(result["errors"])}))
+    except OSError:
+        pass
+
+
+def last_run() -> dict | None:
+    try:
+        return json.loads((settings.db_path.parent / ".last_snapshot_run.json").read_text())
+    except (OSError, ValueError):
+        return None
+
+
+# A source failing for at least this share of a run's artists is shown as a problem.
+SOURCE_PROBLEM_SHARE = 0.10
 
 
 # --------------------------------------------------------------------------- scoring / reports

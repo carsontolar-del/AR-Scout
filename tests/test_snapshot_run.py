@@ -92,3 +92,33 @@ def test_schema_upgrade_survives_parallel_first_requests(tmp_path, monkeypatch):
     assert errors == []
     with sqlite3.connect(path) as c:
         assert "management" in {r[1] for r in c.execute("PRAGMA table_info(artists)")}
+
+
+def test_requests_always_identify_a_contact():
+    ua = config.settings.user_agent
+    assert "github.com/carsontolar-del/AR-Scout" in ua and "no-contact" not in ua
+
+
+def test_html_error_pages_shrink_to_their_message():
+    import httpx
+    from ar_scout import http
+    page = ("<!DOCTYPE html><html><title>Wikimedia Error</title><style>* { margin: 0 }</style>"
+            "<body><p>Error: 403, Please respect our robot policy</p></body></html>")
+    brief = http._brief(httpx.Response(403, text=page, headers={"content-type": "text/html"}))
+    assert brief.startswith("Wikimedia Error Error: 403, Please respect our robot policy") and "margin" not in brief
+
+
+def test_a_failing_source_shows_up_in_health(monkeypatch):
+    for i in range(10):
+        db.upsert_artist({"name": f"Act {i}", "deezer_id": i + 1})
+    monkeypatch.setattr(service.deezer, "artist", lambda _id: {"nb_fan": 100, "nb_album": 1})
+    monkeypatch.setattr(service.deezer, "top_tracks", lambda *_: [])
+    monkeypatch.setattr(service, "_release_info", lambda _id: {})
+    for mod in (service.lastfm, service.youtube, service.spotify, service.instagram):
+        monkeypatch.setattr(mod, "available", lambda: False)
+    monkeypatch.setattr(service.wikipedia, "pageviews", lambda *a, **k: (_ for _ in ()).throw(
+        SourceError("wikimedia.org HTTP 403: Please respect our robot policy")))
+    for a in db.all_artists():
+        db.upsert_artist({"wiki_title": a["name"]}, a["id"])
+    service.snapshot_many("all", retry_wait=0)
+    assert service.data_health()["source_problems"] == {"wikipedia": 10}
