@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-mode="dark" data-accent="lilac" data-genres="on">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -8,26 +8,45 @@
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Figtree:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400..700&family=Geist+Mono:wght@400;500&display=swap">
+<script>
+// Apply saved settings before first paint, so the page never flashes the wrong theme.
+try { const d = document.documentElement;
+  for (const [k, ok] of [["mode", ["dark", "light"]], ["accent", ["mint", "lilac", "rose", "gold"]], ["genres", ["on", "off"]]]) {
+    const v = localStorage.getItem("ee-" + k); if (ok.includes(v)) d.dataset[k] = v; } } catch {}
+</script>
 <style>
-/* The public discovery app. A night-time listening room: one dark look on purpose, and each genre owns a hue that
-   the whole screen takes on while its song plays. */
+/* The public discovery app. Minimal: quiet type, a thin-ring wheel and one accent color. Listeners pick dark or light
+   and one of four accents in Settings; each accent has a bright dark-mode shade and a deeper light-mode shade.
+   Token names: --ink is the page background, --paper the text, --glow the accent. */
 :root {
-  --ink: #120f1c; --ink-2: #1b1729; --ink-3: #2c2541; --deep: #0d0b15;
-  --paper: #f1ecf7; --muted: #a69cbb; --glow: #ff7a59; --like: #6ee7a8; --bad: #ff6b8a;
-  --display: "Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
-  --body: "Figtree", "Helvetica Neue", system-ui, sans-serif;
-  --mono: "DM Mono", ui-monospace, Menlo, monospace;
-  color-scheme: dark;
+  --display: "Geist", "Helvetica Neue", system-ui, sans-serif;
+  --body: "Geist", "Helvetica Neue", system-ui, sans-serif;
+  --mono: "Geist Mono", ui-monospace, Menlo, monospace;
 }
+:root, :root[data-mode="dark"] {
+  color-scheme: dark; --deep: color-mix(in oklab, var(--ink) 72%, black); --on-accent: var(--ink); --ring: var(--ink-3);
+  --hub: var(--ink-2); --hub-ink: var(--paper); --hub-border: var(--ink-3); --ambient: 1; --like: #6ee7a8; --bad: #ff6b8a;
+}
+:root[data-mode="light"] {
+  color-scheme: light; --deep: #ffffff; --on-accent: #ffffff; --ring: var(--paper);
+  --hub: var(--glow); --hub-ink: #ffffff; --hub-border: var(--glow); --ambient: 0; --like: #1f7a4d; --bad: #c0264b;
+}
+:root, :root[data-mode="dark"][data-accent="lilac"] { --ink: #13111c; --ink-2: #1d1a2a; --ink-3: #2d2840; --muted: #968fae; --paper: #eeeaf7; --glow: #c4b5fd; }
+:root[data-mode="dark"][data-accent="mint"]  { --ink: #0e1513; --ink-2: #18221f; --ink-3: #26332f; --muted: #8ea39b; --paper: #e6f2ed; --glow: #6ee7b7; }
+:root[data-mode="dark"][data-accent="rose"]  { --ink: #170f13; --ink-2: #22161c; --ink-3: #36242d; --muted: #a8909b; --paper: #f6e9ee; --glow: #fb7185; }
+:root[data-mode="dark"][data-accent="gold"]  { --ink: #15130e; --ink-2: #201d15; --ink-3: #332e22; --muted: #a39c88; --paper: #f3efe4; --glow: #f5c451; }
+:root[data-mode="light"][data-accent="lilac"] { --ink: #f5f2f8; --ink-2: #e8e1f0; --ink-3: #d6cde3; --muted: #665a77; --paper: #22163a; --glow: #7a2e8e; }
+:root[data-mode="light"][data-accent="mint"]  { --ink: #f1f5f0; --ink-2: #e1eadf; --ink-3: #cbd8c9; --muted: #566a5a; --paper: #13261b; --glow: #1f7a4d; }
+:root[data-mode="light"][data-accent="rose"]  { --ink: #f9f1f3; --ink-2: #f0e0e5; --ink-3: #e2cbd2; --muted: #755862; --paper: #2e0f1c; --glow: #b4235a; }
+:root[data-mode="light"][data-accent="gold"]  { --ink: #f7f4ec; --ink-2: #ece6d6; --ink-3: #dcd3bd; --muted: #6a614d; --paper: #231d0e; --glow: #8a5a00; }
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
 html { background: var(--ink); }
 body { margin: 0; min-height: 100vh; background: var(--ink); color: var(--paper); font: 16px/1.55 var(--body);
   padding: 0 max(16px, env(safe-area-inset-right)) calc(96px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
-.ambient { position: fixed; inset: -20vmax; pointer-events: none; z-index: 0; filter: blur(10px); transition: background 900ms ease;
-  background: radial-gradient(38vmax 28vmax at 78% 8%, color-mix(in oklab, var(--glow) 32%, transparent), transparent 70%),
-              radial-gradient(28vmax 24vmax at 6% 70%, color-mix(in oklab, var(--glow) 12%, transparent), transparent 70%); }
+.ambient { position: fixed; inset: -20vmax; pointer-events: none; z-index: 0; opacity: var(--ambient);
+  background: radial-gradient(34vmax 30vmax at 50% 24%, color-mix(in oklab, var(--glow) 14%, transparent), transparent 70%); }
 .shell { position: relative; z-index: 1; width: min(100%, 560px); margin: 0 auto; display: grid; gap: 22px; }
 button, input, textarea, select { font: inherit; color: inherit; }
 button { cursor: pointer; }
@@ -37,9 +56,11 @@ a { color: var(--paper); }
 .muted { color: var(--muted); }
 
 /* header + tabs */
-header.top { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: max(18px, env(safe-area-inset-top)); }
-.brand { font-family: var(--display); font-weight: 800; font-size: 1.5rem; letter-spacing: -0.04em; text-decoration: none; }
-.brand span { color: var(--glow); transition: color 900ms ease; }
+header.top { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: max(18px, env(safe-area-inset-top)) 0 12px; border-bottom: 1px solid var(--ink-3); }
+.top-right { display: flex; align-items: center; gap: 6px; }
+.icon-btn { width: 44px; height: 44px; margin: -8px -10px -8px 0; border: 0; background: none; display: grid; place-items: center; border-radius: 12px; }
+.brand { font-family: var(--display); font-weight: 600; font-size: 1.15rem; letter-spacing: -0.02em; text-decoration: none; }
+.brand span { color: var(--glow); }
 .spins { font-family: var(--mono); font-size: 0.75rem; color: var(--muted); text-align: right; }
 .spins b { color: var(--glow); }
 nav.tabs { position: fixed; z-index: 5; left: 0; right: 0; bottom: 0; display: flex; justify-content: center;
@@ -52,28 +73,31 @@ nav.tabs a[aria-current="page"] { background: var(--ink-2); color: var(--paper);
 /* spin */
 .wheel-wrap { position: relative; width: min(100%, 420px); aspect-ratio: 1; margin: 0 auto; }
 .wheel-wrap canvas { width: 100%; height: 100%; display: block; }
-.pointer { position: absolute; top: -4px; left: 50%; translate: -50% 0; width: 0; height: 0; border-left: 12px solid transparent;
-  border-right: 12px solid transparent; border-top: 22px solid var(--paper); filter: drop-shadow(0 2px 4px #0008); z-index: 2; transform-origin: 50% 0; }
-.pointer.tick { animation: flick 140ms ease-out; }
-@keyframes flick { 35% { rotate: -16deg; } }
-.hub { position: absolute; inset: 36%; border-radius: 50%; display: grid; place-items: center; border: 1px solid #ffffff1f;
-  background: radial-gradient(circle, #1a1626 0 58%, var(--deep) 60%); font: 800 1.25rem var(--display); letter-spacing: 0.02em; }
+.hub { position: absolute; inset: 35%; border-radius: 50%; display: grid; place-items: center; border: 1px solid var(--hub-border);
+  background: var(--hub); color: var(--hub-ink); font: 600 1.05rem var(--display); }
 .hub:disabled { cursor: progress; color: var(--muted); }
 .picker { display: flex; gap: 8px; justify-content: center; }
 .picker select { min-width: 0; flex: 0 1 280px; background: var(--ink-2); border: 1px solid var(--ink-3); border-radius: 12px; padding: 10px 12px; }
+.wheel-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; width: min(100%, 420px); margin: -6px auto 0; }
+.hint { font: 0.75rem var(--mono); color: var(--muted); }
+.toggle { min-height: 44px; display: inline-flex; align-items: center; gap: 10px; padding: 0; border: 0; background: none; font-weight: 500; font-size: 0.88rem; }
+.switch { flex: none; width: 36px; height: 20px; border-radius: 10px; border: 1px solid var(--muted); position: relative; transition: background 150ms; }
+.switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: var(--muted); transition: left 150ms; }
+[aria-checked="true"] .switch { background: var(--glow); border-color: var(--glow); }
+[aria-checked="true"] .switch::after { left: 18px; background: var(--on-accent); }
 .notice { text-align: center; color: var(--muted); margin: 0; min-height: 1.5em; }
 
 .song { display: grid; gap: 14px; }
-.cover { position: relative; aspect-ratio: 1; border-radius: 22px; overflow: hidden; background: var(--ink-2); box-shadow: 0 30px 70px -30px color-mix(in oklab, var(--glow) 60%, transparent); }
+.cover { position: relative; aspect-ratio: 1; border-radius: 8px; overflow: hidden; background: var(--ink-2); box-shadow: 0 30px 70px -36px color-mix(in oklab, var(--glow) 45%, transparent); }
 .cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .cover .tag { position: absolute; left: 12px; top: 12px; font: 500 0.72rem var(--mono); padding: 4px 10px; border-radius: 99px; background: #000a; backdrop-filter: blur(6px); }
 .cover canvas { position: absolute; left: 0; right: 0; bottom: 0; width: 100%; height: 30%; }
 .cover .play { position: absolute; inset: 0; margin: auto; width: 84px; height: 84px; border-radius: 50%; border: 0; background: var(--paper); color: var(--ink); font-size: 1.8rem; }
 .progress { height: 4px; border-radius: 4px; background: var(--ink-3); overflow: hidden; }
 .progress i { display: block; height: 100%; width: 0; background: var(--glow); }
-.song h2 { font-family: var(--display); font-weight: 800; font-size: 1.9rem; line-height: 1.05; letter-spacing: -0.02em; margin: 0; text-wrap: balance; }
+.song h2 { font-family: var(--display); font-weight: 600; font-size: 1.9rem; line-height: 1.05; letter-spacing: -0.02em; margin: 0; text-wrap: balance; }
 .song .by { color: var(--muted); margin: 2px 0 0; }
-.note { border-left: 2px solid var(--glow); padding-left: 12px; margin: 0; color: #d9d1e8; }
+.note { border-left: 2px solid var(--glow); padding-left: 12px; margin: 0; color: color-mix(in oklab, var(--paper) 82%, var(--muted)); }
 .note small { display: block; font: 500 0.68rem var(--mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
 .choices { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .choices button { border-radius: 16px; padding: 14px; font-weight: 700; font-size: 1.02rem; background: var(--ink-2); border: 1px solid var(--ink-3); }
@@ -82,7 +106,7 @@ nav.tabs a[aria-current="page"] { background: var(--ink-2); color: var(--paper);
 .result { display: grid; gap: 12px; justify-items: center; text-align: center; padding: 8px 0; }
 .stamp { width: 168px; height: 168px; border-radius: 50%; border: 3px dashed var(--glow); display: grid; place-items: center; padding: 16px;
   rotate: -8deg; animation: thunk 420ms cubic-bezier(.2,1.6,.4,1); }
-.stamp b { font: 800 1.05rem/1.05 var(--display); color: var(--glow); }
+.stamp b { font: 600 1.05rem/1.05 var(--display); color: var(--glow); }
 .stamp span { display: block; font: 0.68rem var(--mono); color: var(--muted); margin-top: 4px; }
 @keyframes thunk { from { scale: 1.5; opacity: 0; } }
 .outlinks { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
@@ -101,21 +125,21 @@ nav.tabs a[aria-current="page"] { background: var(--ink-2); color: var(--paper);
 .field { background: var(--deep); border: 1px solid var(--ink-3); border-radius: 12px; padding: 10px 12px; width: 100%; outline: none; }
 .field:focus { border-color: var(--glow); box-shadow: 0 0 0 3px color-mix(in oklab, var(--glow) 25%, transparent); }
 textarea.field { min-height: 72px; resize: vertical; }
-.primary { border: 0; border-radius: 12px; padding: 10px 16px; background: var(--glow); color: var(--ink); font-weight: 700; }
+.primary { border: 0; border-radius: 12px; padding: 10px 16px; background: var(--glow); color: var(--on-accent); font-weight: 700; }
 .primary:disabled { opacity: 0.6; cursor: progress; }
 .err { color: var(--bad); margin: 0; font-size: 0.9rem; min-height: 1.2em; }
 
 /* crate */
 .crate { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .rec { border: 0; padding: 0; background: none; text-align: left; display: grid; gap: 6px; }
-.rec .art { position: relative; aspect-ratio: 1; border-radius: 16px; overflow: hidden; background: var(--ink-2); }
+.rec .art { position: relative; aspect-ratio: 1; border-radius: 6px; overflow: hidden; background: var(--ink-2); }
 .rec img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .rec .art::after { content: ""; position: absolute; right: 8px; top: 8px; width: 30px; height: 30px; border-radius: 50%; border: 2px dashed #fffd; rotate: -10deg; }
-.rec b { font-family: var(--display); font-weight: 800; line-height: 1.1; }
+.rec b { font-family: var(--display); font-weight: 600; line-height: 1.1; }
 .rec span { font: 0.7rem var(--mono); color: var(--muted); }
 .rec .up { color: var(--like); }
 .empty { text-align: center; color: var(--muted); padding: 40px 12px; border: 1px dashed var(--ink-3); border-radius: 20px; }
-.sheet { position: fixed; z-index: 10; inset: 0; background: #0009; display: grid; align-items: end; justify-items: center; }
+.sheet { position: fixed; z-index: 10; inset: 0; background: #0008; display: grid; align-items: end; justify-items: center; }
 .sheet > div { width: min(100%, 560px); max-height: 88vh; overflow: auto; background: var(--ink); border: 1px solid var(--ink-3); border-bottom: 0;
   border-radius: 24px 24px 0 0; padding: 20px max(16px, env(safe-area-inset-right)) calc(24px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); display: grid; gap: 14px; }
 .sheet .close { justify-self: end; }
@@ -123,8 +147,8 @@ textarea.field { min-height: 72px; resize: vertical; }
 /* submit */
 .seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 6px; padding: 5px; border-radius: 16px; background: var(--deep); border: 1px solid var(--ink-3); }
 .seg button { border: 0; background: none; border-radius: 12px; padding: 10px; font-weight: 600; color: var(--muted); }
-.seg button[aria-pressed="true"] { background: var(--glow); color: var(--ink); }
-.sub-head h1 { font: 800 clamp(2rem, 7vw, 2.8rem)/1 var(--display); letter-spacing: -0.035em; margin: 6px 0 0; text-wrap: balance; }
+.seg button[aria-pressed="true"] { background: var(--glow); color: var(--on-accent); }
+.sub-head h1 { font: 600 clamp(2rem, 7vw, 2.8rem)/1 var(--display); letter-spacing: -0.035em; margin: 6px 0 0; text-wrap: balance; }
 .sub-head h1 span { color: var(--glow); }
 .sub-head p { color: var(--muted); margin: 10px 0 0; }
 form.sub { display: grid; gap: 16px; background: color-mix(in oklab, var(--ink-2) 85%, transparent); border: 1px solid var(--ink-3); border-radius: 22px; padding: clamp(16px, 4vw, 24px); }
@@ -138,35 +162,53 @@ form.sub legend { padding: 0; margin-bottom: 6px; }
 .chips span { font-size: 0.84rem; padding: 6px 12px; border-radius: 99px; border: 1px solid var(--ink-3); color: var(--muted); cursor: pointer; }
 .chips input:checked + span { background: color-mix(in oklab, var(--glow) 22%, transparent); border-color: var(--glow); color: var(--paper); }
 .chips input:focus-visible + span { outline: 2px solid var(--glow); outline-offset: 2px; }
-.check { grid-template-columns: auto 1fr !important; align-items: start; font-weight: 400 !important; color: #d9d1e8; }
+.check { grid-template-columns: auto 1fr !important; align-items: start; font-weight: 400 !important; color: color-mix(in oklab, var(--paper) 82%, var(--muted)); }
 .check input { width: 18px; height: 18px; margin-top: 2px; accent-color: var(--glow); }
 .hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
-.send { border: 0; border-radius: 16px; padding: 14px; background: var(--glow); color: var(--ink); font-weight: 800; font-size: 1.05rem; }
+.send { border: 0; border-radius: 16px; padding: 14px; background: var(--glow); color: var(--on-accent); font-weight: 600; font-size: 1.05rem; }
 .send:disabled { opacity: 0.6; cursor: progress; }
 .done { text-align: center; display: grid; gap: 10px; justify-items: center; padding: 30px 18px; border: 1px solid var(--ink-3); border-radius: 22px; background: var(--ink-2); }
-.done h2 { font: 800 1.7rem var(--display); margin: 4px 0 0; }
+.done h2 { font: 600 1.7rem var(--display); margin: 4px 0 0; }
 .done p { color: var(--muted); margin: 0; max-width: 44ch; }
 @media (max-width: 520px) { .two { grid-template-columns: 1fr; } }
-@media (prefers-reduced-motion: reduce) { .pointer.tick, .stamp { animation: none; } .ambient { transition: none; } }
+/* settings */
+.set { display: grid; gap: 10px; }
+.set h2 { margin: 0; font: 600 1.4rem var(--display); letter-spacing: -0.02em; }
+.swatches { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.swatches button { display: grid; justify-items: center; gap: 6px; padding: 12px 4px 10px; border-radius: 14px; border: 1px solid var(--ink-3); background: var(--ink-2); font-size: 0.84rem; font-weight: 500; }
+.swatches i { width: 28px; height: 28px; border-radius: 50%; }
+.swatches button[aria-pressed="true"] { border-color: var(--paper); box-shadow: inset 0 0 0 1px var(--paper); }
+.set .toggle { justify-content: space-between; width: 100%; text-align: left; gap: 16px; }
+.set .toggle small { display: block; color: var(--muted); font-weight: 400; font-size: 0.82rem; }
+@media (prefers-reduced-motion: reduce) { .stamp { animation: none; } .switch, .switch::after { transition: none; } }
 </style>
 </head>
 <body>
 <div class="ambient" aria-hidden="true"></div>
 <div class="shell">
   <header class="top">
-    <a class="brand" href="#spin">Early <span>Ear</span></a>
-    <div class="spins" id="spins"></div>
+    <a class="brand" href="#spin">early ear<span>.</span></a>
+    <div class="top-right">
+      <div class="spins" id="spins"></div>
+      <button class="icon-btn" id="settingsBtn" type="button" aria-label="Settings">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+          <path d="M3 6h14M3 14h14"/><circle cx="7" cy="6" r="2.2" fill="var(--ink)"/><circle cx="13" cy="14" r="2.2" fill="var(--ink)"/></svg>
+      </button>
+    </div>
   </header>
 
   <!-- ============ spin ============ -->
   <section id="tab-spin" data-tab="spin">
     <div id="wheelView" style="display:grid;gap:16px">
       <div class="wheel-wrap">
-        <div class="pointer" id="pointer"></div>
         <canvas id="wheel" width="720" height="720" aria-label="Genre wheel"></canvas>
-        <button class="hub" id="spinBtn" type="button">SPIN</button>
+        <button class="hub" id="spinBtn" type="button">Spin</button>
       </div>
-      <div class="picker"><select id="genre" aria-label="Genre to spin"><option value="">Surprise me: any genre</option></select></div>
+      <div class="wheel-row">
+        <span class="hint" id="wheelHint"></span>
+        <button class="toggle genres-toggle" type="button" role="switch">Genres <span class="switch"></span></button>
+      </div>
+      <div class="picker" id="picker"><select id="genre" aria-label="Genre to spin"><option value="">Surprise me: any genre</option></select></div>
       <p class="notice" id="notice" role="status"></p>
     </div>
 
@@ -276,7 +318,47 @@ async function call(path, body) {
   return data;
 }
 const root = document.documentElement;
-const setGlow = hue => root.style.setProperty("--glow", hue);
+const token = name => getComputedStyle(root).getPropertyValue(name).trim();
+
+// ============================================================ settings (saved in this browser only)
+const ACCENTS = [["mint", "Mint"], ["lilac", "Lilac"], ["rose", "Rose"], ["gold", "Gold"]];
+const ACCENT_HEX = { dark: { mint: "#6ee7b7", lilac: "#c4b5fd", rose: "#fb7185", gold: "#f5c451" },
+                     light: { mint: "#1f7a4d", lilac: "#7a2e8e", rose: "#b4235a", gold: "#8a5a00" } };
+const genresOn = () => root.dataset.genres !== "off";
+function setPref(key, value) {
+  root.dataset[key] = value; store.set("ee-" + key, value);
+  showGenres(); if (WHEEL.length) drawWheel();
+}
+function showGenres() {
+  const on = genresOn();
+  document.querySelectorAll(".genres-toggle").forEach(b => b.setAttribute("aria-checked", String(on)));
+  $("picker").hidden = !on;
+  if (!on) $("genre").value = "";
+  $("wheelHint").textContent = on ? "Pick a genre or let it choose" : "Genres hidden: spin blind";
+}
+document.addEventListener("click", e => { if (e.target.closest(".genres-toggle")) setPref("genres", genresOn() ? "off" : "on"); });
+function openSettings() {
+  const box = showSheet("Settings", `<div class="set"><h2>Settings</h2></div>
+    <div class="set"><p class="eyebrow">Theme</p><div class="seg" role="group" aria-label="Theme">
+      <button type="button" data-mode="dark">Dark</button><button type="button" data-mode="light">Light</button></div></div>
+    <div class="set"><p class="eyebrow">Color</p><div class="swatches" role="group" aria-label="Accent color">
+      ${ACCENTS.map(([k, n]) => `<button type="button" data-accent="${k}"><i></i>${n}</button>`).join("")}</div></div>
+    <div class="set"><p class="eyebrow">Wheel</p><button class="toggle genres-toggle" type="button" role="switch">
+      <span>Show genres on the wheel<small>Turn off to spin blind and find out the genre when it lands.</small></span><span class="switch"></span></button></div>`);
+  const sync = () => {
+    box.querySelectorAll("[data-mode]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.mode === root.dataset.mode)));
+    box.querySelectorAll("[data-accent]").forEach(b => {
+      b.setAttribute("aria-pressed", String(b.dataset.accent === root.dataset.accent));
+      // Show each swatch in the shade it has in the current theme.
+      b.querySelector("i").style.background = ACCENT_HEX[root.dataset.mode === "light" ? "light" : "dark"][b.dataset.accent];
+    });
+    showGenres();
+  };
+  box.querySelectorAll("[data-mode]").forEach(b => b.onclick = () => { setPref("mode", b.dataset.mode); sync(); });
+  box.querySelectorAll("[data-accent]").forEach(b => b.onclick = () => { setPref("accent", b.dataset.accent); sync(); });
+  sync();
+}
+$("settingsBtn").onclick = openSettings;
 
 // ============================================================ tabs
 function route() {
@@ -286,32 +368,38 @@ function route() {
   document.querySelectorAll("[data-tab]").forEach(s => s.hidden = s.dataset.tab !== tab);
   document.querySelectorAll("[data-nav]").forEach(a => a.dataset.nav === tab ? a.setAttribute("aria-current", "page") : a.removeAttribute("aria-current"));
   if (tab === "crate") loadCrate();
-  if (tab === "submit") setGlow(who === "fan" ? "#4fd1c5" : "#ff7a59");
-  else if (tab === "spin" && current) setGlow(hueOf(current.wheel_genre));
 }
 window.addEventListener("hashchange", route);
 
 // ============================================================ wheel
+// A thin ring with a tick between genres. The genres turn past a fixed accent arc at the top; whichever sits under
+// it is the one you land on. With genres hidden, the labels become dots.
 let WHEEL = [], rot = 0, spinning = false, current = null;
-const hueOf = name => (WHEEL.find(w => w.name === name) || {}).hue || "#ff7a59";
-const wc = $("wheel"), w = wc.getContext("2d"), R = 360;
+const SHORT = { "Indie Rock": "INDIE ROCK", "Indie Pop & Dream Pop": "DREAM POP", "Post-punk & Shoegaze": "SHOEGAZE",
+  "Folk & Songwriters": "FOLK", "Country & Americana": "COUNTRY", "Electronic": "ELECTRONIC", "R&B, Soul & Hip-hop": "R&B/HIP-HOP",
+  "Experimental": "EXPER." };
+const wc = $("wheel"), w = wc.getContext("2d"), R = 360, RING = 228, LABEL = 296;
 function drawWheel() {
-  const seg = Math.PI * 2 / WHEEL.length;
+  const seg = Math.PI * 2 / WHEEL.length, turn = rot * Math.PI / 180, top = -Math.PI / 2;
+  const ink = token("--paper"), muted = token("--muted"), accent = token("--glow"), ring = token("--ring"), on = genresOn();
   w.clearRect(0, 0, 720, 720);
+  w.beginPath(); w.arc(R, R, RING, 0, Math.PI * 2); w.strokeStyle = ring; w.lineWidth = 2; w.stroke();
+  w.beginPath(); w.arc(R, R, RING, top - seg / 2, top + seg / 2); w.strokeStyle = accent; w.lineWidth = 14; w.stroke();
+  w.font = "500 20px 'Geist Mono', ui-monospace, monospace"; w.textAlign = "center"; w.textBaseline = "middle";
   WHEEL.forEach((s, i) => {
-    const a0 = -Math.PI / 2 - seg / 2 + i * seg, a1 = a0 + seg;
-    const g = w.createRadialGradient(R, R, 70, R, R, R);
-    g.addColorStop(0, s.hue + "55"); g.addColorStop(1, s.hue);
-    w.globalAlpha = s.unheard ? 1 : 0.32;
-    w.beginPath(); w.moveTo(R, R); w.arc(R, R, R - 6, a0, a1); w.closePath(); w.fillStyle = g; w.fill();
-    w.strokeStyle = "#0d0b15"; w.lineWidth = 4; w.stroke();
-    for (let r = 170; r < R - 10; r += 10) { w.beginPath(); w.arc(R, R, r, a0 + 0.02, a1 - 0.02); w.strokeStyle = "rgba(0,0,0,0.13)"; w.lineWidth = 1.2; w.stroke(); }
-    w.save(); w.translate(R, R); w.rotate(a0 + seg / 2);
-    w.fillStyle = "#120f1c"; w.font = "800 26px 'Bricolage Grotesque', system-ui, sans-serif"; w.textAlign = "right"; w.textBaseline = "middle";
-    const lines = s.name.replace(/ & /, " &\n").replace(/, /, ",\n").split("\n");
-    lines.forEach((t, k) => w.fillText(t, R - 28, (k - (lines.length - 1) / 2) * 28));
-    w.restore(); w.globalAlpha = 1;
+    const edge = top - seg / 2 + i * seg + turn, mid = edge + seg / 2;
+    w.strokeStyle = muted; w.lineWidth = 2; w.beginPath();
+    w.moveTo(R + Math.cos(edge) * (RING - 8), R + Math.sin(edge) * (RING - 8));
+    w.lineTo(R + Math.cos(edge) * (RING + 26), R + Math.sin(edge) * (RING + 26)); w.stroke();
+    const off = Math.atan2(Math.sin(mid - top), Math.cos(mid - top)), landed = Math.abs(off) < seg / 2;
+    const x = R + Math.cos(mid) * LABEL, y = R + Math.sin(mid) * LABEL;
+    w.globalAlpha = s.unheard ? 1 : 0.35;
+    w.fillStyle = landed ? accent : muted;
+    if (on) w.fillText(SHORT[s.name] || s.name.toUpperCase().slice(0, 11), x, y);
+    else { w.beginPath(); w.arc(x, y, landed ? 8 : 5, 0, Math.PI * 2); w.fill(); }
+    w.globalAlpha = 1;
   });
+  w.beginPath(); w.moveTo(R, R - RING - 18); w.lineTo(R, R - RING + 40); w.strokeStyle = ink; w.lineWidth = 4; w.stroke();
 }
 function spinTo(index) {
   return new Promise(done => {
@@ -323,9 +411,9 @@ function spinTo(index) {
       start ||= t;
       const p = dur ? Math.min(1, (t - start) / dur) : 1;
       rot = from + (to - from) * (1 - Math.pow(1 - p, 4));
-      wc.style.transform = `rotate(${rot}deg)`;
+      drawWheel();
       const s = Math.floor((rot + segDeg / 2) / segDeg);
-      if (s !== last && !reduce) { last = s; const pt = $("pointer"); pt.classList.remove("tick"); void pt.offsetWidth; pt.classList.add("tick"); try { navigator.vibrate?.(4); } catch {} }
+      if (s !== last && !reduce) { last = s; try { navigator.vibrate?.(4); } catch {} }
       if (p < 1) requestAnimationFrame(step); else done();
     };
     requestAnimationFrame(step);
@@ -360,11 +448,11 @@ const vc = $("viz"), v = vc.getContext("2d");
 (function viz(t) {
   v.clearRect(0, 0, 600, 180);
   if (!audio.paused) {
-    const hue = getComputedStyle(root).getPropertyValue("--glow").trim();
+    const hue = token("--glow"), ink = token("--paper");
     for (let i = 0; i < 44; i++) {
       const e = 0.3 + 0.7 * Math.abs(Math.sin(t / 250 + i * 0.55) * Math.sin(t / 600 + i * 0.21));
       const h = 12 + e * 140;
-      v.globalAlpha = 0.85; v.fillStyle = i % 3 ? hue : "#ffffff"; v.fillRect(i * (600 / 44) + 2, 180 - h, 600 / 44 - 4, h);
+      v.globalAlpha = 0.85; v.fillStyle = i % 3 ? hue : ink; v.fillRect(i * (600 / 44) + 2, 180 - h, 600 / 44 - 4, h);
     }
     v.globalAlpha = 1;
   }
@@ -398,7 +486,6 @@ const streamLinks = p => {
 
 function showSong(p) {
   current = p; heardMs = 0;
-  setGlow(hueOf(p.wheel_genre));
   $("wheelView").hidden = true; $("songView").hidden = false;
   $("sCover").src = p.cover_url || ""; $("sTag").textContent = p.wheel_genre;
   $("sTitle").textContent = p.title; $("sBy").textContent = p.artist_name;
@@ -479,23 +566,27 @@ async function loadCrate() {
     }));
   } catch (e) { grid.innerHTML = `<div class="empty" style="grid-column:1/-1">${esc(e.message)}</div>`; }
 }
-function openSheet(p) {
+function showSheet(label, html) {
   const s = $("sheet"), box = s.firstElementChild;
-  setGlow(hueOf(p.wheel_genre));
-  box.innerHTML = `<button class="ghost close" type="button">Close</button>
-    <div style="display:grid;grid-template-columns:96px minmax(0,1fr);gap:14px;align-items:center">
-      <img src="${esc(p.cover_url || "")}" alt="" style="width:96px;height:96px;border-radius:14px;object-fit:cover">
-      <div><h2 style="margin:0;font:800 1.4rem/1.05 var(--display)">${esc(p.title)}</h2><p class="muted" style="margin:4px 0 0">${esc(p.artist_name)} · ${esc(p.wheel_genre)}</p>
-      <p class="muted" style="margin:2px 0 0;font:0.75rem var(--mono)">Stamped ${day(p.kept_at)}${p.audience_at ? ` at ${fmt(p.audience_at)} ${esc(p.audience_label)}` : ""}</p></div></div>
-    ${p.note ? `<p class="note"><small>Why we picked it</small>${esc(p.note)}</p>` : ""}
-    <div class="outlinks" style="justify-content:flex-start">${streamLinks(p)}</div><div class="comments"></div>`;
+  box.setAttribute("aria-label", label);
+  box.innerHTML = `<button class="ghost close" type="button">Close</button>${html}`;
   s.hidden = false;
-  const close = () => { s.hidden = true; if (current) setGlow(hueOf(current.wheel_genre)); };
+  const close = () => { s.hidden = true; };
   box.querySelector(".close").onclick = close;
   s.onclick = e => { if (e.target === s) close(); };
   document.onkeydown = e => { if (e.key === "Escape" && !s.hidden) close(); };
-  renderComments(box.querySelector(".comments"), p.id);
   box.querySelector(".close").focus();
+  return box;
+}
+function openSheet(p) {
+  const box = showSheet("Song", `
+    <div style="display:grid;grid-template-columns:96px minmax(0,1fr);gap:14px;align-items:center">
+      <img src="${esc(p.cover_url || "")}" alt="" style="width:96px;height:96px;border-radius:14px;object-fit:cover">
+      <div><h2 style="margin:0;font:600 1.4rem/1.05 var(--display)">${esc(p.title)}</h2><p class="muted" style="margin:4px 0 0">${esc(p.artist_name)} · ${esc(p.wheel_genre)}</p>
+      <p class="muted" style="margin:2px 0 0;font:0.75rem var(--mono)">Stamped ${day(p.kept_at)}${p.audience_at ? ` at ${fmt(p.audience_at)} ${esc(p.audience_label)}` : ""}</p></div></div>
+    ${p.note ? `<p class="note"><small>Why we picked it</small>${esc(p.note)}</p>` : ""}
+    <div class="outlinks" style="justify-content:flex-start">${streamLinks(p)}</div><div class="comments"></div>`);
+  renderComments(box.querySelector(".comments"), p.id);
 }
 
 // ============================================================ submit
@@ -514,7 +605,6 @@ const SUBCOPY = {
 };
 function showSub() {
   const fan = who === "fan", msg = topic === "message", c = SUBCOPY[who];
-  setGlow(fan ? "#4fd1c5" : "#ff7a59");
   document.querySelectorAll("[data-who]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.who === who)));
   document.querySelectorAll("[data-topic]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.topic === topic)));
   document.querySelectorAll("#subForm [data-for]").forEach(el => { el.hidden = !el.dataset.for.split(" ").some(t => t === topic || t === who); });
@@ -555,6 +645,7 @@ $("subForm").onsubmit = async e => {
 $("subAgain").onclick = () => { $("subForm").reset(); $("subDone").hidden = true; $("subForm").hidden = false; showSub(); };
 
 // ============================================================ boot
+showGenres();
 showSub();
 loadState();
 route();
