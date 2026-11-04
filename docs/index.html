@@ -233,9 +233,25 @@ body.demo .demo-hide, body.demo .admin-toggle, body.demo .admin-only, body.demo 
 .demo-banner { padding: 8px 32px; font-size: 12.5px; background: var(--accent-soft); color: var(--accent-text); border-bottom: 1px solid var(--border); }
 .demo-banner a { color: inherit; font-weight: 600; }
 @media (max-width: 760px) { .demo-banner { padding: 8px 16px; } }
+.wk h3 { flex-wrap: wrap; gap: 2px 10px; }
+.wk-summary { font-size: 15px; font-weight: 500; margin: -6px 0 16px; color: var(--text); }
+.wk-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr)); gap: 16px; align-items: start; }
+.wk-list { display: grid; }
+.wk-item { display: flex; align-items: center; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--grid); min-width: 0; }
+.wk-item:last-child { border-bottom: 0; }
+.wk-item > :last-child { margin-left: auto; flex: none; }
+.wk-who { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1; }
+.wk-who .avatar { width: 30px; height: 30px; font-size: 11px; }
+.wk-who .n { font-weight: 600; cursor: pointer; }
+.wk-who .n:hover { text-decoration: underline; }
+.wk-who .g { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wk-empty { font-size: 13px; padding: 6px 0; }
+.wk .rank { width: 18px; }
 .head-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .label-cell { display: inline-flex; align-items: center; max-width: 260px; }
 .nav .count.warn-count { color: var(--warn); font-weight: 600; }
+.nav .overdue { margin-left: auto; font-size: 11px; font-weight: 600; color: var(--bad); background: var(--bad-soft); padding: 1px 6px; border-radius: 999px; }
+.nav .overdue + .count { margin-left: 8px; }
 .review-list { display: grid; gap: 10px; }
 .review-item { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 14px; align-items: start; padding: 14px 16px; }
 .review-item .n { font-weight: 600; cursor: pointer; }
@@ -375,6 +391,44 @@ textarea.input { width: 100%; min-height: 72px; resize: vertical; margin-top: 10
   .hero img, .hero .avatar { width: 72px; height: 72px; }
   .hero h1 { font-size: 24px; }
 }
+
+/* Last, so it overrides the narrow-screen layouts: a printed page is only ~725px wide. */
+/* ---------- print: the artist one-pager */
+.print-only { display: none; }
+@media print {
+  :root:root:root { color-scheme: light;
+    --bg: #fff; --surface: #fff; --surface-2: #f4f4f1; --surface-3: #e9e9e5; --border: #dcdcd6; --border-strong: #cfcfc8;
+    --text: #111; --text-2: #444; --muted: #777; --accent: #2f4bc4; --accent-soft: #e8edfd; --accent-text: #2a46b8;
+    --good: #17703c; --good-soft: #e3f4ea; --bad: #b3261e; --bad-soft: #fbe9e7; --warn: #8a5600; --warn-soft: #fbf1dc;
+    --grid: #ececE7; --shadow: none; --shadow-lg: none; }
+  @page { margin: 12mm; }
+  body { background: #fff; font-size: 11px; }
+  .sidebar, .topbar, .demo-banner, .cmpbar, .toast, .tooltip, .back, .hero-actions, .tag-edit, .pipeline-edit,
+  .no-print, .linkish, #mgmt-status, .admin-only, .yt-src button, .review-banner button { display: none !important; }
+  .print-only { display: block; }
+  .app { display: block; }
+  .content { padding: 0; max-width: none; }
+  .hero { margin-bottom: 10px; gap: 14px; }
+  .hero img, .hero .avatar { width: 64px; height: 64px; box-shadow: none; }
+  .hero h1 { font-size: 22px; }
+  .layout { grid-template-columns: 1fr 260px; gap: 10px; }
+  .kpis { grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  .kpi .yt-src, .kpi .l .mini { display: none !important; }
+  .hero .links a { padding: 1px 6px; font-size: 9.5px; }
+  .rel { padding: 4px 0; font-size: 10.5px; }
+  .kpi { padding: 8px 10px; } .kpi .v { font-size: 16px; }
+  .charts { grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .chart { padding: 8px 10px 6px; } .chart .h { gap: 6px; } .chart .h span { font-size: 12px; }
+  .chart svg { height: 52px; } .chart .na { height: 30px; }
+  .kpi.no-data, .rel.rel-extra, .kpi .d.pending { display: none !important; }
+  .kpi .d { font-size: 10px; }
+  .comp { margin: 4px 0; }
+  .explain .why { font-size: 11px; }
+  .card { box-shadow: none; break-inside: avoid; }
+  .stack { gap: 8px; }
+  .print-foot { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--border); color: var(--muted); font-size: 9.5px; }
+}
+
 </style>
 </head>
 <body>
@@ -385,6 +439,9 @@ textarea.input { width: 100%; min-height: 72px; resize: vertical; margin-top: 10
       <div><div class="brand-name">AR Scout</div><div class="brand-sub">A&amp;R research</div></div>
     </div>
     <nav class="nav">
+      <a href="#/week" data-nav="week">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="11" rx="2"/><path d="M2 6.5h12M5.5 1.5v3M10.5 1.5v3"/></svg>
+        This week</a>
       <a href="#/" data-nav="leaderboard">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 13.5h12M4 11V7M8 11V3M12 11V5.5"/></svg>
         Leaderboard <span class="count" id="cntAll"></span></a>
@@ -393,7 +450,7 @@ textarea.input { width: 100%; min-height: 72px; resize: vertical; margin-top: 10
         Movers this week</a>
       <a href="#/watchlist" data-nav="watchlist">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1.5 8s2.4-4.5 6.5-4.5S14.5 8 14.5 8s-2.4 4.5-6.5 4.5S1.5 8 1.5 8Z"/><circle cx="8" cy="8" r="2"/></svg>
-        Watchlist <span class="count" id="cntWatch"></span></a>
+        Watchlist <span class="overdue" id="cntOverdue" hidden></span><span class="count" id="cntWatch"></span></a>
       <a href="#/discover" data-nav="discover">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6.5"/><path d="m10.5 5.5-1.6 3.4-3.4 1.6 1.6-3.4z"/></svg>
         Discover</a>
@@ -474,6 +531,7 @@ async function demoApi(path, opts) {
   if (at === "/api/status") return d.status;
   if (at === "/api/health") return d.health;
   if (at === "/api/review") return d.review;
+  if (at === "/api/digest") return d.digest;
   if (at === "/api/leaderboard") {
     if (q.get("watchlist") === "true" || q.get("archived") === "true") return [];  // private to the team
     const max = +q.get("max_audience") || 0, plat = q.get("platform") || "any", genre = (q.get("genre") || "").toLowerCase();
@@ -543,6 +601,7 @@ function route() {
   if (page === "discover") { lastList = "discover"; return renderDiscover(); }
   if (page === "review") { lastList = "review"; return renderReview(); }
   if (page === "movers") { lastList = "movers"; return renderMovers(); }
+  if (page === "week") { lastList = "week"; return renderWeek(); }
   if (page === "compare") return renderCompare();
   if (page === "help") { lastList = "help"; return renderHelp(); }
   lastList = "leaderboard"; return renderLeaderboard();
@@ -596,6 +655,7 @@ function dataTable(rows, { empty, showStatus = true, sort = { key: "score", dir:
     if (ms === "managed" || ms === "listed") minis.push(el("span", { class: "mini", title: r.management.evidence || r.management.label }, "Managed"));
     else if (ms === "unmanaged" || ms === "not_listed") minis.push(el("span", { class: "mini pos", title: r.management.label + (r.management.source ? ` (${r.management.source})` : "") }, "No mgmt"));
     if (r.verified) minis.unshift(el("span", { class: "mini ok", title: "Linked accounts checked by a person" }, "✓ Verified"));
+    if (r.added_at && Date.now() - new Date(r.added_at) < 7 * 864e5) minis.unshift(el("span", { class: "mini pos", title: `Added ${ago(r.added_at)}${r.discovered_via ? " by " + r.discovered_via : ""}` }, "New"));
     else if (r.review?.length) minis.unshift(el("span", { class: "mini warn", title: r.review.join("\n") }, "Review"));
     return el("tr", { class: "row", onclick: () => go(r.name) },
       el("td", {}, cmpBox(r)),
@@ -914,6 +974,57 @@ const MODES = {
   country: ["Country", "e.g. United Kingdom, Nigeria", "Last.fm country charts, filtered to emerging acts."],
 };
 const disc = remembered("discover", { mode: "tag", query: "", min: 300, max: 50000, limit: 20, rows: null, sort: { key: "score", dir: -1 } }, ["rows"]);
+// ============================================================ this week
+const PLATFORM_LABEL = { youtube: "YouTube subscribers", lastfm: "Last.fm listeners", deezer: "Deezer fans",
+  instagram: "Instagram followers", tiktok: "TikTok followers", spotify: "Spotify listeners" };
+const dayLabel = d => new Date(d + "T12:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" });
+async function renderWeek() {
+  const slot = el("div", {}, loadingCard(5));
+  view.replaceChildren(el("div", { class: "page-head" }, el("div", {}, el("h1", {}, "This week"),
+    el("p", { id: "week-range" }, "What changed, in the order to act on it."))), slot);
+  let d;
+  try { d = await api("/api/digest"); } catch (e) { slot.replaceChildren(errorCard(e)); return; }
+  $("#week-range").textContent = `${dayLabel(d.from)} – ${dayLabel(d.to)}. What changed, in the order to act on it.`;
+  const who = (r, ...extra) => el("div", { class: "wk-who" }, avatar(r.image_url, r.name),
+    el("div", { style: "min-width:0" }, el("div", { class: "n", onclick: () => go(r.name) }, r.name), el("div", { class: "g" }, ...extra)));
+  const section = (title, aside, items, empty) => el("section", { class: "card card-pad wk" },
+    el("h3", {}, title, el("span", { class: "aside" }, aside)),
+    items.length ? el("div", { class: "wk-list" }, items) : el("div", { class: "dim wk-empty" }, empty));
+  const accelLine = r => r.flags.find(f => f.startsWith("accelerating"))?.replace(/^accelerating: /, "") || "";
+  const g = r => r.gain ? `+${fmt(r.gain.delta)} ${PLATFORM_LABEL[r.gain.platform] || r.gain.platform} (${pct(r.gain.pct)})` : "";
+  const summary = [
+    d.accelerating.length ? `${d.accelerating.length} accelerating` : null,
+    `${d.movers_total} grew`,
+    d.releases.length ? `${d.releases.length} new release${d.releases.length === 1 ? "" : "s"}` : null,
+    d.overdue ? `${d.overdue} next step${d.overdue === 1 ? "" : "s"} overdue` : null,
+    d.review_count ? `${d.review_count} account${d.review_count === 1 ? "" : "s"} to check` : null,
+  ].filter(Boolean).join(" · ");
+  slot.replaceChildren(
+    el("div", { class: "wk-summary" }, summary),
+    el("div", { class: "wk-grid" },
+      section("Accelerating", "growth sped up on 2+ platforms", d.accelerating.map(r => el("div", { class: "wk-item" },
+        who(r, accelLine(r)), el("span", { class: "mini hot" }, "Accelerating"))),
+        "Nobody sped up this week. That's normal: it's rare, and it's the strongest signal when it happens."),
+      section("Top movers", "biggest real 7-day gains", d.movers.map((r, i) => el("div", { class: "wk-item" },
+        el("span", { class: "rank" }, i + 1), who(r, g(r)), el("b", { class: "num up" }, r.gain ? pct(r.gain.pct) : ""))),
+        "Movers need a week of daily snapshots."),
+      section("New releases", "from artists you track", d.releases.map(r => el("div", { class: "wk-item" },
+        who(r, [r.latest_title || "New release", r.latest_type ? ` (${r.latest_type})` : "", r.label ? ` · ${r.label}` : ""].join("")),
+        el("span", { class: "dim" }, dayLabel(r.latest_release)))),
+        "No tracked artist released anything this week."),
+      d.due.length || !DEMO ? section("Pipeline", "next steps due this week", d.due.map(r => {
+        const late = r.next_date < d.to;
+        return el("div", { class: "wk-item" }, who(r, `${r.next_step || "Next step"}${r.owner ? ` · ${r.owner}` : ""}`),
+          el("span", { class: late ? "down" : "dim", style: late ? "font-weight:600" : "" }, `${late ? "overdue " : "due "}${dayLabel(r.next_date)}`));
+      }), "Nothing due. Set next steps on the Watchlist board.") : null,
+      section("New on the radar", "artists added this week", d.new_artists.slice(0, 8).map(r => el("div", { class: "wk-item" },
+        who(r, [r.country, ...(r.genres || [])].filter(Boolean).join(" · ")), scoreCell(r))),
+        "No new artists this week. Run a search on Discover, or save one so it reruns weekly."),
+      d.review_count ? el("section", { class: "card card-pad wk" }, el("h3", {}, "Accounts to check"),
+        el("p", { class: "dim", style: "margin:0 0 10px;font-size:13px" }, `${d.review_count} artist${d.review_count === 1 ? " has" : "s have"} a linked account that may belong to someone else, so ${d.review_count === 1 ? "it's" : "they're"} left out of the rankings above.`),
+        el("button", { class: "btn", onclick: () => location.hash = "/review" }, "Open Needs review")) : null));
+}
+
 // ============================================================ movers this week
 const MOVER_PLATFORMS = [["best", "Best platform"], ["youtube", "YouTube subscribers"], ["lastfm", "Last.fm listeners"],
   ["deezer", "Deezer fans"], ["instagram", "Instagram followers"], ["tiktok", "TikTok followers"], ["spotify", "Spotify listeners"]];
@@ -1230,7 +1341,40 @@ function renderDiscover() {
   const lim = el("input", { class: "input num", type: "number", value: disc.limit });
   const hint = el("p", {}, MODES[disc.mode][2]);
   const goBtn = el("button", { class: "btn primary", type: "submit" }, "Search");
+  const saveBtn = el("button", { class: "btn", type: "button", title: "Rerun this search about once a week and mark what's new" }, "Save search");
   const slot = el("div", {});
+  const savedSlot = el("div", {});
+  const readForm = () => Object.assign(disc, { query: q.value.trim(), min: +mn.value, max: +mx.value, limit: +lim.value });
+  saveBtn.onclick = async () => {
+    readForm();
+    try { await post("/api/searches", { mode: disc.mode, query: disc.query, min_fans: disc.min, max_fans: disc.max, limit: disc.limit });
+      toast("Saved: it reruns about once a week"); drawSaved(); }
+    catch (e) { toast("Couldn't save: " + e.message); }
+  };
+  // Saved searches rerun with the daily job about weekly; artists they find first get a New badge for a week.
+  async function drawSaved() {
+    let list = [];
+    try { list = await api("/api/searches"); } catch { return; }
+    if (!list.length) { savedSlot.replaceChildren(); return; }
+    savedSlot.replaceChildren(el("div", { class: "card card-pad", style: "margin-bottom:16px" },
+      el("h3", {}, "Saved searches", el("span", { class: "aside" }, "rerun about once a week")),
+      el("div", { class: "wk-list" }, list.map(sv => {
+        const run = el("button", { class: "btn ghost" }, "Run now");
+        run.onclick = async () => {
+          run.disabled = true; run.textContent = "Running…";
+          try { const r = await post(`/api/searches/${sv.id}/run`, {}); toast(`${r.found} found, ${r.new.length} new`); loadCounts(); drawSaved(); }
+          catch (e) { toast("Search failed: " + e.message); run.disabled = false; run.textContent = "Run now"; }
+        };
+        const del = el("button", { class: "btn ghost" }, "Remove");
+        del.onclick = async () => { await api(`/api/searches/${sv.id}`, { method: "DELETE" }); toast("Saved search removed"); drawSaved(); };
+        return el("div", { class: "wk-item" },
+          el("div", { style: "min-width:0;flex:1" }, el("div", { style: "font-weight:600" }, `${MODES[sv.mode]?.[0] || sv.mode}${sv.query ? ": " + sv.query : ""}`),
+            el("div", { class: "dim", style: "font-size:12px" }, sv.last_run
+              ? `Last run ${ago(sv.last_run)} · ${sv.last_found} found · ${sv.last_new} new`
+              : `Saved ${ago(sv.created_at)} · runs with the next daily job`, ` · Deezer fans ${fmt(sv.min_fans)}–${fmt(sv.max_fans)}`)),
+          el("span", { class: "head-actions" }, run, del));
+      }))));
+  }
   mode.onchange = () => { disc.mode = mode.value; q.placeholder = MODES[disc.mode][1]; hint.textContent = MODES[disc.mode][2]; };
   const draw = () => slot.replaceChildren(disc.rows ? dataTable(disc.rows, {
     empty: ["No candidates in that range", "Widen the Deezer fan bounds or try a different query."], showStatus: false, sort: disc.sort, onSort: s => { disc.sort = s; draw(); } })
@@ -1241,10 +1385,10 @@ function renderDiscover() {
     el("label", { class: "field" }, el("span", {}, "Min Deezer fans"), mn),
     el("label", { class: "field" }, el("span", {}, "Max Deezer fans"), mx),
     el("label", { class: "field" }, el("span", {}, "Limit"), lim),
-    goBtn);
+    el("div", { class: "head-actions" }, goBtn, saveBtn));
   form.onsubmit = async e => {
     e.preventDefault();
-    Object.assign(disc, { query: q.value.trim(), min: +mn.value, max: +mx.value, limit: +lim.value });
+    readForm();
     goBtn.disabled = true; goBtn.textContent = "Searching…";
     slot.replaceChildren(el("div", { class: "progress" }, el("i")), loadingCard(5));
     try { disc.rows = await post("/api/discover", { mode: disc.mode, query: disc.query, min_fans: disc.min, max_fans: disc.max, limit: disc.limit }); draw(); toast(`${disc.rows.length} candidates saved`); loadCounts(); }
@@ -1253,8 +1397,9 @@ function renderDiscover() {
   };
   view.replaceChildren(
     el("div", { class: "page-head" }, el("div", {}, el("h1", {}, "Discover"), hint)),
-    form, slot);
+    savedSlot, form, slot);
   draw();
+  drawSaved();
 }
 
 // ============================================================ artist
@@ -1370,7 +1515,7 @@ function manualButton(a, metric, label, where) {
 
 function igKpi(a, m) {
   const sub = !igOn ? "Instagram not set up" : !a.instagram_username ? "no account linked" : "not readable: personal or private account?";
-  const tile = el("div", { class: "card kpi" }, el("div", { class: "l" }, "Instagram followers"), el("div", { class: "v" }, fmt(m["instagram.followers"])),
+  const tile = el("div", { class: "card kpi" + (m["instagram.followers"] == null ? " no-data" : "") }, el("div", { class: "l" }, "Instagram followers"), el("div", { class: "v" }, fmt(m["instagram.followers"])),
     el("div", { class: "d" }, m["instagram.followers"] != null ? `${fmt(m["instagram.media_count"])} posts` : sub));
   const change = el("button", { class: "linkish" }, a.instagram_username ? "Change" : "Set account");
   change.onclick = async () => {
@@ -1406,7 +1551,7 @@ function managementCard(a) {
     el("h3", {}, "Management", el("span", { class: "aside" }, info.source ? `from ${info.source}` : "")),
     el("div", { class: tone }, info.label),
     info.evidence ? el("div", { class: "dim", style: "font-size:12.5px;margin-top:8px" }, "Bio says: “", info.evidence, "”") : null,
-    !info.status ? el("div", { class: "dim", style: "font-size:12.5px;margin-top:8px" },
+    !info.status ? el("div", { class: "dim no-print", style: "font-size:12.5px;margin-top:8px" },
       igOn ? "Their Instagram bio doesn't say, or isn't readable." : "Connect Instagram to read this from their bio, or set it here.") : null,
     el("div", { style: "margin-top:10px" }, sel));
 }
@@ -1483,7 +1628,7 @@ function manageCard(a) {
         catch (err) { toast("Couldn't delete: " + err.message); e.target.disabled = false; }
       } }, "Yes, delete")));
   del.onclick = () => { del.hidden = true; confirmRow.hidden = false; };
-  return el("div", { class: "card card-pad demo-hide" },
+  return el("div", { class: "card card-pad demo-hide no-print" },
     el("h3", {}, "Manage artist"),
     el("p", { class: "dim", style: "font-size:12.5px;margin:0 0 10px" }, a.archived_at
       ? "Restoring brings them back into rankings and daily snapshots."
@@ -1563,7 +1708,8 @@ async function renderArtist(name) {
     el("div", { class: "hero-actions" }, watched ? el("span", { class: "pill st-" + watched.status }, "On watchlist") : null,
       el("span", { class: "demo-hide head-actions" }, statusSel, watchBtn, unwatch),
       (() => { const b = el("button", { class: "btn ghost" }, inCompare(a.name) ? "✓ In compare" : "Compare");
-        b.onclick = () => { if (toggleCompare(a.name)) b.textContent = inCompare(a.name) ? "✓ In compare" : "Compare"; }; return b; })()),
+        b.onclick = () => { if (toggleCompare(a.name)) b.textContent = inCompare(a.name) ? "✓ In compare" : "Compare"; }; return b; })(),
+      el("button", { class: "btn ghost", onclick: () => window.print(), title: "A clean one-page copy to print or save as PDF" }, "Print one-pager")),
     el("div", { class: "tag-edit demo-hide", style: "flex-basis:100%" }, el("span", { class: "dim", style: "font-size:12px" }, "Tags"), tagInput),
     watched ? pipelineEditor(a, watched) : null);
 
@@ -1573,7 +1719,7 @@ async function renderArtist(name) {
     const c = r.changes?.[key]?.[String(days)];
     if (!c) {
       const from = r.changes?.[key]?.["28_from"];
-      return el("div", { class: "d" }, days === 28 && from ? `28d: from ${new Date(from + "T12:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" })}` : `${days}d: not enough history`);
+      return el("div", { class: "d pending" }, days === 28 && from ? `28d: from ${new Date(from + "T12:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" })}` : `${days}d: not enough history`);
     }
     const cls = Math.abs(c.pct ?? 0) < 0.0005 ? "" : c.delta > 0 ? "up" : "down";
     const sign = c.delta > 0 ? "+" : c.delta < 0 ? "−" : "±";
@@ -1591,7 +1737,7 @@ async function renderArtist(name) {
     return el("span", { class: "src-at", title: `${src === "typed in" ? "Entered by hand from the public profile" : "From " + src} · ${d.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}` },
       `${src} · ${d.toLocaleDateString(undefined, { month: "short", day: "numeric" })}`);
   };
-  const kpi = (label, key, sub) => el("div", { class: "card kpi" + (uncounted(key) ? " uncounted" : "") },
+  const kpi = (label, key, sub) => el("div", { class: "card kpi" + (uncounted(key) ? " uncounted" : "") + (m[key] == null ? " no-data" : "") },
     el("div", { class: "l" }, label, uncounted(key) ? el("span", { class: "mini warn", style: "margin-left:6px", title: "Flagged for review, so left out of the score until someone fixes or checks it" }, "Not in score") : null),
     el("div", { class: "v" }, fmt(m[key])),
     m[key] == null ? el("div", { class: "d" }, sub || "not linked") : [changeLine(key, 7), changeLine(key, 28)], sourceLine(key));
@@ -1654,18 +1800,18 @@ async function renderArtist(name) {
     el("h3", {}, "Releases", el("span", { class: "aside" }, `${rel.releases_last_year ?? 0} in the last 12 months`)),
     rel.latest_label ? el("div", { style: "margin-bottom:8px;font-size:13px;color:var(--text-2)" }, "Latest label ",
       labelPill(rel.latest_label, a.label_class)) : null,
-    (rel.recent || []).length ? (rel.recent || []).map(x => el("div", { class: "rel" },
+    (rel.recent || []).length ? (rel.recent || []).map((x, i) => el("div", { class: "rel" + (i >= 4 ? " rel-extra" : "") },
       el("span", { class: "t", title: x.title }, x.title), el("span", { class: "ty" }, x.type), el("span", { class: "dt" }, x.date)))
       : el("div", { class: "dim" }, "No releases found on Deezer."));
 
-  const similar = el("div", { class: "card card-pad" }, el("h3", {}, "Similar artists", el("span", { class: "aside" }, "Deezer fans")),
+  const similar = el("div", { class: "card card-pad no-print" }, el("h3", {}, "Similar artists", el("span", { class: "aside" }, "Deezer fans")),
     r.similar_artists.length ? el("div", { class: "chips" }, r.similar_artists.map(x => el("button", { class: "chip", onclick: () => go(x.name) }, x.name, el("small", {}, fmt(x.deezer_fans)))))
       : el("div", { class: "dim" }, "None found."));
 
-  const noteBox = el("textarea", { class: "input", placeholder: "Add a scouting note — show report, contact, gut feel…" });
-  const notes = el("div", { class: "card card-pad demo-hide" }, el("h3", {}, "Notes", el("span", { class: "aside" }, r.notes.length || "")),
+  const noteBox = el("textarea", { class: "input no-print", placeholder: "Add a scouting note — show report, contact, gut feel…" });
+  const notes = el("div", { class: "card card-pad demo-hide" + (r.notes.length ? "" : " no-print") }, el("h3", {}, "Notes", el("span", { class: "aside" }, r.notes.length || "")),
     r.notes.length ? r.notes.map(n => el("div", { class: "note" }, el("time", {}, n.created_at.slice(0, 10)), n.body)) : el("div", { class: "dim", style: "font-size:13px" }, "No notes yet."),
-    noteBox, el("div", { style: "display:flex;justify-content:flex-end;margin-top:8px" }, el("button", { class: "btn", onclick: async () => {
+    noteBox, el("div", { class: "no-print", style: "display:flex;justify-content:flex-end;margin-top:8px" }, el("button", { class: "btn", onclick: async () => {
       if (!noteBox.value.trim()) return;
       await post("/api/note", { name: a.name, body: noteBox.value.trim() }); toast("Note saved"); renderArtist(a.name);
     } }, "Save note")));
@@ -1679,7 +1825,10 @@ async function renderArtist(name) {
             el("span", { style: "color:var(--warn)" }, "┆"), " release")), charts),
         releases),
       el("div", { class: "stack" }, scoreCard, managementCard(a), similar, notes, manageCard(a))),
-    r.errors.length ? el("div", { class: "errors" }, "Source issues: " + r.errors.join("; ")) : null);
+    r.errors.length ? el("div", { class: "errors no-print" }, "Source issues: " + r.errors.join("; ")) : "",
+    el("div", { class: "print-only print-foot" }, `AR Scout · ${a.name} · printed ${new Date().toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}`,
+      newest ? ` · numbers as of ${new Date(newest).toLocaleDateString(undefined, { month: "short", day: "numeric" })}` : "",
+      " · sources: Deezer, Last.fm, YouTube, MusicBrainz, Wikipedia; Spotify and TikTok typed in from public profiles"));
 }
 
 // ============================================================ CSV export
@@ -1751,7 +1900,9 @@ async function loadHealth() {
       adminOnly(row("Daily job", h.daily_job ? `on · ${h.daily_job_at || "09:00"}` : "off", !h.daily_job)),
       row("With growth data", `${h.with_growth} / ${h.artists}`),
       adminOnly(row("Last backup", !h.last_backup ? "none yet" : h.last_backup === new Date().toLocaleDateString("en-CA") ? "today" : ago(h.last_backup + "T12:00:00"), !h.last_backup)),
-      h.unlinked ? adminOnly(row("Not linked", h.unlinked, true)) : null].filter(Boolean));
+      h.unlinked ? adminOnly(row("Not linked", h.unlinked, true)) : null,
+      // a whole source failing (expired key, a block, an outage) shows here the same day
+      ...Object.entries(h.source_problems || {}).map(([src, n]) => adminOnly(row(`${{ wikipedia: "Wikipedia", youtube: "YouTube", lastfm: "Last.fm", deezer: "Deezer", instagram: "Instagram", spotify: "Spotify" }[src] || src} failing`, `${n} artists`, true)))].filter(Boolean));
     $("#health").title = h.daily_job ? "" : "Run scripts/install-daily-snapshot.sh to snapshot every day";
   } catch {}
 }
@@ -1759,6 +1910,12 @@ async function loadCounts() {
   try {
     const [all, watch] = await Promise.all([api("/api/leaderboard?limit=10000"), api("/api/leaderboard?watchlist=true&limit=10000")]);
     $("#cntAll").textContent = all.length || ""; $("#cntWatch").textContent = watch.length || "";
+    // Next steps whose due date has passed, on artists still being worked.
+    const late = watch.filter(r => r.next_date && r.next_date < today() && !["signed", "passed"].includes(r.status));
+    const od = $("#cntOverdue");
+    od.hidden = !late.length;
+    od.textContent = late.length ? `${late.length} overdue` : "";
+    od.title = late.map(r => `${r.name}: ${r.next_step || "next step"} (due ${r.next_date})`).join("\n");
     $("#cntReview").textContent = all.filter(r => r.review?.length && !r.verified).length || "";
   } catch {}
 }

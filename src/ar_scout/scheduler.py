@@ -67,6 +67,7 @@ def run_once() -> dict | None:
         try:
             res = service.snapshot_many("all")
             backup = service.backup_database()
+            service.run_due_searches()
             status = {"started": started, "finished": db.now(), "ok": True, "snapshotted": res["snapshotted"],
                       "skipped": res["skipped_fresh"], "retried": res["retried"], "errors": len(res["errors"]),
                       "backup": backup["path"]}

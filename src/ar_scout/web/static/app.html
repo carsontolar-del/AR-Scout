@@ -1,0 +1,563 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Early Ear</title>
+<meta name="description" content="Spin the wheel, hear a new song our A&R team picked, and keep the ones you love.">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Figtree:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap">
+<style>
+/* The public discovery app. A night-time listening room: one dark look on purpose, and each genre owns a hue that
+   the whole screen takes on while its song plays. */
+:root {
+  --ink: #120f1c; --ink-2: #1b1729; --ink-3: #2c2541; --deep: #0d0b15;
+  --paper: #f1ecf7; --muted: #a69cbb; --glow: #ff7a59; --like: #6ee7a8; --bad: #ff6b8a;
+  --display: "Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
+  --body: "Figtree", "Helvetica Neue", system-ui, sans-serif;
+  --mono: "DM Mono", ui-monospace, Menlo, monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { background: var(--ink); }
+body { margin: 0; min-height: 100vh; background: var(--ink); color: var(--paper); font: 16px/1.55 var(--body);
+  padding: 0 max(16px, env(safe-area-inset-right)) calc(96px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
+.ambient { position: fixed; inset: -20vmax; pointer-events: none; z-index: 0; filter: blur(10px); transition: background 900ms ease;
+  background: radial-gradient(38vmax 28vmax at 78% 8%, color-mix(in oklab, var(--glow) 32%, transparent), transparent 70%),
+              radial-gradient(28vmax 24vmax at 6% 70%, color-mix(in oklab, var(--glow) 12%, transparent), transparent 70%); }
+.shell { position: relative; z-index: 1; width: min(100%, 560px); margin: 0 auto; display: grid; gap: 22px; }
+button, input, textarea, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--paper); outline-offset: 3px; }
+a { color: var(--paper); }
+.eyebrow { font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); margin: 0; }
+.muted { color: var(--muted); }
+
+/* header + tabs */
+header.top { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: max(18px, env(safe-area-inset-top)); }
+.brand { font-family: var(--display); font-weight: 800; font-size: 1.5rem; letter-spacing: -0.04em; text-decoration: none; }
+.brand span { color: var(--glow); transition: color 900ms ease; }
+.spins { font-family: var(--mono); font-size: 0.75rem; color: var(--muted); text-align: right; }
+.spins b { color: var(--glow); }
+nav.tabs { position: fixed; z-index: 5; left: 0; right: 0; bottom: 0; display: flex; justify-content: center;
+  padding: 10px max(16px, env(safe-area-inset-right)) calc(10px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  background: color-mix(in oklab, var(--deep) 88%, transparent); backdrop-filter: blur(14px); border-top: 1px solid var(--ink-3); }
+nav.tabs div { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; width: min(100%, 560px); }
+nav.tabs a { text-align: center; text-decoration: none; padding: 9px 6px; border-radius: 14px; font-weight: 600; font-size: 0.92rem; color: var(--muted); }
+nav.tabs a[aria-current="page"] { background: var(--ink-2); color: var(--paper); box-shadow: inset 0 0 0 1px var(--ink-3); }
+
+/* spin */
+.wheel-wrap { position: relative; width: min(100%, 420px); aspect-ratio: 1; margin: 0 auto; }
+.wheel-wrap canvas { width: 100%; height: 100%; display: block; }
+.pointer { position: absolute; top: -4px; left: 50%; translate: -50% 0; width: 0; height: 0; border-left: 12px solid transparent;
+  border-right: 12px solid transparent; border-top: 22px solid var(--paper); filter: drop-shadow(0 2px 4px #0008); z-index: 2; transform-origin: 50% 0; }
+.pointer.tick { animation: flick 140ms ease-out; }
+@keyframes flick { 35% { rotate: -16deg; } }
+.hub { position: absolute; inset: 36%; border-radius: 50%; display: grid; place-items: center; border: 1px solid #ffffff1f;
+  background: radial-gradient(circle, #1a1626 0 58%, var(--deep) 60%); font: 800 1.25rem var(--display); letter-spacing: 0.02em; }
+.hub:disabled { cursor: progress; color: var(--muted); }
+.picker { display: flex; gap: 8px; justify-content: center; }
+.picker select { min-width: 0; flex: 0 1 280px; background: var(--ink-2); border: 1px solid var(--ink-3); border-radius: 12px; padding: 10px 12px; }
+.notice { text-align: center; color: var(--muted); margin: 0; min-height: 1.5em; }
+
+.song { display: grid; gap: 14px; }
+.cover { position: relative; aspect-ratio: 1; border-radius: 22px; overflow: hidden; background: var(--ink-2); box-shadow: 0 30px 70px -30px color-mix(in oklab, var(--glow) 60%, transparent); }
+.cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.cover .tag { position: absolute; left: 12px; top: 12px; font: 500 0.72rem var(--mono); padding: 4px 10px; border-radius: 99px; background: #000a; backdrop-filter: blur(6px); }
+.cover canvas { position: absolute; left: 0; right: 0; bottom: 0; width: 100%; height: 30%; }
+.cover .play { position: absolute; inset: 0; margin: auto; width: 84px; height: 84px; border-radius: 50%; border: 0; background: var(--paper); color: var(--ink); font-size: 1.8rem; }
+.progress { height: 4px; border-radius: 4px; background: var(--ink-3); overflow: hidden; }
+.progress i { display: block; height: 100%; width: 0; background: var(--glow); }
+.song h2 { font-family: var(--display); font-weight: 800; font-size: 1.9rem; line-height: 1.05; letter-spacing: -0.02em; margin: 0; text-wrap: balance; }
+.song .by { color: var(--muted); margin: 2px 0 0; }
+.note { border-left: 2px solid var(--glow); padding-left: 12px; margin: 0; color: #d9d1e8; }
+.note small { display: block; font: 500 0.68rem var(--mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+.choices { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.choices button { border-radius: 16px; padding: 14px; font-weight: 700; font-size: 1.02rem; background: var(--ink-2); border: 1px solid var(--ink-3); }
+.choices .keep { border-color: color-mix(in oklab, var(--like) 55%, transparent); }
+.choices .pass { border-color: color-mix(in oklab, var(--bad) 45%, transparent); }
+.result { display: grid; gap: 12px; justify-items: center; text-align: center; padding: 8px 0; }
+.stamp { width: 168px; height: 168px; border-radius: 50%; border: 3px dashed var(--glow); display: grid; place-items: center; padding: 16px;
+  rotate: -8deg; animation: thunk 420ms cubic-bezier(.2,1.6,.4,1); }
+.stamp b { font: 800 1.05rem/1.05 var(--display); color: var(--glow); }
+.stamp span { display: block; font: 0.68rem var(--mono); color: var(--muted); margin-top: 4px; }
+@keyframes thunk { from { scale: 1.5; opacity: 0; } }
+.outlinks { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+.outlinks a, .ghost { font-weight: 600; font-size: 0.88rem; padding: 8px 13px; border-radius: 99px; background: var(--ink-2); border: 1px solid var(--ink-3); text-decoration: none; }
+
+/* comments */
+.comments { display: grid; gap: 12px; border-top: 1px solid var(--ink-3); padding-top: 18px; }
+.comments h3 { margin: 0; font: 700 1.05rem var(--display); }
+.clist { display: grid; gap: 10px; }
+.c { display: grid; gap: 2px; }
+.c .who { font-size: 0.82rem; color: var(--muted); }
+.c .who b { color: var(--paper); font-weight: 600; margin-right: 6px; }
+.c p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.cform { display: grid; gap: 8px; }
+.cform .row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+.field { background: var(--deep); border: 1px solid var(--ink-3); border-radius: 12px; padding: 10px 12px; width: 100%; outline: none; }
+.field:focus { border-color: var(--glow); box-shadow: 0 0 0 3px color-mix(in oklab, var(--glow) 25%, transparent); }
+textarea.field { min-height: 72px; resize: vertical; }
+.primary { border: 0; border-radius: 12px; padding: 10px 16px; background: var(--glow); color: var(--ink); font-weight: 700; }
+.primary:disabled { opacity: 0.6; cursor: progress; }
+.err { color: var(--bad); margin: 0; font-size: 0.9rem; min-height: 1.2em; }
+
+/* crate */
+.crate { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.rec { border: 0; padding: 0; background: none; text-align: left; display: grid; gap: 6px; }
+.rec .art { position: relative; aspect-ratio: 1; border-radius: 16px; overflow: hidden; background: var(--ink-2); }
+.rec img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.rec .art::after { content: ""; position: absolute; right: 8px; top: 8px; width: 30px; height: 30px; border-radius: 50%; border: 2px dashed #fffd; rotate: -10deg; }
+.rec b { font-family: var(--display); font-weight: 800; line-height: 1.1; }
+.rec span { font: 0.7rem var(--mono); color: var(--muted); }
+.rec .up { color: var(--like); }
+.empty { text-align: center; color: var(--muted); padding: 40px 12px; border: 1px dashed var(--ink-3); border-radius: 20px; }
+.sheet { position: fixed; z-index: 10; inset: 0; background: #0009; display: grid; align-items: end; justify-items: center; }
+.sheet > div { width: min(100%, 560px); max-height: 88vh; overflow: auto; background: var(--ink); border: 1px solid var(--ink-3); border-bottom: 0;
+  border-radius: 24px 24px 0 0; padding: 20px max(16px, env(safe-area-inset-right)) calc(24px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); display: grid; gap: 14px; }
+.sheet .close { justify-self: end; }
+
+/* submit */
+.seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 6px; padding: 5px; border-radius: 16px; background: var(--deep); border: 1px solid var(--ink-3); }
+.seg button { border: 0; background: none; border-radius: 12px; padding: 10px; font-weight: 600; color: var(--muted); }
+.seg button[aria-pressed="true"] { background: var(--glow); color: var(--ink); }
+.sub-head h1 { font: 800 clamp(2rem, 7vw, 2.8rem)/1 var(--display); letter-spacing: -0.035em; margin: 6px 0 0; text-wrap: balance; }
+.sub-head h1 span { color: var(--glow); }
+.sub-head p { color: var(--muted); margin: 10px 0 0; }
+form.sub { display: grid; gap: 16px; background: color-mix(in oklab, var(--ink-2) 85%, transparent); border: 1px solid var(--ink-3); border-radius: 22px; padding: clamp(16px, 4vw, 24px); }
+form.sub label, form.sub fieldset { display: grid; gap: 6px; font-size: 0.88rem; font-weight: 500; min-width: 0; border: 0; padding: 0; margin: 0; }
+form.sub small { color: var(--muted); font-weight: 400; }
+form.sub legend { padding: 0; margin-bottom: 6px; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.chips { display: flex; flex-wrap: wrap; gap: 7px; }
+.chips label { display: inline-flex !important; }
+.chips input { position: absolute; opacity: 0; pointer-events: none; }
+.chips span { font-size: 0.84rem; padding: 6px 12px; border-radius: 99px; border: 1px solid var(--ink-3); color: var(--muted); cursor: pointer; }
+.chips input:checked + span { background: color-mix(in oklab, var(--glow) 22%, transparent); border-color: var(--glow); color: var(--paper); }
+.chips input:focus-visible + span { outline: 2px solid var(--glow); outline-offset: 2px; }
+.check { grid-template-columns: auto 1fr !important; align-items: start; font-weight: 400 !important; color: #d9d1e8; }
+.check input { width: 18px; height: 18px; margin-top: 2px; accent-color: var(--glow); }
+.hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+.send { border: 0; border-radius: 16px; padding: 14px; background: var(--glow); color: var(--ink); font-weight: 800; font-size: 1.05rem; }
+.send:disabled { opacity: 0.6; cursor: progress; }
+.done { text-align: center; display: grid; gap: 10px; justify-items: center; padding: 30px 18px; border: 1px solid var(--ink-3); border-radius: 22px; background: var(--ink-2); }
+.done h2 { font: 800 1.7rem var(--display); margin: 4px 0 0; }
+.done p { color: var(--muted); margin: 0; max-width: 44ch; }
+@media (max-width: 520px) { .two { grid-template-columns: 1fr; } }
+@media (prefers-reduced-motion: reduce) { .pointer.tick, .stamp { animation: none; } .ambient { transition: none; } }
+</style>
+</head>
+<body>
+<div class="ambient" aria-hidden="true"></div>
+<div class="shell">
+  <header class="top">
+    <a class="brand" href="#spin">Early <span>Ear</span></a>
+    <div class="spins" id="spins"></div>
+  </header>
+
+  <!-- ============ spin ============ -->
+  <section id="tab-spin" data-tab="spin">
+    <div id="wheelView" style="display:grid;gap:16px">
+      <div class="wheel-wrap">
+        <div class="pointer" id="pointer"></div>
+        <canvas id="wheel" width="720" height="720" aria-label="Genre wheel"></canvas>
+        <button class="hub" id="spinBtn" type="button">SPIN</button>
+      </div>
+      <div class="picker"><select id="genre" aria-label="Genre to spin"><option value="">Surprise me: any genre</option></select></div>
+      <p class="notice" id="notice" role="status"></p>
+    </div>
+
+    <div class="song" id="songView" hidden>
+      <div class="cover">
+        <img id="sCover" alt="">
+        <span class="tag" id="sTag"></span>
+        <canvas id="viz" width="600" height="180" aria-hidden="true"></canvas>
+        <button class="play" id="playBtn" type="button" aria-label="Play clip" hidden>▶</button>
+      </div>
+      <div class="progress"><i id="prog"></i></div>
+      <div><h2 id="sTitle"></h2><p class="by" id="sBy"></p></div>
+      <p class="note" id="sNote" hidden></p>
+      <div class="choices" id="choices">
+        <button class="pass" id="passBtn" type="button">Pass</button>
+        <button class="keep" id="keepBtn" type="button">Keep it</button>
+      </div>
+      <div class="result" id="result" hidden>
+        <div class="stamp" id="stamp" hidden><div><b id="stName"></b><span id="stLine"></span><span id="stDate"></span></div></div>
+        <p class="muted" id="resultText" style="margin:0"></p>
+        <div class="outlinks" id="sLinks"></div>
+        <button class="primary" id="againBtn" type="button">Spin again</button>
+      </div>
+      <div class="comments" id="sComments"></div>
+    </div>
+  </section>
+
+  <!-- ============ crate ============ -->
+  <section id="tab-crate" data-tab="crate" hidden style="display:grid;gap:16px">
+    <div><p class="eyebrow">Your crate</p><p class="muted" id="crateSub" style="margin:4px 0 0"></p></div>
+    <div class="crate" id="crate"></div>
+  </section>
+
+  <!-- ============ submit ============ -->
+  <section id="tab-submit" data-tab="submit" hidden style="display:grid;gap:18px">
+    <div class="seg" role="group" aria-label="Who are you?">
+      <button type="button" data-who="fan">I'm a fan</button>
+      <button type="button" data-who="artist">I'm an artist</button>
+    </div>
+    <div class="sub-head"><p class="eyebrow" id="subEyebrow"></p><h1 id="subTitle"></h1><p id="subLede"></p></div>
+
+    <form class="sub" id="subForm" novalidate>
+      <div class="seg" data-for="artist" role="group" aria-label="What are you sending?">
+        <button type="button" data-topic="demo">Send a demo</button>
+        <button type="button" data-topic="message">Message the team</button>
+      </div>
+      <div class="two" data-for="demo song">
+        <label>Song title <input class="field" type="text" id="f_song_title" maxlength="200" autocomplete="off"></label>
+        <label><span id="artistLabel">Artist or band name</span> <input class="field" type="text" id="f_artist_name" maxlength="160" autocomplete="off"></label>
+      </div>
+      <label data-for="message">Artist or band name <input class="field" type="text" id="f_artist_name_msg" maxlength="160" autocomplete="off"></label>
+      <label data-for="demo song"><span>Link to the song <small id="linkHint"></small></span>
+        <input class="field" type="url" id="f_link" maxlength="500" inputmode="url" placeholder="https://" autocomplete="off"></label>
+      <fieldset data-for="demo song"><legend>Genre <small>(pick the closest)</small></legend><div class="chips" id="genreChips"></div></fieldset>
+      <div class="two" data-for="demo">
+        <label><span>Where you're based <small>(optional)</small></span> <input class="field" type="text" id="f_location" maxlength="120" placeholder="City, country"></label>
+        <label><span>Instagram or TikTok <small>(optional)</small></span> <input class="field" type="text" id="f_socials" maxlength="300" placeholder="@handle"></label>
+      </div>
+      <label><span><span id="msgLabel"></span> <small id="msgHint"></small></span> <textarea class="field" id="f_message" maxlength="4000"></textarea></label>
+      <div class="two">
+        <label><span id="nameLabel"></span> <input class="field" type="text" id="f_name" maxlength="120" autocomplete="name"></label>
+        <label><span id="emailLabel"></span> <input class="field" type="email" id="f_email" maxlength="200" autocomplete="email"></label>
+      </div>
+      <label class="check" data-for="demo"><input type="checkbox" id="f_rights"> <span>I own or control the rights to this song.</span></label>
+      <label class="check" data-for="artist"><input type="checkbox" id="f_consent"> <span>The team can contact me at this email about my music.</span></label>
+      <label class="check" data-for="song"><input type="checkbox" id="f_credit_ok"> <span>If you feature this song, you can credit me by first name.</span></label>
+      <label class="hp" aria-hidden="true">Website <input type="text" id="f_website" tabindex="-1" autocomplete="off"></label>
+      <p class="err" id="subErr" role="alert"></p>
+      <button class="send" id="subSend" type="submit">Send</button>
+    </form>
+    <div class="done" id="subDone" hidden>
+      <div class="stamp" style="width:120px;height:120px"><b id="doneStamp"></b></div>
+      <h2 id="doneTitle"></h2><p id="doneText"></p>
+      <button class="ghost" type="button" id="subAgain">Send another</button>
+    </div>
+  </section>
+</div>
+
+<nav class="tabs" aria-label="App"><div>
+  <a href="#spin" data-nav="spin">Spin</a>
+  <a href="#crate" data-nav="crate">Crate</a>
+  <a href="#submit" data-nav="submit">Submit</a>
+</div></nav>
+
+<div class="sheet" id="sheet" hidden><div role="dialog" aria-modal="true" aria-label="Song"></div></div>
+
+<script>
+// ============================================================ basics
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const fmt = n => n == null ? "?" : n >= 1e6 ? (n / 1e6).toFixed(1).replace(/\.0$/, "") + "M" : n >= 1e3 ? Math.round(n / 1e3) + "K" : String(Math.round(n));
+const day = iso => new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const store = { get(k) { try { return localStorage.getItem(k); } catch { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
+
+// Anonymous listener id: remembers this browser's crate and daily spins. Not an account.
+let LISTENER = store.get("ee-listener");
+if (!LISTENER) {
+  LISTENER = Array.from(crypto.getRandomValues(new Uint8Array(16)), b => b.toString(16).padStart(2, "0")).join("");
+  store.set("ee-listener", LISTENER);
+}
+async function call(path, body) {
+  const r = await fetch(path, body ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : undefined)
+    .catch(() => { throw new Error("Can't reach the server. Check your connection and try again."); });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.detail || "Something went wrong. Please try again.");
+  return data;
+}
+const root = document.documentElement;
+const setGlow = hue => root.style.setProperty("--glow", hue);
+
+// ============================================================ tabs
+function route() {
+  let tab = location.hash.slice(1);
+  if (location.pathname.startsWith("/submit/") && !tab) tab = "submit";
+  if (!["spin", "crate", "submit"].includes(tab)) tab = "spin";
+  document.querySelectorAll("[data-tab]").forEach(s => s.hidden = s.dataset.tab !== tab);
+  document.querySelectorAll("[data-nav]").forEach(a => a.dataset.nav === tab ? a.setAttribute("aria-current", "page") : a.removeAttribute("aria-current"));
+  if (tab === "crate") loadCrate();
+  if (tab === "submit") setGlow(who === "fan" ? "#4fd1c5" : "#ff7a59");
+  else if (tab === "spin" && current) setGlow(hueOf(current.wheel_genre));
+}
+window.addEventListener("hashchange", route);
+
+// ============================================================ wheel
+let WHEEL = [], rot = 0, spinning = false, current = null;
+const hueOf = name => (WHEEL.find(w => w.name === name) || {}).hue || "#ff7a59";
+const wc = $("wheel"), w = wc.getContext("2d"), R = 360;
+function drawWheel() {
+  const seg = Math.PI * 2 / WHEEL.length;
+  w.clearRect(0, 0, 720, 720);
+  WHEEL.forEach((s, i) => {
+    const a0 = -Math.PI / 2 - seg / 2 + i * seg, a1 = a0 + seg;
+    const g = w.createRadialGradient(R, R, 70, R, R, R);
+    g.addColorStop(0, s.hue + "55"); g.addColorStop(1, s.hue);
+    w.globalAlpha = s.unheard ? 1 : 0.32;
+    w.beginPath(); w.moveTo(R, R); w.arc(R, R, R - 6, a0, a1); w.closePath(); w.fillStyle = g; w.fill();
+    w.strokeStyle = "#0d0b15"; w.lineWidth = 4; w.stroke();
+    for (let r = 170; r < R - 10; r += 10) { w.beginPath(); w.arc(R, R, r, a0 + 0.02, a1 - 0.02); w.strokeStyle = "rgba(0,0,0,0.13)"; w.lineWidth = 1.2; w.stroke(); }
+    w.save(); w.translate(R, R); w.rotate(a0 + seg / 2);
+    w.fillStyle = "#120f1c"; w.font = "800 26px 'Bricolage Grotesque', system-ui, sans-serif"; w.textAlign = "right"; w.textBaseline = "middle";
+    const lines = s.name.replace(/ & /, " &\n").replace(/, /, ",\n").split("\n");
+    lines.forEach((t, k) => w.fillText(t, R - 28, (k - (lines.length - 1) / 2) * 28));
+    w.restore(); w.globalAlpha = 1;
+  });
+}
+function spinTo(index) {
+  return new Promise(done => {
+    const segDeg = 360 / WHEEL.length, from = rot;
+    const to = from - (from % 360) - 360 * 4 - index * segDeg + (Math.random() - 0.5) * segDeg * 0.6;
+    const dur = reduce ? 0 : 3800;
+    let start = 0, last = Math.floor((from + segDeg / 2) / segDeg);
+    const step = t => {
+      start ||= t;
+      const p = dur ? Math.min(1, (t - start) / dur) : 1;
+      rot = from + (to - from) * (1 - Math.pow(1 - p, 4));
+      wc.style.transform = `rotate(${rot}deg)`;
+      const s = Math.floor((rot + segDeg / 2) / segDeg);
+      if (s !== last && !reduce) { last = s; const pt = $("pointer"); pt.classList.remove("tick"); void pt.offsetWidth; pt.classList.add("tick"); try { navigator.vibrate?.(4); } catch {} }
+      if (p < 1) requestAnimationFrame(step); else done();
+    };
+    requestAnimationFrame(step);
+  });
+}
+
+async function loadState() {
+  try {
+    const s = await call(`/api/app/state?listener=${LISTENER}`);
+    WHEEL = s.wheel; drawWheel();
+    const sel = $("genre"), keep = sel.value;
+    sel.replaceChildren(new Option("Surprise me: any genre", ""), ...WHEEL.map(g => new Option(g.unheard ? g.name : `${g.name} (all heard)`, g.name)));
+    sel.value = keep;
+    $("spins").innerHTML = `<b>${s.spins_left}</b> of ${s.spins_per_day} spins left today`;
+    $("spinBtn").disabled = !s.spins_left;
+    $("notice").textContent = !s.spins_left ? "That's today's crate. New spins tomorrow." :
+      !WHEEL.some(g => g.unheard) ? "You've heard every pick so far. New ones arrive every week." : "";
+  } catch (e) { $("notice").textContent = e.message; }
+}
+if (document.fonts) document.fonts.ready.then(() => WHEEL.length && drawWheel());
+
+// ============================================================ playing a song
+const audio = new Audio();
+audio.preload = "auto";
+let heardMs = 0;
+audio.addEventListener("timeupdate", () => {
+  heardMs = Math.max(heardMs, audio.currentTime * 1000);
+  $("prog").style.width = (audio.duration ? audio.currentTime / audio.duration * 100 : 0) + "%";
+});
+audio.addEventListener("ended", () => { $("playBtn").hidden = false; $("playBtn").textContent = "↻"; });
+const vc = $("viz"), v = vc.getContext("2d");
+(function viz(t) {
+  v.clearRect(0, 0, 600, 180);
+  if (!audio.paused) {
+    const hue = getComputedStyle(root).getPropertyValue("--glow").trim();
+    for (let i = 0; i < 44; i++) {
+      const e = 0.3 + 0.7 * Math.abs(Math.sin(t / 250 + i * 0.55) * Math.sin(t / 600 + i * 0.21));
+      const h = 12 + e * 140;
+      v.globalAlpha = 0.85; v.fillStyle = i % 3 ? hue : "#ffffff"; v.fillRect(i * (600 / 44) + 2, 180 - h, 600 / 44 - 4, h);
+    }
+    v.globalAlpha = 1;
+  }
+  requestAnimationFrame(viz);
+})(0);
+function tryPlay() {
+  audio.play().then(() => { $("playBtn").hidden = true; }).catch(() => { $("playBtn").hidden = false; $("playBtn").textContent = "▶"; });
+}
+$("playBtn").onclick = () => { if (audio.ended) audio.currentTime = 0; tryPlay(); };
+
+async function doSpin() {
+  if (spinning) return;
+  spinning = true; $("spinBtn").disabled = true; $("notice").textContent = "";
+  // Unlock audio inside the tap, so the clip can start once the wheel stops (Safari needs this).
+  audio.muted = true; audio.play().catch(() => {}); audio.pause(); audio.muted = false;
+  try {
+    const pick = await call("/api/app/spin", { listener: LISTENER, genre: $("genre").value || null });
+    await spinTo(WHEEL.findIndex(g => g.name === pick.wheel_genre));
+    showSong(pick);
+  } catch (e) { $("notice").textContent = e.message; }
+  spinning = false; loadState();
+}
+$("spinBtn").onclick = doSpin;
+
+const streamLinks = p => {
+  const q = encodeURIComponent(`${p.artist_name} ${p.title}`);
+  return [[p.deezer_link, "Deezer"], [`https://open.spotify.com/search/${q}`, "Spotify"], [`https://music.apple.com/us/search?term=${q}`, "Apple Music"],
+          [`https://music.youtube.com/search?q=${q}`, "YouTube Music"]]
+    .filter(([u]) => u).map(([u, n]) => `<a href="${esc(u)}" target="_blank" rel="noopener noreferrer">${n} ↗</a>`).join("");
+};
+
+function showSong(p) {
+  current = p; heardMs = 0;
+  setGlow(hueOf(p.wheel_genre));
+  $("wheelView").hidden = true; $("songView").hidden = false;
+  $("sCover").src = p.cover_url || ""; $("sTag").textContent = p.wheel_genre;
+  $("sTitle").textContent = p.title; $("sBy").textContent = p.artist_name;
+  $("sNote").hidden = !p.note;
+  $("sNote").innerHTML = p.note ? `<small>Why we picked it${p.curator ? " · " + esc(p.curator) : ""}</small>${esc(p.note)}` : "";
+  $("choices").hidden = false; $("result").hidden = true; $("prog").style.width = "0";
+  audio.src = p.preview; tryPlay();
+  renderComments($("sComments"), p.id);
+  window.scrollTo({ top: 0, behavior: reduce ? "auto" : "smooth" });
+}
+
+async function react(verdict) {
+  const p = current;
+  $("keepBtn").disabled = $("passBtn").disabled = true;
+  try {
+    const r = await call("/api/app/react", { listener: LISTENER, pick_id: p.id, verdict, listened_ms: Math.round(heardMs) });
+    $("choices").hidden = true; $("result").hidden = false;
+    $("stamp").hidden = verdict !== "keep";
+    if (verdict === "keep") {
+      $("stName").textContent = p.artist_name;
+      $("stLine").textContent = r.audience ? `found at ${fmt(r.audience)} ${r.audience_label}` : "found early";
+      $("stDate").textContent = day(new Date());
+      $("resultText").textContent = "Stamped and in your crate. Save it wherever you listen:";
+    } else {
+      audio.pause();
+      $("resultText").textContent = "Not for you. Noted. Want to hear it somewhere else anyway?";
+    }
+    $("sLinks").innerHTML = streamLinks(p);
+  } catch (e) { $("notice").textContent = e.message; }
+  $("keepBtn").disabled = $("passBtn").disabled = false;
+  loadState();
+}
+$("keepBtn").onclick = () => react("keep");
+$("passBtn").onclick = () => react("pass");
+$("againBtn").onclick = () => { audio.pause(); $("songView").hidden = true; $("wheelView").hidden = false; current = null; };
+
+// ============================================================ comments (public, under each song)
+async function renderComments(box, pickId) {
+  box.innerHTML = `<h3>Comments</h3><div class="clist"><p class="muted" style="margin:0">Loading…</p></div>
+    <form class="cform"><input class="field" name="author" maxlength="40" placeholder="Your name (optional)" autocomplete="nickname">
+      <div class="row"><textarea class="field" name="body" maxlength="1000" placeholder="What do you hear in it?" required></textarea></div>
+      <input class="hp" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
+      <p class="err" role="alert"></p><button class="primary" type="submit">Post comment</button></form>`;
+  const list = box.querySelector(".clist"), form = box.querySelector("form"), err = form.querySelector(".err");
+  form.author.value = store.get("ee-name") || "";
+  const draw = rows => {
+    list.innerHTML = rows.length ? rows.map(c => `<div class="c"><div class="who"><b>${esc(c.author)}</b>${day(c.created_at)}</div><p>${esc(c.body)}</p></div>`).join("")
+      : `<p class="muted" style="margin:0">No comments yet. Be the first to say what you hear.</p>`;
+  };
+  try { draw(await call(`/api/app/picks/${pickId}/comments`)); } catch (e) { list.innerHTML = `<p class="err">${esc(e.message)}</p>`; }
+  form.onsubmit = async e => {
+    e.preventDefault();
+    const btn = form.querySelector("button"); btn.disabled = true; err.textContent = "";
+    store.set("ee-name", form.author.value.trim());
+    try {
+      await call(`/api/app/picks/${pickId}/comments`, { listener: LISTENER, author: form.author.value, body: form.body.value, website: form.website.value });
+      form.body.value = ""; draw(await call(`/api/app/picks/${pickId}/comments`));
+    } catch (ex) { err.textContent = ex.message; }
+    btn.disabled = false;
+  };
+}
+
+// ============================================================ crate
+async function loadCrate() {
+  const grid = $("crate");
+  try {
+    const rows = await call(`/api/app/crate?listener=${LISTENER}`);
+    $("crateSub").textContent = rows.length ? `${rows.length} ${rows.length === 1 ? "song" : "songs"} kept. Tap one for links and comments.` : "";
+    if (!rows.length) { grid.innerHTML = `<div class="empty" style="grid-column:1/-1">Nothing here yet. Spin the wheel and keep a song you love; it lands here with the date you found it.</div>`; return; }
+    grid.replaceChildren(...rows.map(p => {
+      const b = document.createElement("button");
+      b.className = "rec"; b.type = "button";
+      const growth = p.growth != null && p.growth > 0.01 ? `<span class="up">+${Math.round(p.growth * 100)}% since your stamp</span>` : "";
+      b.innerHTML = `<div class="art">${p.cover_url ? `<img src="${esc(p.cover_url)}" alt="" loading="lazy">` : ""}</div>
+        <b>${esc(p.artist_name)}</b><span>${esc(p.title)}</span><span>${day(p.kept_at)}${p.audience_at ? " · " + fmt(p.audience_at) : ""}</span>${growth}`;
+      b.onclick = () => openSheet(p);
+      return b;
+    }));
+  } catch (e) { grid.innerHTML = `<div class="empty" style="grid-column:1/-1">${esc(e.message)}</div>`; }
+}
+function openSheet(p) {
+  const s = $("sheet"), box = s.firstElementChild;
+  setGlow(hueOf(p.wheel_genre));
+  box.innerHTML = `<button class="ghost close" type="button">Close</button>
+    <div style="display:grid;grid-template-columns:96px minmax(0,1fr);gap:14px;align-items:center">
+      <img src="${esc(p.cover_url || "")}" alt="" style="width:96px;height:96px;border-radius:14px;object-fit:cover">
+      <div><h2 style="margin:0;font:800 1.4rem/1.05 var(--display)">${esc(p.title)}</h2><p class="muted" style="margin:4px 0 0">${esc(p.artist_name)} · ${esc(p.wheel_genre)}</p>
+      <p class="muted" style="margin:2px 0 0;font:0.75rem var(--mono)">Stamped ${day(p.kept_at)}${p.audience_at ? ` at ${fmt(p.audience_at)} ${esc(p.audience_label)}` : ""}</p></div></div>
+    ${p.note ? `<p class="note"><small>Why we picked it</small>${esc(p.note)}</p>` : ""}
+    <div class="outlinks" style="justify-content:flex-start">${streamLinks(p)}</div><div class="comments"></div>`;
+  s.hidden = false;
+  const close = () => { s.hidden = true; if (current) setGlow(hueOf(current.wheel_genre)); };
+  box.querySelector(".close").onclick = close;
+  s.onclick = e => { if (e.target === s) close(); };
+  document.onkeydown = e => { if (e.key === "Escape" && !s.hidden) close(); };
+  renderComments(box.querySelector(".comments"), p.id);
+  box.querySelector(".close").focus();
+}
+
+// ============================================================ submit
+const GENRES = ["Indie rock", "Indie pop / dream pop", "Post-punk / shoegaze", "Folk / singer-songwriter", "Country / Americana",
+  "Electronic", "R&B / soul", "Hip-hop / rap", "Pop", "Experimental", "Other"];
+$("genreChips").innerHTML = GENRES.map((g, i) => `<label><input type="radio" name="genre" value="${g}" id="gc${i}"><span>${g}</span></label>`).join("");
+let who = location.pathname.startsWith("/submit/artist") ? "artist" : "fan";
+let topic = who === "fan" ? "song" : "demo";
+const SUBCOPY = {
+  fan: { eyebrow: "For fans", title: "Share a song you <span>love</span>",
+    lede: "Found something great that more people should hear? Our team listens to every one, and the best finds may end up on the wheel or in our newsletter.",
+    link: "(Spotify, Apple Music, SoundCloud, YouTube or Bandcamp)" },
+  artist: { eyebrow: "For artists", title: "Send us your <span>music</span>",
+    lede: "Our A&R team listens to every demo. Send one song you're proud of, or message the team directly. We reply to the ones we want to hear more from, usually within two weeks.",
+    link: "(SoundCloud, private links, Dropbox, Google Drive or YouTube; make sure it opens without a login)" },
+};
+function showSub() {
+  const fan = who === "fan", msg = topic === "message", c = SUBCOPY[who];
+  setGlow(fan ? "#4fd1c5" : "#ff7a59");
+  document.querySelectorAll("[data-who]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.who === who)));
+  document.querySelectorAll("[data-topic]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.topic === topic)));
+  document.querySelectorAll("#subForm [data-for]").forEach(el => { el.hidden = !el.dataset.for.split(" ").some(t => t === topic || t === who); });
+  $("subEyebrow").textContent = c.eyebrow; $("subTitle").innerHTML = c.title; $("subLede").textContent = c.lede; $("linkHint").textContent = c.link;
+  $("artistLabel").textContent = fan ? "Artist" : "Artist or band name";
+  $("msgLabel").textContent = fan ? "Why do you love it?" : msg ? "Your message" : "Anything we should know?";
+  $("msgHint").textContent = fan ? "(optional)" : msg ? "" : "(optional: the story behind it, upcoming releases, shows)";
+  $("nameLabel").textContent = fan ? "Your name (optional)" : "Your name";
+  $("emailLabel").textContent = fan ? "Your email (optional)" : "Your email";
+  $("subSend").textContent = fan ? "Share this song" : msg ? "Send message" : "Send demo";
+}
+document.querySelectorAll("[data-who]").forEach(b => b.onclick = () => { who = b.dataset.who; topic = who === "fan" ? "song" : "demo"; $("subErr").textContent = ""; showSub(); });
+document.querySelectorAll("[data-topic]").forEach(b => b.onclick = () => { topic = b.dataset.topic; $("subErr").textContent = ""; showSub(); });
+$("subForm").onsubmit = async e => {
+  e.preventDefault();
+  const val = id => $(id).value.trim() || null, msg = topic === "message";
+  const body = {
+    kind: who, topic, name: val("f_name"), email: val("f_email"),
+    artist_name: msg ? val("f_artist_name_msg") : val("f_artist_name"), song_title: msg ? null : val("f_song_title"),
+    link: msg ? null : val("f_link"), genre: msg ? null : document.querySelector("input[name=genre]:checked")?.value || null,
+    location: topic === "demo" ? val("f_location") : null, socials: topic === "demo" ? val("f_socials") : null,
+    message: val("f_message"), consent: $("f_consent").checked, rights: $("f_rights").checked, credit_ok: $("f_credit_ok").checked,
+    website: val("f_website"),
+  };
+  $("subSend").disabled = true; $("subErr").textContent = "";
+  try {
+    await call("/api/submit", body);
+    const fan = who === "fan";
+    $("doneStamp").textContent = fan ? "Shared" : msg ? "Sent" : "Got it";
+    $("doneTitle").textContent = fan ? "Thanks for the tip." : "Thanks. It's in.";
+    $("doneText").textContent = fan ? `We'll give ${body.artist_name} a listen. If it makes the cut, it could end up on the wheel.`
+      : msg ? "Someone from the team will read it and reply by email if it's a fit."
+            : `We'll listen to "${body.song_title}". If we want to hear more, we'll email you at ${body.email}.`;
+    $("subForm").hidden = true; $("subDone").hidden = false;
+  } catch (ex) { $("subErr").textContent = ex.message; }
+  $("subSend").disabled = false;
+};
+$("subAgain").onclick = () => { $("subForm").reset(); $("subDone").hidden = true; $("subForm").hidden = false; showSub(); };
+
+// ============================================================ boot
+showSub();
+loadState();
+route();
+</script>
+</body>
+</html>

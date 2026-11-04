@@ -30,6 +30,13 @@ accelerating: after her Oct 16, 2026 album, her daily gains ran **3.6× faster o
 - **Movers this week**, a **pipeline board** (watching → contacted → meeting → signed / passed) with owners and due
   dates, **side-by-side comparison**, CSV export and a help page.
 - **Discovery** by similar artists, scene tags, curated playlists, new releases and country charts.
+- **A public discovery app** at `/app` (no sign-in): spin a genre wheel, hear a 30-second Deezer clip of a song the
+  team picked, keep or pass, and collect kept songs in a crate that shows how much each artist has grown since.
+  Every song has a public comment section. Its Submit tab (also at `/submit/artist` and `/submit/fan`) takes demos
+  and messages from artists and songs fans want to share.
+- **Running it from the dashboard**: the **Discovery app** page adds songs to the wheel and shows plays, keep rate,
+  listen time and comments for each, with moderation for public comments. **Submissions** collects everything sent
+  in. Picks and submissions each get a private team comment thread.
 - **Three front ends over one core**: a web dashboard, a CLI, and an MCP server so Claude can do the research in
   conversation ("find artists like Fcukers with under 20k YouTube subscribers and tell me who's unsigned").
 

@@ -65,6 +65,15 @@ def top_tracks(deezer_id: int, limit: int = 10) -> list[dict]:
     return _data(f"/artist/{deezer_id}/top", limit=limit)
 
 
+def track(track_id: int, fresh: bool = False) -> dict | None:
+    """One track: title, preview (a 30-second MP3 whose signed URL expires in minutes, so play from a fresh
+    lookup), album cover, link and ISRC."""
+    payload = get_json(f"{BASE}/track/{track_id}", cache=not fresh)
+    if not payload or "error" in payload:
+        return None
+    return payload
+
+
 def genres() -> list[dict]:
     return _data("/genre")
 

@@ -53,6 +53,9 @@ Reported beside the score, not in it:
   owner, next step and due date. Use `archive_artist` for dead ends: it hides them everywhere, stops their daily
   snapshot and keeps discovery from re-adding them. There is no delete tool on purpose; deleting is done by a
   person on the dashboard.
+- For "what happened this week?", use `weekly_digest`: accelerating artists, top movers (accounts under review left
+  out), tracked artists' new releases, pipeline steps due, artists added. `save_search` keeps a discovery search
+  rerunning about weekly with the daily job (Deezer/Last.fm only, no YouTube quota).
 - Name thin or missing data plainly (e.g. "no YouTube channel linked", "only 1 snapshot").
 - MusicBrainz YouTube links are community-edited and sometimes wrong. On a "YouTube count looks off" flag, run
   `recheck_youtube`, or `set_youtube_channel` with the right URL; both delete the old channel's YouTube history.

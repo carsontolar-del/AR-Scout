@@ -11,7 +11,7 @@ from pydantic import BaseModel
 
 from contextlib import asynccontextmanager
 
-from .. import db, scheduler, service
+from .. import db, game, scheduler, service, submissions
 from ..http import SourceError
 from . import auth
 
@@ -26,8 +26,9 @@ async def lifespan(_app: FastAPI):
 
 app = FastAPI(title="AR Scout", lifespan=lifespan)
 
-# Reachable without signing in.
-PUBLIC = {"/login", "/api/login", "/favicon.svg", "/favicon.ico"}
+# Reachable without signing in: the public discovery app (/app, with its submission links) and what it calls.
+PUBLIC = {"/login", "/api/login", "/favicon.svg", "/favicon.ico", "/app", "/submit/artist", "/submit/fan", "/api/submit"}
+PUBLIC_PREFIX = "/api/app/"
 
 
 @app.middleware("http")
@@ -36,7 +37,7 @@ async def require_sign_in(request: Request, call_next):
         request.state.role = "admin"  # local use: no login, everything allowed
         return await call_next(request)
     request.state.role = auth.read_token(request.cookies.get(auth.COOKIE))
-    if request.state.role or request.url.path in PUBLIC:
+    if request.state.role or request.url.path in PUBLIC or request.url.path.startswith(PUBLIC_PREFIX):
         return await call_next(request)
     if request.url.path.startswith("/api/"):
         return JSONResponse({"detail": "Sign in first"}, status_code=401)
@@ -242,6 +243,11 @@ def delete(artist_id: int):
         raise HTTPException(404, str(exc)) from exc
 
 
+@app.get("/api/digest")
+def digest(days: int = 7):
+    return service.weekly_digest(days)
+
+
 @app.get("/api/review")
 def review():
     return service.review_queue()
@@ -290,18 +296,37 @@ def note(body: NoteIn):
 
 @app.post("/api/discover")
 def discover(body: DiscoverIn):
-    q, kw = body.query.strip(), dict(min_fans=body.min_fans, max_fans=body.max_fans, limit=body.limit)
-    if body.mode == "similar":
-        return service.discover_similar([s.strip() for s in q.split(",") if s.strip()], **kw)
-    if body.mode == "tag":
-        return service.discover_by_tag(q, **kw)
-    if body.mode == "country":
-        return service.discover_by_country(q, **kw)
-    if body.mode == "playlists":
-        return service.discover_playlists(q, **kw)
-    if body.mode == "new":
-        return service.discover_new_releases(q or None, **kw)
-    raise HTTPException(400, f"unknown mode {body.mode}")
+    try:
+        return service.discover(body.mode, body.query, body.min_fans, body.max_fans, body.limit)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@app.get("/api/searches")
+def searches():
+    return db.saved_searches()
+
+
+@app.post("/api/searches")
+def save_search(body: DiscoverIn):
+    try:
+        return service.save_search(body.mode, body.query, body.min_fans, body.max_fans, body.limit)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@app.post("/api/searches/{search_id}/run")
+def run_search(search_id: int):
+    try:
+        return service.run_saved_search(search_id)
+    except (SourceError, ValueError) as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@app.delete("/api/searches/{search_id}")
+def delete_search(search_id: int):
+    db.delete_search(search_id)
+    return {"ok": True}
 
 
 @app.post("/api/snapshot", dependencies=[Depends(admin_only)])
@@ -321,3 +346,233 @@ async def upload_database(request: Request):
 @app.post("/api/relink", dependencies=[Depends(admin_only)])
 def relink():
     return service.relink_all()
+
+
+# ---------------------------------------------------------------- public submission links
+
+class SubmitIn(BaseModel):
+    kind: str            # artist | fan
+    topic: str           # demo | message | song
+    name: str | None = None
+    email: str | None = None
+    artist_name: str | None = None
+    song_title: str | None = None
+    link: str | None = None
+    genre: str | None = None
+    location: str | None = None
+    socials: str | None = None
+    message: str | None = None
+    consent: bool = False
+    rights: bool = False
+    credit_ok: bool = False
+    website: str | None = None  # hidden field people never see; bots fill it in
+
+
+class SubmissionIn(BaseModel):
+    status: str | None = None
+    team_note: str | None = None
+
+
+@app.get("/app")
+@app.get("/submit/artist")
+@app.get("/submit/fan")
+def app_page():
+    """The discovery app. /submit/artist and /submit/fan open it on the matching Submit tab."""
+    return FileResponse(STATIC / "app.html", headers={"Cache-Control": "no-cache"})
+
+
+@app.post("/api/submit")
+def submit(body: SubmitIn, request: Request):
+    if body.website:  # a bot: pretend it worked, store nothing
+        return {"ok": True}
+    addr = request.client.host if request.client else "?"
+    if auth.too_many("submission", addr):
+        raise HTTPException(429, "That's a lot of submissions in a short time. Please try again in an hour.")
+    try:
+        submissions.submit(body.kind, body.topic, body.model_dump())
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    auth.record("submission", addr)
+    return {"ok": True}  # the stored row stays private to the team
+
+
+@app.get("/api/submissions")
+def list_submissions(kind: str | None = None, status: str | None = None):
+    return {"rows": db.submissions(kind or None, status or None), "new": submissions.counts(),
+            "statuses": submissions.STATUSES}
+
+
+@app.patch("/api/submissions/{submission_id}")
+def update_submission(submission_id: int, body: SubmissionIn):
+    try:
+        return submissions.update(submission_id, body.status, body.team_note)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@app.delete("/api/submissions/{submission_id}", dependencies=[Depends(admin_only)])
+def delete_submission(submission_id: int):
+    db.delete_submission(submission_id)
+    return {"ok": True}
+
+
+# ---------------------------------------------------------------- discovery app: public (no sign-in)
+
+class SpinIn(BaseModel):
+    listener: str
+    genre: str | None = None
+
+
+class ReactIn(BaseModel):
+    listener: str
+    pick_id: int
+    verdict: str
+    listened_ms: int | None = None
+
+
+class PublicCommentIn(BaseModel):
+    listener: str
+    author: str | None = None
+    body: str
+    website: str | None = None  # bots only
+
+
+def _bad_request(fn, *args, **kwargs):
+    try:
+        return fn(*args, **kwargs)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@app.get("/api/app/state")
+def app_state(listener: str):
+    return _bad_request(game.state, listener)
+
+
+@app.post("/api/app/spin")
+def app_spin(body: SpinIn):
+    return _bad_request(game.spin, body.listener, body.genre or None)
+
+
+@app.post("/api/app/react")
+def app_react(body: ReactIn):
+    return _bad_request(game.react, body.listener, body.pick_id, body.verdict, body.listened_ms)
+
+
+@app.get("/api/app/crate")
+def app_crate(listener: str):
+    return _bad_request(game.crate, listener)
+
+
+@app.get("/api/app/picks/{pick_id}/comments")
+def app_comments(pick_id: int):
+    return game.public_comments(pick_id)
+
+
+@app.post("/api/app/picks/{pick_id}/comments")
+def app_add_comment(pick_id: int, body: PublicCommentIn, request: Request):
+    if body.website:
+        return {"ok": True}
+    addr = request.client.host if request.client else "?"
+    if auth.too_many("comment", addr):
+        raise HTTPException(429, "That's a lot of comments in a short time. Please try again in an hour.")
+    out = _bad_request(game.add_public_comment, body.listener, pick_id, body.author, body.body)
+    auth.record("comment", addr)
+    return out
+
+
+# ---------------------------------------------------------------- discovery app: team side
+
+class PickIn(BaseModel):
+    artist_id: int
+    deezer_track_id: int
+    wheel_genre: str
+    curator: str | None = None
+    note: str | None = None
+    submission_id: int | None = None
+
+
+class PickUpdateIn(BaseModel):
+    status: str | None = None
+    note: str | None = None
+    wheel_genre: str | None = None
+    curator: str | None = None
+
+
+class TeamCommentIn(BaseModel):
+    target: str        # pick | submission
+    target_id: int
+    author: str | None = None
+    body: str
+
+
+class HideIn(BaseModel):
+    hidden: bool = True
+
+
+@app.get("/api/picks")
+def list_picks():
+    return {"rows": game.picks(), "wheel": [{"name": n, "hue": h} for n, h in game.WHEEL]}
+
+
+@app.get("/api/artist/{artist_id}/tracks")
+def artist_tracks(artist_id: int):
+    try:
+        return game.artist_tracks(artist_id)
+    except (ValueError, SourceError) as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@app.post("/api/picks")
+def add_pick(body: PickIn):
+    try:
+        return game.add_pick(body.artist_id, body.deezer_track_id, body.wheel_genre, body.curator, body.note,
+                             body.submission_id)
+    except (ValueError, SourceError) as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@app.patch("/api/picks/{pick_id}")
+def update_pick(pick_id: int, body: PickUpdateIn):
+    return _bad_request(game.update_pick, pick_id, **{k: getattr(body, k) for k in body.model_fields_set})
+
+
+@app.delete("/api/picks/{pick_id}", dependencies=[Depends(admin_only)])
+def delete_pick(pick_id: int):
+    db.delete_pick(pick_id)
+    return {"ok": True}
+
+
+@app.get("/api/comments")
+def list_comments(target: str, target_id: int, scope: str = "team"):
+    if scope not in ("team", "public"):
+        raise HTTPException(400, "scope must be team or public")
+    return db.comments(target, target_id, scope, include_hidden=True)
+
+
+@app.get("/api/comments/public")
+def public_comment_feed():
+    return game.moderation_feed()
+
+
+@app.post("/api/comments")
+def add_team_comment(body: TeamCommentIn):
+    return _bad_request(game.add_team_comment, body.target, body.target_id, body.author, body.body)
+
+
+@app.patch("/api/comments/{comment_id}")
+def hide_comment(comment_id: int, body: HideIn):
+    if not db.get_comment(comment_id):
+        raise HTTPException(404, "That comment no longer exists.")
+    db.set_comment_hidden(comment_id, body.hidden)
+    return db.get_comment(comment_id)
+
+
+@app.delete("/api/comments/{comment_id}")
+def delete_comment(comment_id: int):
+    """Team comments only. Public comments are hidden instead, so there's a record of what was removed."""
+    c = db.get_comment(comment_id)
+    if c and c["scope"] != "team":
+        raise HTTPException(400, "Public comments can be hidden, not deleted.")
+    db.delete_comment(comment_id)
+    return {"ok": True}

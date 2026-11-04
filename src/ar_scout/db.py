@@ -42,6 +42,8 @@ CREATE TABLE IF NOT EXISTS artists (
     mgmt_evidence   TEXT,           -- the bio line that mentions management
     management      TEXT,           -- managed | unmanaged, set by a person (wins over mgmt_auto)
     archived_at     TEXT,           -- hidden from rankings and daily snapshots, history kept
+    latest_title    TEXT,           -- title and type (album, single, ep) of the latest release
+    latest_type     TEXT,
     lastfm_source   TEXT,           -- manual when a person picked the Last.fm artist
     deezer_source   TEXT,           -- manual when a person picked the Deezer artist
     created_at      TEXT NOT NULL,
@@ -74,6 +76,90 @@ CREATE TABLE IF NOT EXISTS notes (
     body       TEXT NOT NULL,
     created_at TEXT NOT NULL
 );
+
+-- Discovery searches that rerun about weekly (see service.run_due_searches).
+CREATE TABLE IF NOT EXISTS saved_searches (
+    id          INTEGER PRIMARY KEY,
+    mode        TEXT NOT NULL,     -- similar | tag | country | playlists | new
+    query       TEXT NOT NULL DEFAULT '',
+    min_fans    INTEGER NOT NULL,
+    max_fans    INTEGER NOT NULL,
+    lim         INTEGER NOT NULL,
+    created_at  TEXT NOT NULL,
+    last_run    TEXT,
+    last_found  INTEGER,           -- artists the last run returned
+    last_new    INTEGER            -- of those, first seen by that run
+);
+
+-- Demos and messages from artists, and songs fans want to share, sent through the public links (/submit/...).
+CREATE TABLE IF NOT EXISTS submissions (
+    id          INTEGER PRIMARY KEY,
+    kind        TEXT NOT NULL,     -- artist | fan
+    topic       TEXT NOT NULL,     -- demo | message (artists); song (fans)
+    name        TEXT,              -- who sent it (optional for fans)
+    email       TEXT,              -- required for artists, optional for fans
+    artist_name TEXT,
+    song_title  TEXT,
+    link        TEXT,
+    genre       TEXT,
+    location    TEXT,
+    socials     TEXT,
+    message     TEXT,
+    credit_ok   INTEGER NOT NULL DEFAULT 0,  -- fan agreed to be credited by first name if featured
+    status      TEXT NOT NULL DEFAULT 'new', -- new | listened | shortlisted | replied | passed
+    team_note   TEXT,
+    created_at  TEXT NOT NULL,
+    updated_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_submissions ON submissions(kind, status, created_at);
+
+-- Songs the team approved for the public discovery app (/app). The preview clip URL expires, so it's fetched
+-- from Deezer each time a pick is played rather than stored.
+CREATE TABLE IF NOT EXISTS picks (
+    id              INTEGER PRIMARY KEY,
+    artist_id       INTEGER NOT NULL REFERENCES artists(id) ON DELETE CASCADE,
+    deezer_track_id INTEGER NOT NULL UNIQUE,
+    title           TEXT NOT NULL,
+    artist_name     TEXT NOT NULL,
+    wheel_genre     TEXT NOT NULL,
+    cover_url       TEXT,
+    deezer_link     TEXT,
+    isrc            TEXT,
+    curator         TEXT,
+    note            TEXT,           -- "why we picked it", shown to listeners
+    status          TEXT NOT NULL DEFAULT 'live',  -- live | retired
+    submission_id   INTEGER,        -- the submission it came from, if any
+    created_at      TEXT NOT NULL,
+    updated_at      TEXT NOT NULL
+);
+
+-- One listener's keep or pass on one pick. Listeners are anonymous ids the app makes in the browser.
+CREATE TABLE IF NOT EXISTS reactions (
+    pick_id         INTEGER NOT NULL REFERENCES picks(id) ON DELETE CASCADE,
+    listener        TEXT NOT NULL,
+    verdict         TEXT NOT NULL,  -- keep | pass
+    listened_ms     INTEGER,
+    audience_at     REAL,           -- the artist's audience when kept, for "found them at..."
+    audience_metric TEXT,
+    created_at      TEXT NOT NULL,
+    PRIMARY KEY (pick_id, listener)
+);
+CREATE INDEX IF NOT EXISTS idx_reactions_listener ON reactions(listener, created_at);
+
+-- Comment threads. Public ones sit under picks in the app; team ones are private to the dashboard and can be on
+-- a pick or a submission.
+CREATE TABLE IF NOT EXISTS comments (
+    id          INTEGER PRIMARY KEY,
+    target      TEXT NOT NULL,      -- pick | submission
+    target_id   INTEGER NOT NULL,
+    scope       TEXT NOT NULL,      -- public | team
+    author      TEXT NOT NULL,
+    listener    TEXT,               -- the app listener who wrote a public comment
+    body        TEXT NOT NULL,
+    hidden_at   TEXT,               -- set when the team hides a public comment
+    created_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_comments ON comments(target, target_id, scope, created_at);
 
 -- A counter bumped by triggers on every change to the data scores depend on, from any process (dashboard, daily
 -- job, MCP server). Cached leaderboards are reused while it stays the same.
@@ -133,7 +219,7 @@ def _prepare(conn: sqlite3.Connection) -> None:
 _ADDED_COLUMNS = {
     "artists": ("resolved_at", "youtube_source", "instagram_username", "instagram_source", "youtube_title",
                 "verified_at", "instagram_bio", "mgmt_auto", "mgmt_evidence", "management", "archived_at",
-                "lastfm_source", "deezer_source"),
+                "lastfm_source", "deezer_source", "latest_title", "latest_type"),
     "watchlist": ("status_since", "owner", "next_step", "next_date"),
 }
 
@@ -281,6 +367,207 @@ def replace_with(upload: Path) -> dict:
     upload.replace(settings.db_path)
     _prepared.discard(str(settings.db_path))  # upgrade the uploaded file's schema on next use
     return counts
+
+
+def save_search(mode: str, query: str, min_fans: int, max_fans: int, lim: int) -> int:
+    with connect() as c:
+        existing = c.execute("SELECT id FROM saved_searches WHERE mode = ? AND lower(query) = lower(?) AND min_fans = ? "
+                             "AND max_fans = ?", (mode, query, min_fans, max_fans)).fetchone()
+        if existing:
+            return existing["id"]
+        return c.execute("INSERT INTO saved_searches (mode, query, min_fans, max_fans, lim, created_at) "
+                         "VALUES (?, ?, ?, ?, ?, ?)", (mode, query, min_fans, max_fans, lim, now())).lastrowid
+
+
+def saved_searches() -> list[dict]:
+    with connect() as c:
+        return [dict(r) for r in c.execute("SELECT * FROM saved_searches ORDER BY created_at")]
+
+
+def saved_search(search_id: int) -> dict | None:
+    with connect() as c:
+        row = c.execute("SELECT * FROM saved_searches WHERE id = ?", (search_id,)).fetchone()
+    return dict(row) if row else None
+
+
+def record_search_run(search_id: int, found: int, new: int) -> None:
+    with connect() as c:
+        c.execute("UPDATE saved_searches SET last_run = ?, last_found = ?, last_new = ? WHERE id = ?",
+                  (now(), found, new, search_id))
+
+
+def delete_search(search_id: int) -> None:
+    with connect() as c:
+        c.execute("DELETE FROM saved_searches WHERE id = ?", (search_id,))
+
+
+SUBMISSION_FIELDS = ("kind", "topic", "name", "email", "artist_name", "song_title", "link", "genre", "location",
+                     "socials", "message", "credit_ok")
+
+
+def add_submission(fields: dict[str, Any]) -> int:
+    cols = [k for k in SUBMISSION_FIELDS if k in fields]
+    with connect() as c:
+        cur = c.execute(
+            f"INSERT INTO submissions ({', '.join(cols)}, created_at, updated_at) "
+            f"VALUES ({', '.join('?' for _ in cols)}, ?, ?)", (*[fields[k] for k in cols], now(), now()))
+        return cur.lastrowid
+
+
+def get_submission(submission_id: int) -> dict | None:
+    with connect() as c:
+        row = c.execute("SELECT * FROM submissions WHERE id = ?", (submission_id,)).fetchone()
+    return dict(row) if row else None
+
+
+def submissions(kind: str | None = None, status: str | None = None, limit: int = 500) -> list[dict]:
+    """Newest first."""
+    where, args = [], []
+    if kind:
+        where.append("kind = ?"); args.append(kind)
+    if status:
+        where.append("status = ?"); args.append(status)
+    sql = "SELECT * FROM submissions" + (f" WHERE {' AND '.join(where)}" if where else "")
+    with connect() as c:
+        return [dict(r) for r in c.execute(sql + " ORDER BY created_at DESC, id DESC LIMIT ?", (*args, limit))]
+
+
+def update_submission(submission_id: int, **fields: Any) -> None:
+    fields = {k: v for k, v in fields.items() if k in ("status", "team_note")}
+    if not fields:
+        return
+    sets = ", ".join(f"{k} = ?" for k in fields)
+    with connect() as c:
+        c.execute(f"UPDATE submissions SET {sets}, updated_at = ? WHERE id = ?", (*fields.values(), now(), submission_id))
+
+
+def delete_submission(submission_id: int) -> None:
+    with connect() as c:
+        c.execute("DELETE FROM submissions WHERE id = ?", (submission_id,))
+        c.execute("DELETE FROM comments WHERE target = 'submission' AND target_id = ?", (submission_id,))
+
+
+# ---------------------------------------------------------------- discovery app: picks, reactions, comments
+
+def add_pick(fields: dict[str, Any]) -> int:
+    with connect() as c:
+        cols = list(fields)
+        cur = c.execute(
+            f"INSERT INTO picks ({', '.join(cols)}, created_at, updated_at) VALUES ({', '.join('?' for _ in cols)}, ?, ?)",
+            (*fields.values(), now(), now()))
+        return cur.lastrowid
+
+
+def get_pick(pick_id: int) -> dict | None:
+    with connect() as c:
+        row = c.execute("SELECT * FROM picks WHERE id = ?", (pick_id,)).fetchone()
+    return dict(row) if row else None
+
+
+def update_pick(pick_id: int, **fields: Any) -> None:
+    fields = {k: v for k, v in fields.items() if k in ("status", "note", "wheel_genre", "curator")}
+    if not fields:
+        return
+    sets = ", ".join(f"{k} = ?" for k in fields)
+    with connect() as c:
+        c.execute(f"UPDATE picks SET {sets}, updated_at = ? WHERE id = ?", (*fields.values(), now(), pick_id))
+
+
+def delete_pick(pick_id: int) -> None:
+    with connect() as c:
+        c.execute("DELETE FROM picks WHERE id = ?", (pick_id,))
+        c.execute("DELETE FROM comments WHERE target = 'pick' AND target_id = ?", (pick_id,))
+
+
+def picks_with_stats() -> list[dict]:
+    """Every pick, newest first, with plays (reactions), keeps, average listen time and visible public comments."""
+    with connect() as c:
+        return [dict(r) for r in c.execute(
+            "SELECT p.*, "
+            " (SELECT count(*) FROM reactions r WHERE r.pick_id = p.id) AS plays, "
+            " (SELECT count(*) FROM reactions r WHERE r.pick_id = p.id AND r.verdict = 'keep') AS keeps, "
+            " (SELECT avg(listened_ms) FROM reactions r WHERE r.pick_id = p.id) AS avg_listened_ms, "
+            " (SELECT count(*) FROM comments m WHERE m.target = 'pick' AND m.target_id = p.id AND m.scope = 'public' "
+            "  AND m.hidden_at IS NULL) AS comments "
+            "FROM picks p ORDER BY p.created_at DESC, p.id DESC")]
+
+
+def unheard_picks(listener: str, genre: str | None = None) -> list[dict]:
+    """Live picks this listener hasn't reacted to yet, optionally in one wheel genre."""
+    sql = ("SELECT * FROM picks p WHERE status = 'live' AND NOT EXISTS "
+           "(SELECT 1 FROM reactions r WHERE r.pick_id = p.id AND r.listener = ?)")
+    args: list = [listener]
+    if genre:
+        sql += " AND wheel_genre = ?"; args.append(genre)
+    with connect() as c:
+        return [dict(r) for r in c.execute(sql, args)]
+
+
+def save_reaction(pick_id: int, listener: str, verdict: str, listened_ms: int | None,
+                  audience_at: float | None, audience_metric: str | None) -> None:
+    with connect() as c:
+        c.execute("INSERT INTO reactions (pick_id, listener, verdict, listened_ms, audience_at, audience_metric, created_at) "
+                  "VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT (pick_id, listener) DO UPDATE SET verdict = excluded.verdict, "
+                  "listened_ms = excluded.listened_ms",
+                  (pick_id, listener, verdict, listened_ms, audience_at, audience_metric, now()))
+
+
+def reactions_since(listener: str, since: str) -> int:
+    with connect() as c:
+        return c.execute("SELECT count(*) FROM reactions WHERE listener = ? AND created_at >= ?",
+                         (listener, since)).fetchone()[0]
+
+
+def kept(listener: str) -> list[dict]:
+    with connect() as c:
+        return [dict(r) for r in c.execute(
+            "SELECT p.*, r.audience_at, r.audience_metric, r.created_at AS kept_at FROM reactions r "
+            "JOIN picks p ON p.id = r.pick_id WHERE r.listener = ? AND r.verdict = 'keep' ORDER BY r.created_at DESC",
+            (listener,))]
+
+
+def add_comment(target: str, target_id: int, scope: str, author: str, body: str, listener: str | None = None) -> int:
+    with connect() as c:
+        return c.execute("INSERT INTO comments (target, target_id, scope, author, listener, body, created_at) "
+                         "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                         (target, target_id, scope, author, listener, body, now())).lastrowid
+
+
+def get_comment(comment_id: int) -> dict | None:
+    with connect() as c:
+        row = c.execute("SELECT * FROM comments WHERE id = ?", (comment_id,)).fetchone()
+    return dict(row) if row else None
+
+
+def comments(target: str | None = None, target_id: int | None = None, scope: str | None = None,
+             include_hidden: bool = False, limit: int = 500) -> list[dict]:
+    """Oldest first within a thread; newest first for a feed across targets (no target_id)."""
+    where, args = [], []
+    for col, val in (("target", target), ("target_id", target_id), ("scope", scope)):
+        if val is not None:
+            where.append(f"{col} = ?"); args.append(val)
+    if not include_hidden:
+        where.append("hidden_at IS NULL")
+    order = "ASC" if target_id is not None else "DESC"
+    sql = "SELECT * FROM comments" + (f" WHERE {' AND '.join(where)}" if where else "")
+    with connect() as c:
+        return [dict(r) for r in c.execute(sql + f" ORDER BY created_at {order}, id {order} LIMIT ?", (*args, limit))]
+
+
+def comments_since(listener: str, since: str) -> int:
+    with connect() as c:
+        return c.execute("SELECT count(*) FROM comments WHERE listener = ? AND created_at >= ?",
+                         (listener, since)).fetchone()[0]
+
+
+def set_comment_hidden(comment_id: int, hidden: bool) -> None:
+    with connect() as c:
+        c.execute("UPDATE comments SET hidden_at = ? WHERE id = ?", (now() if hidden else None, comment_id))
+
+
+def delete_comment(comment_id: int) -> None:
+    with connect() as c:
+        c.execute("DELETE FROM comments WHERE id = ?", (comment_id,))
 
 
 def data_version() -> int:

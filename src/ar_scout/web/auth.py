@@ -93,3 +93,25 @@ def record_failure(addr: str) -> None:
     with _lock:
         for key in (addr, "*"):
             _failures.setdefault(key, []).append(time.time())
+
+
+# Posts from the public app (submissions, comments): (per address, from everyone together) per hour.
+MAX_SUBMISSIONS = 10
+PUBLIC_LIMITS = {"submission": (MAX_SUBMISSIONS, 300), "comment": (20, 600)}
+PUBLIC_WINDOW = 60 * 60
+_posts: dict[tuple[str, str], list[float]] = {}
+
+
+def too_many(kind: str, addr: str) -> bool:
+    per_addr, everyone = PUBLIC_LIMITS[kind]
+    now = time.time()
+    with _lock:
+        for key in ((kind, addr), (kind, "*")):
+            _posts[key] = [t for t in _posts.get(key, []) if now - t < PUBLIC_WINDOW]
+        return len(_posts[(kind, addr)]) >= per_addr or len(_posts[(kind, "*")]) >= everyone
+
+
+def record(kind: str, addr: str) -> None:
+    with _lock:
+        for key in ((kind, addr), (kind, "*")):
+            _posts.setdefault(key, []).append(time.time())

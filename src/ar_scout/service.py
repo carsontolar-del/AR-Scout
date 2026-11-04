@@ -350,8 +350,8 @@ def snapshot(artist_id: int) -> dict:
             m["deezer.top_track_rank"] = max(t.get("rank", 0) for t in top)
         rel = _try(errors, "deezer releases", lambda: _release_info(a["deezer_id"])) or {}
         m["releases_last_year"] = rel.get("releases_last_year")
-        db.upsert_artist({"latest_label": rel.get("latest_label"),
-                          "latest_release": rel.get("latest_release")}, artist_id)
+        db.upsert_artist({"latest_label": rel.get("latest_label"), "latest_release": rel.get("latest_release"),
+                          "latest_title": rel.get("latest_title"), "latest_type": rel.get("latest_type")}, artist_id)
 
     if lastfm.available():
         exact = a.get("lastfm_source") == "manual"
@@ -812,6 +812,7 @@ def _scored(watchlist_only: bool, window_days: int, archived: bool) -> list[tupl
             "image_url": a.get("image_url"),
             "monthly_growth": {k: round(g["monthly_rate"], 3) for k, g in s["growth"].items() if g["monthly_rate"] is not None},
             "latest_release": a.get("latest_release"), "label": a.get("latest_label"),
+            "latest_title": a.get("latest_title"), "latest_type": a.get("latest_type"), "added_at": a.get("created_at"),
             "label_class": labels.classify(a.get("latest_label"), a.get("name")),
             "flags": s["flags"], "discovered_via": a.get("discovered_via"),
             "tags": json.loads(a.get("watch_tags") or "[]"),
@@ -829,6 +830,48 @@ def _scored(watchlist_only: bool, window_days: int, archived: bool) -> list[tupl
     out.sort(key=lambda x: x[0]["score"], reverse=True)
     _score_cache[key] = out
     return out
+
+
+# --------------------------------------------------------------------------- weekly digest
+
+MOVER_MIN_BASE, MOVER_MIN_GAIN = 200, 20  # same rule as the dashboard's Movers page
+
+
+def best_gain(row: dict) -> dict | None:
+    """The artist's biggest real 7-day gain across platforms, counting only from a base of 200+ and by 20+."""
+    best = None
+    for platform, c in (row.get("change_7d") or {}).items():
+        if c and c["pct"] is not None and c["start"] >= MOVER_MIN_BASE and c["delta"] >= MOVER_MIN_GAIN:
+            if not best or c["pct"] > best["pct"]:
+                best = {"platform": platform, **c}
+    return best
+
+
+def weekly_digest(days: int = 7, today: date | None = None) -> dict:
+    """What changed in the last `days` days, in the order a scout acts on it: accelerating artists, top movers,
+    new releases, pipeline steps due, new artists, accounts to check. Accounts under review stay out of the
+    rankings, as on the dashboard."""
+    today = today or date.today()
+    since = (today - timedelta(days=days)).isoformat()
+    soon = (today + timedelta(days=days)).isoformat()
+    rows = leaderboard(limit=100_000)
+    trusted = [r for r in rows if not (r["review"] and not r["verified"])]
+    movers = sorted(((r, g) for r in trusted if (g := best_gain(r))), key=lambda x: -x[1]["pct"])
+    released = [r for r in rows if r.get("latest_release") and since < r["latest_release"] <= today.isoformat()]
+    due = [r for r in rows if r.get("status") and r.get("next_date") and r["next_date"] <= soon
+           and r["status"] not in ("signed", "passed")]
+    new = [r for r in rows if (r.get("added_at") or "")[:10] > since]
+    return {
+        "from": since, "to": today.isoformat(),
+        "accelerating": [r for r in trusted if r["accelerating"]],
+        "movers": [r | {"gain": g} for r, g in movers[:10]],
+        "movers_total": len(movers),
+        "releases": sorted(released, key=lambda r: r["latest_release"], reverse=True),
+        "due": sorted(due, key=lambda r: r["next_date"]),
+        "overdue": sum(1 for r in due if r["next_date"] < today.isoformat()),
+        "new_artists": sorted(new, key=lambda r: -r["score"]),
+        "review_count": sum(1 for r in rows if r["review"] and not r["verified"]),
+    }
 
 
 # --------------------------------------------------------------------------- discovery
@@ -952,6 +995,63 @@ def discover_new_releases(genre: str | None = None, min_fans: int = 200, max_fan
                 pool.setdefault(a["id"], a)
     ordered = sorted(pool.values(), key=lambda a: -counts[a["id"]])
     return _filter_track(ordered, f"new_releases:{genre or 'all'}", min_fans, max_fans, limit, progress)
+
+
+# --------------------------------------------------------------------------- saved searches
+
+DISCOVERY_MODES = ("similar", "tag", "country", "playlists", "new")
+SEARCH_EVERY_DAYS = 7
+
+
+def discover(mode: str, query: str = "", min_fans: int = 300, max_fans: int = 50_000, limit: int = 20,
+             progress: Callable[[str], None] | None = None) -> list[dict]:
+    """Run one discovery method by name (the dashboard, saved searches and the CLI all come through here)."""
+    q, kw = query.strip(), dict(min_fans=min_fans, max_fans=max_fans, limit=limit, progress=progress)
+    if mode == "similar":
+        return discover_similar([s.strip() for s in q.split(",") if s.strip()], **kw)
+    if mode == "tag":
+        return discover_by_tag(q, **kw)
+    if mode == "country":
+        return discover_by_country(q, **kw)
+    if mode == "playlists":
+        return discover_playlists(q, **kw)
+    if mode == "new":
+        return discover_new_releases(q or None, **kw)
+    raise ValueError(f"mode must be one of {', '.join(DISCOVERY_MODES)}")
+
+
+def save_search(mode: str, query: str = "", min_fans: int = 300, max_fans: int = 50_000, limit: int = 20) -> dict:
+    if mode not in DISCOVERY_MODES:
+        raise ValueError(f"mode must be one of {', '.join(DISCOVERY_MODES)}")
+    if mode != "new" and not query.strip():
+        raise ValueError("Enter what to search for first")
+    return db.saved_search(db.save_search(mode, query.strip(), min_fans, max_fans, limit))
+
+
+def run_saved_search(search_id: int, progress: Callable[[str], None] | None = None) -> dict:
+    """Rerun a saved search; artists it finds for the first time count as new (and get the New badge)."""
+    s = db.saved_search(search_id)
+    if not s:
+        raise SourceError(f"No saved search {search_id}")
+    started = db.now()
+    rows = discover(s["mode"], s["query"], s["min_fans"], s["max_fans"], s["lim"], progress)
+    new = [r for r in rows if (r.get("added_at") or "") >= started]
+    db.record_search_run(search_id, len(rows), len(new))
+    return {"search": db.saved_search(search_id), "found": len(rows), "new": [r["name"] for r in new]}
+
+
+def run_due_searches(progress: Callable[[str], None] | None = None) -> list[dict]:
+    """Rerun every saved search not run in the last week. Part of the daily job; uses no YouTube quota."""
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=SEARCH_EVERY_DAYS) + timedelta(hours=6)).isoformat()
+    done = []
+    for s in db.saved_searches():
+        if s["last_run"] and s["last_run"] > cutoff:
+            continue
+        try:
+            done.append(run_saved_search(s["id"], progress))
+        except (SourceError, ValueError) as exc:
+            done.append({"search": s, "error": str(exc)})
+    return done
 
 
 def source_status() -> dict:

@@ -111,9 +111,14 @@ def snapshot(scope: str = typer.Argument("watchlist", help="watchlist | all"), s
     res = service.snapshot_many(scope, stale_hours, progress=_progress)
     console.print(f"Snapshotted {res['snapshotted']}, skipped {res['skipped_fresh']} fresh, "
                   f"retried {res['retried']} after network errors.")
-    if scope == "all":  # the daily job's run: keep a dated copy of the history
+    if scope == "all":  # the daily job's run: keep a dated copy of the history, then rerun due saved searches
         b = service.backup_database()
         console.print(f"Backed up to {b['path']} ({b['size_mb']} MB, keeping {b['kept']})")
+        for run in service.run_due_searches(progress=_progress):
+            s = run["search"]
+            label = f"{s['mode']} {s['query']!r}".strip()
+            console.print(f"Saved search {label}: " + (f"[red]{run['error']}[/]" if "error" in run
+                          else f"{run['found']} artists, {len(run['new'])} new {run['new'][:5]}"))
     for name, errs in res["errors"].items():
         console.print(f"  [red]{name}[/]: {'; '.join(errs)}")
 

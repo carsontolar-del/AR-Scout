@@ -61,7 +61,14 @@ def export(out_dir: Path, include_watchlist: bool = False, repo: str | None = No
 
     health = service.data_health() | {"daily_job": False, "last_backup": None, "unlinked": 0, "artists": len(rows),
                                        "with_growth": sum(1 for r in rows if r["components"]["momentum"] is not None)}
+    digest = service.weekly_digest()
+    public = {r["id"]: r for r in rows}
+    for key in ("accelerating", "movers", "releases", "new_artists"):
+        digest[key] = [public[r["id"]] | ({"gain": r["gain"]} if "gain" in r else {}) for r in digest[key] if r["id"] in public]
+    digest.update(due=[], overdue=0, review_count=sum(1 for r in rows if r["review"] and not r["verified"]),
+                  movers_total=sum(1 for r in rows if not (r["review"] and not r["verified"]) and service.best_gain(r)))
     board = {
+        "digest": digest,
         "meta": {"snapshot": date.today().isoformat(), "repo": repo, "credit": credit, "artists": len(rows)},
         "status": service.source_status() | {"role": "demo", "login": False},
         "health": health,
