@@ -7,7 +7,7 @@ from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from contextlib import asynccontextmanager
 
@@ -421,6 +421,7 @@ def delete_submission(submission_id: int):
 class SpinIn(BaseModel):
     listener: str
     genre: str | None = None
+    genres: list[str] | None = Field(None, max_length=20)  # the listener's vibe: genres on their wheel
 
 
 class ReactIn(BaseModel):
@@ -451,7 +452,7 @@ def app_state(listener: str):
 
 @app.post("/api/app/spin")
 def app_spin(body: SpinIn):
-    return _bad_request(game.spin, body.listener, body.genre or None)
+    return _bad_request(game.spin, body.listener, body.genre or None, body.genres or None)
 
 
 @app.post("/api/app/react")

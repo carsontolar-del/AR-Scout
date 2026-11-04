@@ -119,15 +119,19 @@ def state(listener: str) -> dict:
             "unheard": len(live)}
 
 
-def spin(listener: str, genre: str | None = None) -> dict:
-    """A live pick this listener hasn't heard, from `genre` or (None) any genre that has one. Includes a fresh
-    preview URL, since Deezer's signed preview links expire."""
+def spin(listener: str, genre: str | None = None, genres: list[str] | None = None) -> dict:
+    """A live pick this listener hasn't heard, from `genre`, from any of `genres` (the listener's vibe: the genres
+    they put on their wheel), or from any genre at all. Includes a fresh preview URL, since Deezer's signed preview
+    links expire."""
     listener = _check_listener(listener)
-    if genre and genre not in WHEEL_NAMES:
+    if any(g not in WHEEL_NAMES for g in [genre or WHEEL_NAMES[0], *(genres or [])]):
         raise ValueError("Unknown genre.")
     pool = db.unheard_picks(listener, genre)
+    if genres:
+        pool = [p for p in pool if p["wheel_genre"] in genres]
     if not pool:
         raise ValueError(f"You've heard every {genre} pick so far. Try another genre." if genre
+                         else "You've heard every pick in this vibe. Add a genre or two." if genres
                          else "You've heard every pick so far. New ones arrive every week.")
     random.shuffle(pool)
     for pick in pool:

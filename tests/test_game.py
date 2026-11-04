@@ -140,3 +140,15 @@ def test_comment_rate_limit(client, artist):
     for i in range(per_addr):
         assert c.post(f"/api/app/picks/{p['id']}/comments", json={"listener": ME, "body": f"c{i}"}).status_code == 200
     assert c.post(f"/api/app/picks/{p['id']}/comments", json={"listener": ME, "body": "one more"}).status_code == 429
+
+
+def test_spin_stays_inside_the_vibe(artist):
+    rock = game.add_pick(artist, 11, "Indie Rock")
+    game.add_pick(artist, 12, "Electronic")
+    for _ in range(5):
+        assert game.spin(ME, genres=["Indie Rock", "Folk & Songwriters"])["id"] == rock["id"]
+    game.react(ME, rock["id"], "pass")
+    with pytest.raises(ValueError, match="every pick in this vibe"):
+        game.spin(ME, genres=["Indie Rock"])
+    with pytest.raises(ValueError, match="Unknown genre"):
+        game.spin(ME, genres=["Polka"])

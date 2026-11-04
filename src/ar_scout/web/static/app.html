@@ -76,8 +76,18 @@ nav.tabs a[aria-current="page"] { background: var(--ink-2); color: var(--paper);
 .hub { position: absolute; inset: 35%; border-radius: 50%; display: grid; place-items: center; border: 1px solid var(--hub-border);
   background: var(--hub); color: var(--hub-ink); font: 600 1.05rem var(--display); }
 .hub:disabled { cursor: progress; color: var(--muted); }
-.picker { display: flex; gap: 8px; justify-content: center; }
-.picker select { min-width: 0; flex: 0 1 280px; background: var(--ink-2); border: 1px solid var(--ink-3); border-radius: 12px; padding: 10px 12px; }
+.vibe { display: grid; gap: 12px; width: min(100%, 420px); margin: 0 auto; }
+.vibe-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.vibe-head h2 { margin: 0; font: 600 1.05rem var(--display); letter-spacing: -0.01em; }
+.moods { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; margin: 0 -16px; padding: 0 16px; }
+.moods::-webkit-scrollbar { display: none; }
+.moods button { flex: none; min-height: 36px; padding: 6px 14px; border-radius: 99px; border: 1px solid var(--ink-3); background: none; font-size: 0.88rem; font-weight: 500; color: var(--muted); }
+.moods button[aria-pressed="true"] { background: var(--glow); border-color: var(--glow); color: var(--on-accent); }
+.vchips { display: flex; flex-wrap: wrap; gap: 7px; }
+.vchips button { min-height: 36px; display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 10px; border: 1px solid var(--ink-3); background: var(--ink-2); font-size: 0.84rem; color: var(--muted); }
+.vchips button i { font: normal 0.72rem var(--mono); opacity: 0.8; }
+.vchips button[aria-pressed="true"] { border-color: var(--glow); color: var(--paper); box-shadow: inset 0 0 0 1px var(--glow); }
+.vchips button.empty-g { opacity: 0.5; }
 .wheel-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; width: min(100%, 420px); margin: -6px auto 0; }
 .hint { font: 0.75rem var(--mono); color: var(--muted); }
 .toggle { min-height: 44px; display: inline-flex; align-items: center; gap: 10px; padding: 0; border: 0; background: none; font-weight: 500; font-size: 0.88rem; }
@@ -208,7 +218,11 @@ form.sub legend { padding: 0; margin-bottom: 6px; }
         <span class="hint" id="wheelHint"></span>
         <button class="toggle genres-toggle" type="button" role="switch">Genres <span class="switch"></span></button>
       </div>
-      <div class="picker" id="picker"><select id="genre" aria-label="Genre to spin"><option value="">Surprise me: any genre</option></select></div>
+      <div class="vibe" role="group" aria-labelledby="vibeTitle">
+        <div class="vibe-head"><h2 id="vibeTitle">What's the vibe?</h2><span class="hint" id="vibeHint"></span></div>
+        <div class="moods" id="moods"></div>
+        <div class="vchips" id="vchips"></div>
+      </div>
       <p class="notice" id="notice" role="status"></p>
     </div>
 
@@ -332,9 +346,7 @@ function setPref(key, value) {
 function showGenres() {
   const on = genresOn();
   document.querySelectorAll(".genres-toggle").forEach(b => b.setAttribute("aria-checked", String(on)));
-  $("picker").hidden = !on;
-  if (!on) $("genre").value = "";
-  $("wheelHint").textContent = on ? "Pick a genre or let it choose" : "Genres hidden: spin blind";
+  $("wheelHint").textContent = on ? `${vibe.size} of ${WHEEL.length || 8} genres on your wheel` : "Genres hidden: spin blind";
 }
 document.addEventListener("click", e => { if (e.target.closest(".genres-toggle")) setPref("genres", genresOn() ? "off" : "on"); });
 function openSettings() {
@@ -371,6 +383,44 @@ function route() {
 }
 window.addEventListener("hashchange", route);
 
+// ============================================================ vibe: which genres are on your wheel right now
+// Moods are shortcuts to a set of genres; listeners can also tap genres on and off. Saved in this browser.
+const MOODS = [
+  ["Everything", null],
+  ["Late night", ["Indie Pop & Dream Pop", "Electronic", "R&B, Soul & Hip-hop", "Experimental"]],
+  ["Loud", ["Indie Rock", "Post-punk & Shoegaze", "Electronic"]],
+  ["Slow & soft", ["Folk & Songwriters", "Country & Americana", "Indie Pop & Dream Pop", "R&B, Soul & Hip-hop"]],
+  ["Road trip", ["Indie Rock", "Country & Americana", "Folk & Songwriters", "Indie Pop & Dream Pop"]],
+  ["Strange", ["Experimental", "Post-punk & Shoegaze", "Electronic"]],
+];
+let vibe = new Set();
+try { vibe = new Set(JSON.parse(store.get("ee-vibe") || "[]")); } catch {}
+const onWheel = () => WHEEL.filter(g => vibe.has(g.name));
+function setVibe(names) {
+  vibe = new Set(names); store.set("ee-vibe", JSON.stringify([...vibe]));
+  renderVibe(); showGenres(); drawWheel();
+}
+function renderVibe() {
+  const all = WHEEL.map(g => g.name);
+  vibe = new Set([...vibe].filter(n => all.includes(n)));
+  if (!vibe.size) vibe = new Set(all);
+  const same = list => list.length === vibe.size && list.every(n => vibe.has(n));
+  $("moods").innerHTML = MOODS.map(([label, list], i) =>
+    `<button type="button" data-mood="${i}" aria-pressed="${same(list || all)}">${label}</button>`).join("");
+  $("vchips").innerHTML = WHEEL.map((g, i) =>
+    `<button type="button" data-g="${i}" aria-pressed="${vibe.has(g.name)}" class="${g.unheard ? "" : "empty-g"}">${esc(g.name)} <i>${g.unheard}</i></button>`).join("");
+  const n = onWheel().reduce((s, g) => s + g.unheard, 0);
+  $("vibeHint").textContent = `${n} new ${n === 1 ? "song" : "songs"} in this vibe`;
+}
+$("moods").onclick = e => { const b = e.target.closest("[data-mood]"); if (b) setVibe(MOODS[b.dataset.mood][1] || WHEEL.map(g => g.name)); };
+$("vchips").onclick = e => {
+  const b = e.target.closest("[data-g]"); if (!b || spinning) return;
+  const name = WHEEL[b.dataset.g].name, next = new Set(vibe);
+  next.has(name) ? next.delete(name) : next.add(name);
+  if (next.size) setVibe(next);
+  else $("notice").textContent = "Keep at least one genre on the wheel.";
+};
+
 // ============================================================ wheel
 // A thin ring with a tick between genres. The genres turn past a fixed accent arc at the top; whichever sits under
 // it is the one you land on. With genres hidden, the labels become dots.
@@ -380,13 +430,14 @@ const SHORT = { "Indie Rock": "INDIE ROCK", "Indie Pop & Dream Pop": "DREAM POP"
   "Experimental": "EXPER." };
 const wc = $("wheel"), w = wc.getContext("2d"), R = 360, RING = 228, LABEL = 296;
 function drawWheel() {
-  const seg = Math.PI * 2 / WHEEL.length, turn = rot * Math.PI / 180, top = -Math.PI / 2;
+  const ON = onWheel(); if (!ON.length) return;
+  const seg = Math.PI * 2 / ON.length, turn = rot * Math.PI / 180, top = -Math.PI / 2;
   const ink = token("--paper"), muted = token("--muted"), accent = token("--glow"), ring = token("--ring"), on = genresOn();
   w.clearRect(0, 0, 720, 720);
   w.beginPath(); w.arc(R, R, RING, 0, Math.PI * 2); w.strokeStyle = ring; w.lineWidth = 2; w.stroke();
   w.beginPath(); w.arc(R, R, RING, top - seg / 2, top + seg / 2); w.strokeStyle = accent; w.lineWidth = 14; w.stroke();
   w.font = "500 20px 'Geist Mono', ui-monospace, monospace"; w.textAlign = "center"; w.textBaseline = "middle";
-  WHEEL.forEach((s, i) => {
+  ON.forEach((s, i) => {
     const edge = top - seg / 2 + i * seg + turn, mid = edge + seg / 2;
     w.strokeStyle = muted; w.lineWidth = 2; w.beginPath();
     w.moveTo(R + Math.cos(edge) * (RING - 8), R + Math.sin(edge) * (RING - 8));
@@ -403,7 +454,7 @@ function drawWheel() {
 }
 function spinTo(index) {
   return new Promise(done => {
-    const segDeg = 360 / WHEEL.length, from = rot;
+    const segDeg = 360 / onWheel().length, from = rot;
     const to = from - (from % 360) - 360 * 4 - index * segDeg + (Math.random() - 0.5) * segDeg * 0.6;
     const dur = reduce ? 0 : 3800;
     let start = 0, last = Math.floor((from + segDeg / 2) / segDeg);
@@ -423,10 +474,7 @@ function spinTo(index) {
 async function loadState() {
   try {
     const s = await call(`/api/app/state?listener=${LISTENER}`);
-    WHEEL = s.wheel; drawWheel();
-    const sel = $("genre"), keep = sel.value;
-    sel.replaceChildren(new Option("Surprise me: any genre", ""), ...WHEEL.map(g => new Option(g.unheard ? g.name : `${g.name} (all heard)`, g.name)));
-    sel.value = keep;
+    WHEEL = s.wheel; renderVibe(); showGenres(); drawWheel();
     $("spins").innerHTML = s.unheard ? `<b>${s.unheard}</b> new ${s.unheard === 1 ? "song" : "songs"} to hear` : "";
     $("spinBtn").disabled = !s.unheard;
     $("notice").textContent = s.unheard ? "" : "You've heard every pick so far. New ones arrive every week.";
@@ -468,8 +516,9 @@ async function doSpin() {
   // Unlock audio inside the tap, so the clip can start once the wheel stops (Safari needs this).
   audio.muted = true; audio.play().catch(() => {}); audio.pause(); audio.muted = false;
   try {
-    const pick = await call("/api/app/spin", { listener: LISTENER, genre: $("genre").value || null });
-    await spinTo(WHEEL.findIndex(g => g.name === pick.wheel_genre));
+    const ON = onWheel();
+    const pick = await call("/api/app/spin", { listener: LISTENER, genres: ON.length < WHEEL.length ? ON.map(g => g.name) : null });
+    await spinTo(ON.findIndex(g => g.name === pick.wheel_genre));
     showSong(pick);
   } catch (e) { $("notice").textContent = e.message; }
   spinning = false; loadState();
