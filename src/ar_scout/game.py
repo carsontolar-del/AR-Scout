@@ -1,7 +1,7 @@
 """The public discovery app (/app): spin a genre wheel, hear a 30-second clip the team picked, keep or pass.
 
 Listeners are anonymous: the app makes a random id in the browser and sends it with each call. That's enough to
-remember someone's crate and daily spins, not to prove who they are, so nothing private hangs off it.
+remember someone's crate and what they've heard, not to prove who they are, so nothing private hangs off it.
 Public comments sit under each pick; the team's own comment threads (on picks and submissions) never leave the
 dashboard.
 """
@@ -23,7 +23,6 @@ WHEEL = [
     ("R&B, Soul & Hip-hop", "#7c9cff"), ("Experimental", "#c6e85a"),
 ]
 WHEEL_NAMES = [name for name, _ in WHEEL]
-SPINS_PER_DAY = 5
 COMMENTS_PER_DAY = 30
 MAX_COMMENT = 1000
 MAX_AUTHOR = 40
@@ -116,17 +115,14 @@ def picks() -> list[dict]:
 def state(listener: str) -> dict:
     listener = _check_listener(listener)
     live = db.unheard_picks(listener)
-    left = max(0, SPINS_PER_DAY - db.reactions_since(listener, _today()))
     return {"wheel": [{"name": n, "hue": h, "unheard": sum(p["wheel_genre"] == n for p in live)} for n, h in WHEEL],
-            "spins_left": left, "spins_per_day": SPINS_PER_DAY}
+            "unheard": len(live)}
 
 
 def spin(listener: str, genre: str | None = None) -> dict:
     """A live pick this listener hasn't heard, from `genre` or (None) any genre that has one. Includes a fresh
     preview URL, since Deezer's signed preview links expire."""
     listener = _check_listener(listener)
-    if db.reactions_since(listener, _today()) >= SPINS_PER_DAY:
-        raise ValueError(f"That's today's {SPINS_PER_DAY} spins. New spins tomorrow.")
     if genre and genre not in WHEEL_NAMES:
         raise ValueError("Unknown genre.")
     pool = db.unheard_picks(listener, genre)

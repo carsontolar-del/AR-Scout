@@ -304,7 +304,7 @@ const day = iso => new Date(iso).toLocaleDateString(undefined, { month: "short",
 const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const store = { get(k) { try { return localStorage.getItem(k); } catch { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
 
-// Anonymous listener id: remembers this browser's crate and daily spins. Not an account.
+// Anonymous listener id: remembers this browser's crate and what it has heard. Not an account.
 let LISTENER = store.get("ee-listener");
 if (!LISTENER) {
   LISTENER = Array.from(crypto.getRandomValues(new Uint8Array(16)), b => b.toString(16).padStart(2, "0")).join("");
@@ -427,10 +427,9 @@ async function loadState() {
     const sel = $("genre"), keep = sel.value;
     sel.replaceChildren(new Option("Surprise me: any genre", ""), ...WHEEL.map(g => new Option(g.unheard ? g.name : `${g.name} (all heard)`, g.name)));
     sel.value = keep;
-    $("spins").innerHTML = `<b>${s.spins_left}</b> of ${s.spins_per_day} spins left today`;
-    $("spinBtn").disabled = !s.spins_left;
-    $("notice").textContent = !s.spins_left ? "That's today's crate. New spins tomorrow." :
-      !WHEEL.some(g => g.unheard) ? "You've heard every pick so far. New ones arrive every week." : "";
+    $("spins").innerHTML = s.unheard ? `<b>${s.unheard}</b> new ${s.unheard === 1 ? "song" : "songs"} to hear` : "";
+    $("spinBtn").disabled = !s.unheard;
+    $("notice").textContent = s.unheard ? "" : "You've heard every pick so far. New ones arrive every week.";
   } catch (e) { $("notice").textContent = e.message; }
 }
 if (document.fonts) document.fonts.ready.then(() => WHEEL.length && drawWheel());

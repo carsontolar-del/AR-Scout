@@ -56,7 +56,7 @@ def test_pick_needs_a_preview_clip_and_a_wheel_genre(artist):
 def test_spin_keep_and_crate(artist):
     p = game.add_pick(artist, 11, "Indie Rock")
     st = game.state(ME)
-    assert st["spins_left"] == game.SPINS_PER_DAY
+    assert st["unheard"] == 1
     assert next(w for w in st["wheel"] if w["name"] == "Indie Rock")["unheard"] == 1
     got = game.spin(ME, "Indie Rock")
     assert got["id"] == p["id"] and got["preview"].startswith("https://cdn.example/11")
@@ -71,14 +71,15 @@ def test_spin_keep_and_crate(artist):
     assert game.spin(YOU)["id"] == p["id"]  # someone else hasn't heard it
 
 
-def test_daily_spin_limit(artist, monkeypatch):
-    monkeypatch.setattr(game, "SPINS_PER_DAY", 1)
-    a = game.add_pick(artist, 11, "Indie Rock")
-    game.add_pick(artist, 12, "Electronic")
-    game.react(ME, a["id"], "pass")
-    assert game.state(ME)["spins_left"] == 0
-    with pytest.raises(ValueError, match="today's 1 spins"):
-        game.spin(ME)
+def test_no_spin_limit(artist, monkeypatch):
+    monkeypatch.setattr(deezer, "track", lambda tid, fresh=False: {"id": tid, "title": f"Song {tid}",
+                                                                   "preview": f"https://cdn.example/{tid}.mp3", "album": {}})
+    for n in range(20, 28):
+        game.add_pick(artist, n, "Indie Rock")
+    for _ in range(7):  # more than any old daily cap
+        game.react(ME, game.spin(ME)["id"], "pass")
+    assert game.state(ME)["unheard"] == 1
+    assert game.spin(ME)["id"]
 
 
 def test_retired_picks_leave_the_wheel(artist):

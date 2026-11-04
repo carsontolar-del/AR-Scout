@@ -512,12 +512,6 @@ def save_reaction(pick_id: int, listener: str, verdict: str, listened_ms: int | 
                   (pick_id, listener, verdict, listened_ms, audience_at, audience_metric, now()))
 
 
-def reactions_since(listener: str, since: str) -> int:
-    with connect() as c:
-        return c.execute("SELECT count(*) FROM reactions WHERE listener = ? AND created_at >= ?",
-                         (listener, since)).fetchone()[0]
-
-
 def kept(listener: str) -> list[dict]:
     with connect() as c:
         return [dict(r) for r in c.execute(
