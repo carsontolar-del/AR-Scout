@@ -16,13 +16,34 @@ from . import db
 from .http import SourceError
 from .sources import deezer
 
-# The wheel's slices and their colors (the app's genre color system).
+# Two wheels, each a list of (genre, hue). The main wheel covers everything; the bass wheel (its own tab in the
+# app) splits EDM and bass music into subgenres. Genre names are unique across wheels, so a pick's genre also says
+# which wheel it's on.
 WHEEL = [
     ("Indie Rock", "#ff7a59"), ("Indie Pop & Dream Pop", "#ff5fa2"), ("Post-punk & Shoegaze", "#b07cff"),
     ("Folk & Songwriters", "#e8b04a"), ("Country & Americana", "#f2884b"), ("Electronic", "#4fd1c5"),
     ("R&B, Soul & Hip-hop", "#7c9cff"), ("Experimental", "#c6e85a"),
 ]
+BASS_WHEEL = [
+    ("Dubstep", "#8b5cf6"), ("Riddim", "#a3e635"), ("Melodic & Future Bass", "#38bdf8"), ("Drum & Bass", "#f97316"),
+    ("UK Garage", "#f472b6"), ("House", "#facc15"), ("Bass House", "#22d3ee"), ("Techno", "#94a3b8"),
+    ("Trance", "#60a5fa"), ("Hardstyle", "#ef4444"),
+]
+WHEELS = {"main": WHEEL, "bass": BASS_WHEEL}
 WHEEL_NAMES = [name for name, _ in WHEEL]
+ALL_GENRES = [name for w in WHEELS.values() for name, _ in w]
+# Last.fm tags whose charts feed each genre when filling the wheels (fill_wheel). Deeper chart pages hold the
+# smaller artists, which is who the app is for.
+GENRE_TAGS = {
+    "Indie Rock": ["indie rock"], "Indie Pop & Dream Pop": ["indie pop", "dream pop", "bedroom pop"],
+    "Post-punk & Shoegaze": ["post-punk", "shoegaze"], "Folk & Songwriters": ["indie folk", "singer-songwriter"],
+    "Country & Americana": ["alt-country", "americana"], "Electronic": ["indietronica", "electropop"],
+    "R&B, Soul & Hip-hop": ["alternative rnb", "neo-soul", "underground hip-hop"], "Experimental": ["experimental", "art pop"],
+    "Dubstep": ["dubstep", "brostep"], "Riddim": ["riddim"], "Melodic & Future Bass": ["melodic dubstep", "future bass"],
+    "Drum & Bass": ["drum and bass", "liquid funk", "neurofunk"], "UK Garage": ["uk garage", "2-step"],
+    "House": ["deep house", "house"], "Bass House": ["bass house", "uk bass"], "Techno": ["techno", "hard techno"],
+    "Trance": ["trance", "psytrance"], "Hardstyle": ["hardstyle", "hard dance"],
+}
 COMMENTS_PER_DAY = 30
 MAX_COMMENT = 1000
 MAX_AUTHOR = 40
@@ -74,8 +95,8 @@ def add_pick(artist_id: int, deezer_track_id: int, wheel_genre: str, curator: st
     a = db.get_artist(artist_id)
     if not a:
         raise ValueError("That artist isn't in AR Scout.")
-    if wheel_genre not in WHEEL_NAMES:
-        raise ValueError(f"Pick a wheel genre: {', '.join(WHEEL_NAMES)}.")
+    if wheel_genre not in ALL_GENRES:
+        raise ValueError(f"Pick a wheel genre: {', '.join(ALL_GENRES)}.")
     if any(p["deezer_track_id"] == deezer_track_id for p in db.picks_with_stats()):
         raise ValueError("That song is already a pick.")
     t = deezer.track(deezer_track_id)
@@ -96,10 +117,53 @@ def update_pick(pick_id: int, **fields) -> dict:
         raise ValueError("That pick no longer exists.")
     if "status" in fields and fields["status"] not in ("live", "retired"):
         raise ValueError("Status must be live or retired.")
-    if "wheel_genre" in fields and fields["wheel_genre"] not in WHEEL_NAMES:
-        raise ValueError(f"Pick a wheel genre: {', '.join(WHEEL_NAMES)}.")
+    if "wheel_genre" in fields and fields["wheel_genre"] not in ALL_GENRES:
+        raise ValueError(f"Pick a wheel genre: {', '.join(ALL_GENRES)}.")
     db.update_pick(pick_id, **fields)
     return db.get_pick(pick_id)
+
+
+def fill_wheel(wheel: str = "main", per_genre: int = 8, tracks_per_artist: int = 1, max_fans: int = 50_000,
+               curator: str | None = None, genres: list[str] | None = None, progress=None) -> dict[str, int]:
+    """Top up each genre on a wheel to `per_genre` live picks: find emerging artists on the genre's Last.fm tag
+    charts (AR Scout's tag discovery, which also starts tracking them) and feature their top clips. A starting
+    point for the team to prune, not a replacement for picking by ear. Returns how many picks each genre gained."""
+    from . import service  # service is heavy and game is imported by the web app at startup
+    if wheel not in WHEELS:
+        raise ValueError(f"Unknown wheel: {wheel}.")
+    names = [n for n, _ in WHEELS[wheel] if not genres or n in genres]
+    live = [p for p in db.picks_with_stats() if p["status"] == "live"]
+    used = {p["artist_id"] for p in live}
+    added: dict[str, int] = {}
+    for genre in names:
+        have = sum(p["wheel_genre"] == genre for p in live)
+        for tag in GENRE_TAGS.get(genre, []):
+            if have >= per_genre:
+                break
+            try:
+                found = service.discover_by_tag(tag, min_fans=100, max_fans=max_fans, start_page=2, pages=1,
+                                                limit=per_genre * 2, progress=progress)
+            except (SourceError, ValueError):
+                continue
+            for row in sorted(found, key=lambda r: _audience(r["id"])[0] or 0):  # smallest first
+                if have >= per_genre:
+                    break
+                if row["id"] in used:
+                    continue
+                try:
+                    tracks = [t for t in artist_tracks(row["id"]) if t["has_preview"] and not t["already_picked"]]
+                except (SourceError, ValueError):
+                    continue
+                for t in tracks[:tracks_per_artist]:
+                    try:
+                        add_pick(row["id"], t["id"], genre, curator=curator)
+                    except (SourceError, ValueError):
+                        continue
+                    have += 1
+                    added[genre] = added.get(genre, 0) + 1
+                if tracks:
+                    used.add(row["id"])
+    return added
 
 
 def picks() -> list[dict]:
@@ -112,23 +176,32 @@ def picks() -> list[dict]:
 
 # ---------------------------------------------------------------- listener side
 
-def state(listener: str) -> dict:
+def _wheel(wheel: str) -> list[tuple[str, str]]:
+    if wheel not in WHEELS:
+        raise ValueError("Unknown wheel.")
+    return WHEELS[wheel]
+
+
+def state(listener: str, wheel: str = "main") -> dict:
     listener = _check_listener(listener)
-    live = db.unheard_picks(listener)
-    return {"wheel": [{"name": n, "hue": h, "unheard": sum(p["wheel_genre"] == n for p in live)} for n, h in WHEEL],
+    slices = _wheel(wheel)
+    names = {n for n, _ in slices}
+    live = [p for p in db.unheard_picks(listener) if p["wheel_genre"] in names]
+    return {"wheel": [{"name": n, "hue": h, "unheard": sum(p["wheel_genre"] == n for p in live)} for n, h in slices],
             "unheard": len(live)}
 
 
-def spin(listener: str, genre: str | None = None, genres: list[str] | None = None) -> dict:
+def spin(listener: str, genre: str | None = None, genres: list[str] | None = None, wheel: str = "main") -> dict:
     """A live pick this listener hasn't heard, from `genre`, from any of `genres` (the listener's vibe: the genres
-    they put on their wheel), or from any genre at all. Includes a fresh preview URL, since Deezer's signed preview
-    links expire."""
+    they put on their wheel), or from anywhere on `wheel`. Includes a fresh preview URL, since Deezer's signed
+    preview links expire."""
     listener = _check_listener(listener)
-    if any(g not in WHEEL_NAMES for g in [genre or WHEEL_NAMES[0], *(genres or [])]):
+    names = [n for n, _ in _wheel(wheel)]
+    if any(g not in ALL_GENRES for g in [genre or names[0], *(genres or [])]):
         raise ValueError("Unknown genre.")
     pool = db.unheard_picks(listener, genre)
-    if genres:
-        pool = [p for p in pool if p["wheel_genre"] in genres]
+    allowed = set(genres or names)
+    pool = [p for p in pool if p["wheel_genre"] in allowed]
     if not pool:
         raise ValueError(f"You've heard every {genre} pick so far. Try another genre." if genre
                          else "You've heard every pick in this vibe. Add a genre or two." if genres

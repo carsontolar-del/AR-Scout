@@ -1518,10 +1518,15 @@ async function renderPicks() {
   } catch (e) { modSlot.replaceChildren(errorCard(e)); }
 }
 
+// The app has two wheels (main, and the Bass tab); group their genres so it's clear where a song lands.
+function genreOptions(wheel, selected) {
+  return [["main", "Main wheel"], ["bass", "Bass wheel"]].map(([k, label]) => el("optgroup", { label },
+    wheel.filter(w => (w.wheel || "main") === k).map(w => el("option", { value: w.name, selected: w.name === selected }, w.name))));
+}
 function pickItem(p, hue, wheel) {
   const card = el("div", { class: "card pick-item" + (p.status === "retired" ? " retired" : "") });
   const status = el("select", { class: "input", "aria-label": "Status" }, [["live", "Live on the wheel"], ["retired", "Retired"]].map(([v, t]) => el("option", { value: v, selected: v === p.status }, t)));
-  const genre = el("select", { class: "input", "aria-label": "Wheel genre" }, wheel.map(w => el("option", { value: w.name, selected: w.name === p.wheel_genre }, w.name)));
+  const genre = el("select", { class: "input", "aria-label": "Wheel genre" }, genreOptions(wheel, p.wheel_genre));
   const note = el("textarea", { class: "input", placeholder: "Why we picked it (listeners see this)", maxlength: 300 });
   note.value = p.note || "";
   const save = async fields => {
@@ -1561,7 +1566,7 @@ function addPickForm() {
   box.append(el("b", {}, "Add a song to the wheel"),
     el("span", { class: "dim", style: "font-size:13px" }, "The artist has to be in AR Scout (look them up first if not). Clips come from Deezer's 30-second previews."),
     el("div", { class: "grid" }, artistIn, genre, curator), list, tracks, note, el("div", {}, add));
-  api("/api/picks").then(d => genre.replaceChildren(...d.wheel.map(w => el("option", { value: w.name }, w.name)))).catch(() => {});
+  api("/api/picks").then(d => genre.replaceChildren(...genreOptions(d.wheel))).catch(() => {});
   api("/api/leaderboard?limit=10000").then(rows => { artists = rows; list.replaceChildren(...rows.map(r => el("option", { value: r.name }))); load(); }).catch(() => {});
   const load = async () => {
     const a = artists.find(r => r.name.toLowerCase() === artistIn.value.trim().toLowerCase());

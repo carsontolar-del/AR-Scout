@@ -152,3 +152,29 @@ def test_spin_stays_inside_the_vibe(artist):
         game.spin(ME, genres=["Indie Rock"])
     with pytest.raises(ValueError, match="Unknown genre"):
         game.spin(ME, genres=["Polka"])
+
+
+def test_bass_wheel_is_its_own_room(artist):
+    rock = game.add_pick(artist, 11, "Indie Rock")
+    dub = game.add_pick(artist, 12, "Dubstep")
+    assert [w["name"] for w in game.state(ME, "bass")["wheel"]][:2] == ["Dubstep", "Riddim"]
+    assert game.state(ME, "bass")["unheard"] == 1 and game.state(ME)["unheard"] == 1
+    for _ in range(5):
+        assert game.spin(ME, wheel="bass")["id"] == dub["id"]
+        assert game.spin(ME)["id"] == rock["id"]
+    with pytest.raises(ValueError, match="Unknown wheel"):
+        game.state(ME, "polka")
+
+
+def test_fill_wheel_tops_up_genres_from_tag_charts(artist, monkeypatch):
+    other = db.upsert_artist({"name": "Low End", "deezer_id": 998})
+    calls = []
+    def fake_discover(tag, **kw):
+        calls.append(tag)
+        return [{"id": artist}, {"id": other}] if tag == "riddim" else []
+    monkeypatch.setattr(service, "discover_by_tag", fake_discover)
+    added = game.fill_wheel("bass", per_genre=1, curator="auto", genres=["Riddim", "Techno"])
+    assert added == {"Riddim": 1}
+    assert calls == ["riddim", "techno", "hard techno"]
+    assert [(p["wheel_genre"], p["curator"]) for p in game.picks()] == [("Riddim", "auto")]
+    assert game.fill_wheel("bass", per_genre=1, genres=["Riddim"]) == {}  # already full

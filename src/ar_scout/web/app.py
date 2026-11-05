@@ -422,6 +422,7 @@ class SpinIn(BaseModel):
     listener: str
     genre: str | None = None
     genres: list[str] | None = Field(None, max_length=20)  # the listener's vibe: genres on their wheel
+    wheel: str = "main"
 
 
 class ReactIn(BaseModel):
@@ -446,13 +447,13 @@ def _bad_request(fn, *args, **kwargs):
 
 
 @app.get("/api/app/state")
-def app_state(listener: str):
-    return _bad_request(game.state, listener)
+def app_state(listener: str, wheel: str = "main"):
+    return _bad_request(game.state, listener, wheel)
 
 
 @app.post("/api/app/spin")
 def app_spin(body: SpinIn):
-    return _bad_request(game.spin, body.listener, body.genre or None, body.genres or None)
+    return _bad_request(game.spin, body.listener, body.genre or None, body.genres or None, body.wheel)
 
 
 @app.post("/api/app/react")
@@ -513,7 +514,8 @@ class HideIn(BaseModel):
 
 @app.get("/api/picks")
 def list_picks():
-    return {"rows": game.picks(), "wheel": [{"name": n, "hue": h} for n, h in game.WHEEL]}
+    return {"rows": game.picks(), "wheel": [{"name": n, "hue": h, "wheel": w} for w, slices in game.WHEELS.items()
+                                            for n, h in slices]}
 
 
 @app.get("/api/artist/{artist_id}/tracks")

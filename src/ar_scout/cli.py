@@ -244,6 +244,21 @@ def set_youtube(name: str, url: str):
     console.print(f"{res['artist']} -> {res['title']} ({_n(res['subscribers'])} subscribers, {res['videos']} videos)")
 
 
+@app.command("fill-wheel")
+def fill_wheel(wheel: str = typer.Argument("main", help="main | bass"),
+               per_genre: int = typer.Option(8, help="Top each genre up to this many live picks"),
+               tracks_per_artist: int = typer.Option(1, help="Clips to feature per artist"),
+               max_fans: int = typer.Option(50_000, help="Skip artists with more Deezer fans than this"),
+               curator: str = typer.Option("auto", help="Shown on the dashboard so these are easy to review"),
+               genre: Optional[list[str]] = typer.Option(None, help="Only these genres (repeatable)")):
+    """Fill the app's wheel with clips from emerging artists on each genre's Last.fm tag charts."""
+    from . import game
+    added = game.fill_wheel(wheel, per_genre, tracks_per_artist, max_fans, curator, genre, _progress)
+    for name, _ in game.WHEELS[wheel]:
+        console.print(f"{name:24} +{added.get(name, 0)}")
+    console.print(f"{sum(added.values())} picks added. Review them on the dashboard's Discovery app page.")
+
+
 @discover_app.command("similar")
 def d_similar(seeds: list[str], min_fans: int = 300, max_fans: int = 50_000, hops: int = 1, limit: int = 20):
     """Smaller artists in the orbit of one or more seed artists."""

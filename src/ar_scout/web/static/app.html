@@ -66,7 +66,7 @@ header.top { display: flex; align-items: center; justify-content: space-between;
 nav.tabs { position: fixed; z-index: 5; left: 0; right: 0; bottom: 0; display: flex; justify-content: center;
   padding: 10px max(16px, env(safe-area-inset-right)) calc(10px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
   background: color-mix(in oklab, var(--deep) 88%, transparent); backdrop-filter: blur(14px); border-top: 1px solid var(--ink-3); }
-nav.tabs div { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; width: min(100%, 560px); }
+nav.tabs div { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; width: min(100%, 560px); }
 nav.tabs a { text-align: center; text-decoration: none; padding: 9px 6px; border-radius: 14px; font-weight: 600; font-size: 0.92rem; color: var(--muted); }
 nav.tabs a[aria-current="page"] { background: var(--ink-2); color: var(--paper); box-shadow: inset 0 0 0 1px var(--ink-3); }
 
@@ -76,6 +76,8 @@ nav.tabs a[aria-current="page"] { background: var(--ink-2); color: var(--paper);
 .hub { position: absolute; inset: 35%; border-radius: 50%; display: grid; place-items: center; border: 1px solid var(--hub-border);
   background: var(--hub); color: var(--hub-ink); font: 600 1.05rem var(--display); }
 .hub:disabled { cursor: progress; color: var(--muted); }
+.room-head { display: grid; gap: 4px; text-align: center; margin-top: 4px; }
+.room-head h1 { margin: 0; font: 600 1.35rem var(--display); letter-spacing: -0.02em; }
 .vibe { display: grid; gap: 12px; width: min(100%, 420px); margin: 0 auto; }
 .vibe-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
 .vibe-head h2 { margin: 0; font: 600 1.05rem var(--display); letter-spacing: -0.01em; }
@@ -210,6 +212,7 @@ form.sub legend { padding: 0; margin-bottom: 6px; }
   <!-- ============ spin ============ -->
   <section id="tab-spin" data-tab="spin">
     <div id="wheelView" style="display:grid;gap:16px">
+      <div class="room-head" id="roomHead" hidden><p class="eyebrow">Bass room</p><h1>Dubstep to hardstyle, all drops</h1></div>
       <div class="wheel-wrap">
         <canvas id="wheel" width="720" height="720" aria-label="Genre wheel"></canvas>
         <button class="hub" id="spinBtn" type="button">Spin</button>
@@ -303,6 +306,7 @@ form.sub legend { padding: 0; margin-bottom: 6px; }
 
 <nav class="tabs" aria-label="App"><div>
   <a href="#spin" data-nav="spin">Spin</a>
+  <a href="#bass" data-nav="bass">Bass</a>
   <a href="#crate" data-nav="crate">Crate</a>
   <a href="#submit" data-nav="submit">Submit</a>
 </div></nav>
@@ -373,31 +377,55 @@ function openSettings() {
 $("settingsBtn").onclick = openSettings;
 
 // ============================================================ tabs
+// Spin and Bass are the same wheel screen, loaded with a different wheel ("room").
+let ROOM = null;
 function route() {
   let tab = location.hash.slice(1);
   if (location.pathname.startsWith("/submit/") && !tab) tab = "submit";
-  if (!["spin", "crate", "submit"].includes(tab)) tab = "spin";
-  document.querySelectorAll("[data-tab]").forEach(s => s.hidden = s.dataset.tab !== tab);
+  if (!["spin", "bass", "crate", "submit"].includes(tab)) tab = "spin";
+  const view = tab === "bass" ? "spin" : tab;
+  document.querySelectorAll("[data-tab]").forEach(s => s.hidden = s.dataset.tab !== view);
   document.querySelectorAll("[data-nav]").forEach(a => a.dataset.nav === tab ? a.setAttribute("aria-current", "page") : a.removeAttribute("aria-current"));
+  if (view === "spin") enterRoom(tab === "bass" ? "bass" : "main");
   if (tab === "crate") loadCrate();
+}
+function enterRoom(room) {
+  if (room === ROOM) return;
+  ROOM = room; WHEEL = []; rot = 0; vibe = loadVibe();
+  audio.pause(); current = null; $("songView").hidden = true; $("wheelView").hidden = false;
+  $("roomHead").hidden = room !== "bass";
+  $("notice").textContent = "";
+  loadState();
 }
 window.addEventListener("hashchange", route);
 
 // ============================================================ vibe: which genres are on your wheel right now
 // Moods are shortcuts to a set of genres; listeners can also tap genres on and off. Saved in this browser.
-const MOODS = [
-  ["Everything", null],
-  ["Late night", ["Indie Pop & Dream Pop", "Electronic", "R&B, Soul & Hip-hop", "Experimental"]],
-  ["Loud", ["Indie Rock", "Post-punk & Shoegaze", "Electronic"]],
-  ["Slow & soft", ["Folk & Songwriters", "Country & Americana", "Indie Pop & Dream Pop", "R&B, Soul & Hip-hop"]],
-  ["Road trip", ["Indie Rock", "Country & Americana", "Folk & Songwriters", "Indie Pop & Dream Pop"]],
-  ["Strange", ["Experimental", "Post-punk & Shoegaze", "Electronic"]],
-];
+const MOODS_BY = {
+  main: [
+    ["Everything", null],
+    ["Late night", ["Indie Pop & Dream Pop", "Electronic", "R&B, Soul & Hip-hop", "Experimental"]],
+    ["Loud", ["Indie Rock", "Post-punk & Shoegaze", "Electronic"]],
+    ["Slow & soft", ["Folk & Songwriters", "Country & Americana", "Indie Pop & Dream Pop", "R&B, Soul & Hip-hop"]],
+    ["Road trip", ["Indie Rock", "Country & Americana", "Folk & Songwriters", "Indie Pop & Dream Pop"]],
+    ["Strange", ["Experimental", "Post-punk & Shoegaze", "Electronic"]],
+  ],
+  bass: [
+    ["Everything", null],
+    ["Heavy", ["Dubstep", "Riddim", "Bass House", "Hardstyle"]],
+    ["Euphoric", ["Melodic & Future Bass", "Trance", "House"]],
+    ["Warehouse", ["Techno", "House", "UK Garage"]],
+    ["Fast", ["Drum & Bass", "Hardstyle", "Trance"]],
+    ["Sunset", ["House", "UK Garage", "Melodic & Future Bass"]],
+  ],
+};
+const MOODS = () => MOODS_BY[ROOM] || MOODS_BY.main;
+const vibeKey = () => ROOM === "bass" ? "ee-vibe-bass" : "ee-vibe";
+function loadVibe() { try { return new Set(JSON.parse(store.get(vibeKey()) || "[]")); } catch { return new Set(); } }
 let vibe = new Set();
-try { vibe = new Set(JSON.parse(store.get("ee-vibe") || "[]")); } catch {}
 const onWheel = () => WHEEL.filter(g => vibe.has(g.name));
 function setVibe(names) {
-  vibe = new Set(names); store.set("ee-vibe", JSON.stringify([...vibe]));
+  vibe = new Set(names); store.set(vibeKey(), JSON.stringify([...vibe]));
   renderVibe(); showGenres(); drawWheel();
 }
 function renderVibe() {
@@ -405,14 +433,14 @@ function renderVibe() {
   vibe = new Set([...vibe].filter(n => all.includes(n)));
   if (!vibe.size) vibe = new Set(all);
   const same = list => list.length === vibe.size && list.every(n => vibe.has(n));
-  $("moods").innerHTML = MOODS.map(([label, list], i) =>
+  $("moods").innerHTML = MOODS().map(([label, list], i) =>
     `<button type="button" data-mood="${i}" aria-pressed="${same(list || all)}">${label}</button>`).join("");
   $("vchips").innerHTML = WHEEL.map((g, i) =>
     `<button type="button" data-g="${i}" aria-pressed="${vibe.has(g.name)}" class="${g.unheard ? "" : "empty-g"}">${esc(g.name)} <i>${g.unheard}</i></button>`).join("");
   const n = onWheel().reduce((s, g) => s + g.unheard, 0);
   $("vibeHint").textContent = `${n} new ${n === 1 ? "song" : "songs"} in this vibe`;
 }
-$("moods").onclick = e => { const b = e.target.closest("[data-mood]"); if (b) setVibe(MOODS[b.dataset.mood][1] || WHEEL.map(g => g.name)); };
+$("moods").onclick = e => { const b = e.target.closest("[data-mood]"); if (b) setVibe(MOODS()[b.dataset.mood][1] || WHEEL.map(g => g.name)); };
 $("vchips").onclick = e => {
   const b = e.target.closest("[data-g]"); if (!b || spinning) return;
   const name = WHEEL[b.dataset.g].name, next = new Set(vibe);
@@ -427,7 +455,7 @@ $("vchips").onclick = e => {
 let WHEEL = [], rot = 0, spinning = false, current = null;
 const SHORT = { "Indie Rock": "INDIE ROCK", "Indie Pop & Dream Pop": "DREAM POP", "Post-punk & Shoegaze": "SHOEGAZE",
   "Folk & Songwriters": "FOLK", "Country & Americana": "COUNTRY", "Electronic": "ELECTRONIC", "R&B, Soul & Hip-hop": "R&B/HIP-HOP",
-  "Experimental": "EXPER." };
+  "Experimental": "EXPER.", "Melodic & Future Bass": "MELODIC", "Drum & Bass": "DNB", "UK Garage": "UKG" };
 const wc = $("wheel"), w = wc.getContext("2d"), R = 360, RING = 228, LABEL = 296;
 function drawWheel() {
   const ON = onWheel(); if (!ON.length) return;
@@ -473,7 +501,8 @@ function spinTo(index) {
 
 async function loadState() {
   try {
-    const s = await call(`/api/app/state?listener=${LISTENER}`);
+    const room = ROOM, s = await call(`/api/app/state?listener=${LISTENER}&wheel=${room}`);
+    if (room !== ROOM) return;  // switched rooms while this was loading
     WHEEL = s.wheel; renderVibe(); showGenres(); drawWheel();
     $("spins").innerHTML = s.unheard ? `<b>${s.unheard}</b> new ${s.unheard === 1 ? "song" : "songs"} to hear` : "";
     $("spinBtn").disabled = !s.unheard;
@@ -516,10 +545,10 @@ async function doSpin() {
   // Unlock audio inside the tap, so the clip can start once the wheel stops (Safari needs this).
   audio.muted = true; audio.play().catch(() => {}); audio.pause(); audio.muted = false;
   try {
-    const ON = onWheel();
-    const pick = await call("/api/app/spin", { listener: LISTENER, genres: ON.length < WHEEL.length ? ON.map(g => g.name) : null });
+    const ON = onWheel(), room = ROOM;
+    const pick = await call("/api/app/spin", { listener: LISTENER, wheel: room, genres: ON.length < WHEEL.length ? ON.map(g => g.name) : null });
     await spinTo(ON.findIndex(g => g.name === pick.wheel_genre));
-    showSong(pick);
+    if (room === ROOM) showSong(pick);
   } catch (e) { $("notice").textContent = e.message; }
   spinning = false; loadState();
 }
@@ -693,9 +722,7 @@ $("subForm").onsubmit = async e => {
 $("subAgain").onclick = () => { $("subForm").reset(); $("subDone").hidden = true; $("subForm").hidden = false; showSub(); };
 
 // ============================================================ boot
-showGenres();
 showSub();
-loadState();
 route();
 </script>
 </body>
