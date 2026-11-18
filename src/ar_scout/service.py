@@ -303,16 +303,23 @@ def resolve(name: str, deep: bool = True) -> dict:
             if wd := mb["links"].get("wikidata"):
                 fields["wiki_title"] = _try(errors, "wikidata", lambda: wikipedia.enwiki_title_from_wikidata(wd))
 
+        youtube_failed = False
         if youtube.available():
             yt_url = (mb or {}).get("links", {}).get("youtube", "")
+            before = len(errors)
             channel, source = _youtube_from_link(errors, yt_url, display) if yt_url else (None, None)
             if not channel:
                 channel = _try(errors, "youtube", lambda: youtube.search_channel(display))
                 source = "search" if channel else None
-            if artist and artist.get("youtube_channel") and channel and channel != artist["youtube_channel"]:
-                db.delete_metrics(artist["id"], "youtube.")
-            fields.update(youtube_channel=channel, youtube_source=source)
-        fields["resolved_at"] = db.now()
+            # A failed search (usually the 10k/day quota) isn't "no channel": leave the artist unresolved so the
+            # next relink tries again, instead of marking it linked with no YouTube for good.
+            youtube_failed = not channel and any(e.startswith("youtube") and "HTTP" in e for e in errors[before:])
+            if not youtube_failed:
+                if artist and artist.get("youtube_channel") and channel and channel != artist["youtube_channel"]:
+                    db.delete_metrics(artist["id"], "youtube.")
+                fields.update(youtube_channel=channel, youtube_source=source)
+        if not youtube_failed:
+            fields["resolved_at"] = db.now()
 
         if spotify.available():
             sp = _try(errors, "spotify", lambda: spotify.search_artist(display))
@@ -402,11 +409,15 @@ def relink_all(progress: Callable[[str], None] | None = None) -> dict:
         try:
             r = resolve(a["name"], deep=True)
             errors += [f"{a['name']}: {e}" for e in r.get("_errors", [])]
+            if not r.get("resolved_at"):  # YouTube refused (quota): stop, the rest would fail the same way
+                return {"relinked": done, "errors": errors, "stopped": "YouTube refused the lookup (likely the "
+                        "daily quota); the remaining artists stay unlinked and will be tried on the next run",
+                        "remaining": sum(1 for x in db.all_artists() if not x.get("resolved_at"))}
             errors += [f"{a['name']}: {e}" for e in snapshot(r["id"])["errors"]]
             done += 1
         except SourceError as exc:
             errors.append(f"{a['name']}: {exc}")
-    return {"relinked": done, "errors": errors}
+    return {"relinked": done, "errors": errors, "remaining": 0}
 
 
 def _span_days(cov: dict) -> float:

@@ -182,6 +182,8 @@ def relink():
     console.print(f"Relinked {res['relinked']} artists")
     for e in res["errors"]:
         console.print(f"[yellow]{e}[/]")
+    if res.get("stopped"):
+        console.print(f"[red]Stopped: {res['stopped']}[/] ({res['remaining']} left)")
 
 
 @app.command("recheck-youtube")

@@ -67,3 +67,37 @@ def test_recheck_switches_suspect_channels_but_not_manual_ones(tmp_db, fake_yout
 
 def test_ampersand_matches_and():
     assert youtube.title_matches("Penny and Sparrow", "Penny & Sparrow")
+
+
+def test_quota_error_leaves_artist_unlinked_and_stops_relink(tmp_db, monkeypatch):
+    from ar_scout.http import SourceError
+
+    def refused(name):
+        raise SourceError("www.googleapis.com HTTP 403: quotaExceeded")
+
+    for src in ("deezer", "lastfm", "musicbrainz", "spotify"):
+        monkeypatch.setattr(getattr(service, src), "available", lambda: False, raising=False)
+    monkeypatch.setattr(service, "_pick_deezer", lambda name: None)
+    monkeypatch.setattr(service.musicbrainz, "search", lambda name: [])
+    monkeypatch.setattr(service.youtube, "available", lambda: True)
+    monkeypatch.setattr(service.youtube, "search_channel", refused)
+    monkeypatch.setattr(service, "snapshot", lambda artist_id: pytest.fail("snapshotted after a refused lookup"))
+    first = db.upsert_artist({"name": "Band One", "deezer_id": 1})
+    db.upsert_artist({"name": "Band Two", "deezer_id": 2})
+    monkeypatch.setattr(service.deezer, "artist", lambda did: {"id": did, "name": f"Band {did}"})
+
+    res = service.relink_all()
+    assert res["relinked"] == 0 and res["remaining"] == 2 and "quota" in res["stopped"]
+    assert db.get_artist(first)["resolved_at"] is None  # tried again on the next run
+
+
+def test_no_channel_found_still_counts_as_linked(tmp_db, monkeypatch):
+    monkeypatch.setattr(service.lastfm, "available", lambda: False)
+    monkeypatch.setattr(service.spotify, "available", lambda: False)
+    monkeypatch.setattr(service.musicbrainz, "search", lambda name: [])
+    monkeypatch.setattr(service.youtube, "available", lambda: True)
+    monkeypatch.setattr(service.youtube, "search_channel", lambda name: None)
+    monkeypatch.setattr(service.deezer, "artist", lambda did: {"id": did, "name": "Quiet Band"})
+    artist_id = db.upsert_artist({"name": "Quiet Band", "deezer_id": 7})
+    assert service.resolve("Quiet Band")["resolved_at"]
+    assert db.get_artist(artist_id)["youtube_channel"] is None
