@@ -103,6 +103,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .btn:hover { background: var(--surface-2); }
 .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
 .btn.primary:hover { background: var(--accent-hover); }
+a.btn { text-decoration: none; }
 .btn.ghost { box-shadow: none; border-color: transparent; background: none; color: var(--text-2); }
 .btn.ghost:hover { background: var(--surface-2); color: var(--text); }
 .btn:disabled { opacity: .55; cursor: progress; }
@@ -263,6 +264,52 @@ body.demo .demo-hide, body.demo .admin-toggle, body.demo .admin-only, body.demo 
 .review-banner ul { margin: 0; padding-left: 18px; display: grid; gap: 2px; }
 .review-banner .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; justify-content: space-between; }
 @media (max-width: 760px) { .review-item { grid-template-columns: auto minmax(0, 1fr); } .review-item .acts { grid-column: 1 / -1; justify-content: flex-start; } }
+.sub-links { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px; margin-bottom: 20px; }
+.sub-link { display: grid; gap: 6px; padding: 12px 14px; }
+.sub-link .row { display: flex; gap: 8px; align-items: center; }
+.sub-link .sub-url { flex: 1; min-width: 0; overflow: hidden; }
+.sub-link code { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; color: var(--accent-text); }
+.sub-list { display: grid; gap: 10px; }
+.sub-item { display: grid; grid-template-columns: minmax(0, 1fr) 220px; gap: 16px; padding: 14px 16px; }
+.sub-item.is-new { border-left: 3px solid var(--accent); }
+.sub-item .t { font-weight: 600; font-size: 15px; }
+.sub-item .meta { color: var(--text-2); font-size: 12.5px; display: flex; gap: 6px 12px; flex-wrap: wrap; margin-top: 4px; }
+.sub-item .msg { margin: 8px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13.5px; }
+.sub-item .acts { display: grid; gap: 8px; align-content: start; }
+.sub-item .acts .input { width: 100%; }
+.sub-item textarea.input { margin-top: 0; min-height: 56px; }
+.sub-item a { color: var(--accent-text); overflow-wrap: anywhere; }
+@media (max-width: 760px) { .sub-item { grid-template-columns: minmax(0, 1fr); } }
+.thread { grid-column: 1 / -1; border-top: 1px solid var(--border); padding-top: 10px; }
+.thread summary { cursor: pointer; font-size: 13px; font-weight: 600; color: var(--text-2); }
+.thread .tl { display: grid; gap: 8px; margin: 10px 0; }
+.thread .tc { font-size: 13px; }
+.thread .tc .h { color: var(--muted); font-size: 12px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.thread .tc .h b { color: var(--text); font-weight: 600; }
+.thread .tc p { margin: 2px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.thread .tc.hidden-c p { color: var(--muted); text-decoration: line-through; }
+.thread form { display: grid; grid-template-columns: 140px minmax(0, 1fr) auto; gap: 8px; align-items: start; }
+.thread form textarea.input { margin-top: 0; min-height: 38px; }
+@media (max-width: 760px) { .thread form { grid-template-columns: minmax(0, 1fr); } }
+.pick-item { display: grid; grid-template-columns: 64px minmax(0, 1fr) 240px; gap: 14px; padding: 14px 16px; }
+.pick-item img, .pick-item .noart { width: 64px; height: 64px; border-radius: 10px; object-fit: cover; background: var(--surface-2); }
+.pick-item.retired { opacity: .65; }
+.pick-item .stats { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 6px; font-size: 12.5px; color: var(--text-2); font-variant-numeric: tabular-nums; }
+.pick-item .stats b { color: var(--text); }
+.pick-item .acts { display: grid; gap: 8px; align-content: start; }
+.pick-item .acts .input { width: 100%; }
+.genre-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; }
+.add-pick { display: grid; gap: 12px; padding: 16px; margin-bottom: 20px; }
+.add-pick .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; }
+.add-pick .input { width: 100%; }
+.tracks { display: grid; gap: 6px; }
+.tracks label { display: flex; gap: 10px; align-items: center; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--border); cursor: pointer; font-size: 13px; }
+.tracks label.off { opacity: .5; cursor: not-allowed; }
+.tracks img { width: 36px; height: 36px; border-radius: 6px; }
+.mod-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; padding: 10px 14px; font-size: 13px; }
+.mod-item.hidden-c .body { color: var(--muted); text-decoration: line-through; }
+.mod-item .h { color: var(--muted); font-size: 12px; }
+@media (max-width: 760px) { .pick-item { grid-template-columns: 56px minmax(0, 1fr); } .pick-item .acts { grid-column: 1 / -1; } }
 .who .t { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 3px; }
 .yt-note { font-size: 11.5px; font-style: italic; }
 .star { border: 0; background: none; cursor: pointer; color: var(--border-strong); padding: 4px; border-radius: 6px; line-height: 0; }
@@ -457,6 +504,12 @@ textarea.input { width: 100%; min-height: 72px; resize: vertical; margin-top: 10
       <a href="#/review" data-nav="review">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 1.5 14.5 13h-13z"/><path d="M8 6v3.2M8 11.2v.3"/></svg>
         Needs review <span class="count warn-count" id="cntReview"></span></a>
+      <a href="#/picks" data-nav="picks" class="demo-hide">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6.5"/><circle cx="8" cy="8" r="2"/><path d="M8 1.5v4.5"/></svg>
+        Discovery app <span class="count" id="cntPicks"></span></a>
+      <a href="#/submissions" data-nav="submissions" class="demo-hide">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1.5 9.5h3.5l1 2h4l1-2h3.5"/><path d="M1.5 9.5 3.5 3h9l2 6.5V13a.5.5 0 0 1-.5.5H2a.5.5 0 0 1-.5-.5z"/></svg>
+        Submissions <span class="count" id="cntSubs"></span></a>
       <a href="#/help" data-nav="help">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6.5"/><path d="M6.3 6.2a1.8 1.8 0 1 1 2.4 1.7c-.5.2-.7.6-.7 1.1v.4M8 11.3v.2"/></svg>
         Help</a>
@@ -600,6 +653,8 @@ function route() {
   if (page === "watchlist") { lastList = "watchlist"; return renderWatchlist(); }
   if (page === "discover") { lastList = "discover"; return renderDiscover(); }
   if (page === "review") { lastList = "review"; return renderReview(); }
+  if (page === "submissions") { lastList = "submissions"; return renderSubmissions(); }
+  if (page === "picks") { lastList = "picks"; return renderPicks(arg); }
   if (page === "movers") { lastList = "movers"; return renderMovers(); }
   if (page === "week") { lastList = "week"; return renderWeek(); }
   if (page === "compare") return renderCompare();
@@ -1310,6 +1365,247 @@ async function renderReview() {
   })));
 }
 
+// ============================================================ submissions (from the public /submit links)
+const subs = { kind: "", status: "" };
+const SUB_STATUS = { new: "New", listened: "Listened", shortlisted: "Shortlisted", replied: "Replied", passed: "Passed" };
+const SUB_TOPIC = { demo: "Demo", message: "Message", song: "Fan pick" };
+
+function copyBtn(text, label = "Copy") {
+  const b = el("button", { class: "btn" }, label);
+  b.onclick = async () => {
+    try { await navigator.clipboard.writeText(text); toast("Copied"); } catch { toast("Couldn't copy. Select the text and copy it instead."); }
+  };
+  return b;
+}
+
+async function renderSubmissions() {
+  const slot = el("div", {}, loadingCard(4));
+  const kindSeg = el("div", { class: "segmented" }), statusSel = el("select", { class: "input", id: "sub-status" });
+  const links = [["app", "Discovery app", "The wheel, with Submit tabs for fans and artists"], ["submit/artist", "Artist link", "Opens the app on the artist form"],
+                 ["submit/fan", "Fan link", "Opens the app on the fan form"]].map(([k, t, d]) => {
+    const url = `${location.origin}/${k}`;
+    return el("div", { class: "card sub-link" }, el("b", {}, t), el("span", { class: "dim", style: "font-size:12.5px" }, d),
+      el("div", { class: "row" }, el("a", { href: url, target: "_blank", rel: "noopener", class: "sub-url", title: "Open in a new tab" }, el("code", {}, url)), copyBtn(url)));
+  });
+  view.replaceChildren(
+    el("div", { class: "page-head" }, el("div", {}, el("h1", {}, "Submissions"),
+      el("p", {}, "Demos and messages from artists, and songs fans want to share, sent from the discovery app's Submit tab. Anyone with a link can send one without signing in."))),
+    el("div", { class: "sub-links" }, links),
+    el("div", { class: "toolbar" }, el("div", { class: "field" }, el("span", {}, "From"), kindSeg),
+      el("label", { class: "field" }, el("span", {}, "Status"), statusSel)),
+    slot);
+  let d;
+  try { d = await api(`/api/submissions?kind=${subs.kind}&status=${subs.status}`); } catch (e) { slot.replaceChildren(errorCard(e)); return; }
+  kindSeg.replaceChildren(...[["", "Everyone"], ["artist", "Artists"], ["fan", "Fans"]].map(([k, t]) => {
+    const n = k ? d.new[k] : d.new.artist + d.new.fan;
+    return el("button", { class: subs.kind === k ? "on" : "", onclick: () => { subs.kind = k; renderSubmissions(); } },
+      t, n ? el("span", { class: "c" }, `${n} new`) : null);
+  }));
+  statusSel.replaceChildren(el("option", { value: "" }, "Any status"), ...d.statuses.map(s => el("option", { value: s, selected: s === subs.status }, SUB_STATUS[s])));
+  statusSel.onchange = () => { subs.status = statusSel.value; renderSubmissions(); };
+  setSubCount(d.new);
+  if (!d.rows.length) {
+    slot.replaceChildren(el("div", { class: "card" }, el("div", { class: "empty" },
+      el("h4", {}, subs.kind || subs.status ? "Nothing matches these filters" : "No submissions yet"),
+      subs.kind || subs.status ? "Try Everyone and Any status." : "Share the artist and fan links above. New submissions show up here.")));
+    return;
+  }
+  slot.replaceChildren(el("div", { class: "sub-list" }, d.rows.map(subItem)));
+}
+
+function subItem(s) {
+  const title = s.topic === "message" ? `${s.artist_name}` : `${s.song_title} — ${s.artist_name}`;
+  const status = el("select", { class: "input", "aria-label": "Status" }, Object.entries(SUB_STATUS).map(([k, t]) => el("option", { value: k, selected: k === s.status }, t)));
+  const note = el("textarea", { class: "input", placeholder: "Team note (only the team sees this)" });
+  note.value = s.team_note || "";
+  const card = el("div", { class: "card sub-item" + (s.status === "new" ? " is-new" : "") });
+  const save = async fields => {
+    try { const r = await api(`/api/submissions/${s.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(fields) });
+      Object.assign(s, r); card.classList.toggle("is-new", s.status === "new"); loadSubCount(); toast("Saved"); }
+    catch (e) { toast("Couldn't save: " + e.message); }
+  };
+  status.onchange = () => save({ status: status.value });
+  note.onchange = () => save({ team_note: note.value });
+  const when = new Date(s.created_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+  const from = [s.name || "Anonymous fan", s.email ? el("a", { href: `mailto:${s.email}` }, s.email) : null];
+  card.append(
+    el("div", { style: "min-width:0" },
+      el("div", { style: "display:flex;gap:8px;align-items:center;flex-wrap:wrap" },
+        el("span", { class: "pill" + (s.kind === "artist" ? " diy" : "") }, SUB_TOPIC[s.topic] || s.topic), el("span", { class: "t" }, title)),
+      el("div", { class: "meta" },
+        el("span", {}, "From ", ...from.filter(Boolean).flatMap((x, i) => i ? [" · ", x] : [x])), el("span", {}, when),
+        s.genre ? el("span", {}, s.genre) : null, s.location ? el("span", {}, s.location) : null,
+        s.socials ? el("span", {}, s.socials) : null, s.kind === "fan" && s.credit_ok ? el("span", {}, "OK to credit") : null),
+      s.link ? el("div", { class: "msg" }, el("a", { href: s.link, target: "_blank", rel: "noopener noreferrer" }, s.link)) : null,
+      s.message ? el("p", { class: "msg" }, s.message) : null),
+    el("div", { class: "acts" }, status, note,
+      el("div", { style: "display:flex;gap:6px;flex-wrap:wrap" },
+        s.artist_name ? el("button", { class: "btn", onclick: () => go(s.artist_name), title: "Look the artist up in AR Scout" }, "Look up artist") : null,
+        s.artist_name && s.topic !== "message" ? el("button", { class: "btn", title: "Choose one of their songs for the discovery app",
+          onclick: () => { pickDraft = { artist: s.artist_name, submission_id: s.id }; location.hash = "/picks"; } }, "Feature in app") : null,
+        s.email ? copyBtn(s.email, "Copy email") : null)),
+    teamThread("submission", s.id));
+  return card;
+}
+
+// ============================================================ team comment threads (private to the dashboard)
+const myName = () => { try { return localStorage.getItem("ars-name") || ""; } catch { return ""; } };
+function teamThread(target, id, { label = "Team thread", publicToo = false } = {}) {
+  const box = el("details", { class: "thread" }), sum = el("summary", {}, label);
+  const list = el("div", { class: "tl" });
+  const who = el("input", { class: "input", placeholder: "Your name", maxlength: 40, "aria-label": "Your name" });
+  const body = el("textarea", { class: "input", placeholder: "Only the team sees this", maxlength: 4000, "aria-label": "Comment" });
+  const send = el("button", { class: "btn primary", type: "submit" }, "Post");
+  who.value = myName();
+  const form = el("form", {}, who, body, send);
+  box.append(sum, list, form);
+  const draw = async () => {
+    const [team, pub] = await Promise.all([
+      api(`/api/comments?target=${target}&target_id=${id}&scope=team`),
+      publicToo ? api(`/api/comments?target=${target}&target_id=${id}&scope=public`) : Promise.resolve([])]);
+    const row = (c, isPublic) => {
+      const r = el("div", { class: "tc" + (c.hidden_at ? " hidden-c" : "") });
+      const act = isPublic
+        ? el("button", { class: "linkish", onclick: async () => { await api(`/api/comments/${c.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ hidden: !c.hidden_at }) }); draw(); } }, c.hidden_at ? "Show" : "Hide")
+        : el("button", { class: "linkish", onclick: async () => { await api(`/api/comments/${c.id}`, { method: "DELETE" }); draw(); } }, "Delete");
+      r.append(el("div", { class: "h" }, el("b", {}, c.author), isPublic ? el("span", { class: "pill" }, "public") : null, ago(c.created_at), act), el("p", {}, c.body));
+      return r;
+    };
+    list.replaceChildren(...(team.length || pub.length ? [] : [el("span", { class: "dim", style: "font-size:13px" }, "No comments yet.")]),
+      ...pub.map(c => row(c, true)), ...team.map(c => row(c, false)));
+    sum.textContent = `${label} (${team.length}${publicToo ? ` team · ${pub.filter(c => !c.hidden_at).length} public` : ""})`;
+  };
+  box.addEventListener("toggle", () => { if (box.open) draw().catch(e => list.replaceChildren(el("span", { class: "warn" }, e.message))); });
+  form.onsubmit = async e => {
+    e.preventDefault(); send.disabled = true;
+    try { localStorage.setItem("ars-name", who.value.trim()); } catch {}
+    try { await post("/api/comments", { target, target_id: id, author: who.value, body: body.value }); body.value = ""; await draw(); }
+    catch (ex) { toast("Couldn't post: " + ex.message); }
+    send.disabled = false;
+  };
+  return box;
+}
+
+// ============================================================ discovery app: picks, stats, moderation
+let pickDraft = null;  // set by "Feature in app" on a submission
+
+async function renderPicks() {
+  const slot = el("div", {}, loadingCard(4));
+  const modSlot = el("div", {});
+  view.replaceChildren(
+    el("div", { class: "page-head" }, el("div", {}, el("h1", {}, "Discovery app"),
+      el("p", {}, "The songs on the public wheel, how listeners react to them, and their comments. Listeners don't sign in; each browser gets an anonymous id.")),
+      el("div", { class: "head-actions" }, el("a", { class: "btn", href: "/app", target: "_blank", rel: "noopener" }, "Open the app ↗"), copyBtn(location.origin + "/app", "Copy app link"))),
+    addPickForm(), el("h3", { style: "margin:24px 0 10px;font-size:15px" }, "Picks"), slot,
+    el("h3", { style: "margin:28px 0 4px;font-size:15px" }, "Public comments"),
+    el("p", { class: "dim", style: "margin:0 0 10px;font-size:13px" }, "Newest first, across all songs. Hide anything that breaks the rules; hidden comments disappear from the app right away."), modSlot);
+  let d;
+  try { d = await api("/api/picks"); } catch (e) { slot.replaceChildren(errorCard(e)); return; }
+  const hue = Object.fromEntries(d.wheel.map(w => [w.name, w.hue]));
+  $("#cntPicks").textContent = d.rows.filter(p => p.status === "live").length || "";
+  slot.replaceChildren(!d.rows.length
+    ? el("div", { class: "card" }, el("div", { class: "empty" }, el("h4", {}, "No picks yet"), "Add a song above. Each genre needs a few before the wheel feels full."))
+    : el("div", { class: "sub-list" }, d.rows.map(p => pickItem(p, hue, d.wheel))));
+  try {
+    const feed = await api("/api/comments/public");
+    modSlot.replaceChildren(!feed.length ? el("div", { class: "card" }, el("div", { class: "empty", style: "padding:28px" }, "No public comments yet."))
+      : el("div", { class: "card", style: "display:grid" }, feed.map(c => {
+        const r = el("div", { class: "mod-item" + (c.hidden_at ? " hidden-c" : ""), style: "border-bottom:1px solid var(--border)" });
+        const b = el("button", { class: "btn" }, c.hidden_at ? "Show" : "Hide");
+        b.onclick = async () => { await api(`/api/comments/${c.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ hidden: !c.hidden_at }) }); renderPicks(); };
+        r.append(el("div", { style: "min-width:0" }, el("div", { class: "h" }, `${c.author} on ${c.song} · ${ago(c.created_at)}`), el("div", { class: "body", style: "white-space:pre-wrap;overflow-wrap:anywhere" }, c.body)), b);
+        return r;
+      })));
+  } catch (e) { modSlot.replaceChildren(errorCard(e)); }
+}
+
+// The app has two wheels (main, and the Bass tab); group their genres so it's clear where a song lands.
+function genreOptions(wheel, selected) {
+  return [["main", "Main wheel"], ["bass", "Bass wheel"]].map(([k, label]) => el("optgroup", { label },
+    wheel.filter(w => (w.wheel || "main") === k).map(w => el("option", { value: w.name, selected: w.name === selected }, w.name))));
+}
+function pickItem(p, hue, wheel) {
+  const card = el("div", { class: "card pick-item" + (p.status === "retired" ? " retired" : "") });
+  const status = el("select", { class: "input", "aria-label": "Status" }, [["live", "Live on the wheel"], ["retired", "Retired"]].map(([v, t]) => el("option", { value: v, selected: v === p.status }, t)));
+  const genre = el("select", { class: "input", "aria-label": "Wheel genre" }, genreOptions(wheel, p.wheel_genre));
+  const note = el("textarea", { class: "input", placeholder: "Why we picked it (listeners see this)", maxlength: 300 });
+  note.value = p.note || "";
+  const save = async fields => {
+    try { await api(`/api/picks/${p.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(fields) }); toast("Saved"); renderPicks(); }
+    catch (e) { toast("Couldn't save: " + e.message); }
+  };
+  status.onchange = () => save({ status: status.value });
+  genre.onchange = () => save({ wheel_genre: genre.value });
+  note.onchange = () => save({ note: note.value });
+  const rate = p.keep_rate == null ? "–" : Math.round(p.keep_rate * 100) + "%";
+  card.append(
+    p.cover_url ? el("img", { src: p.cover_url, alt: "", loading: "lazy" }) : el("div", { class: "noart" }),
+    el("div", { style: "min-width:0" },
+      el("div", { style: "font-weight:600;font-size:15px" }, p.title),
+      el("div", { class: "dim", style: "font-size:13px" }, el("span", { class: "n", style: "cursor:pointer", onclick: () => go(p.artist_name) }, p.artist_name), " · ",
+        el("span", { class: "genre-dot", style: `background:${hue[p.wheel_genre] || "var(--muted)"}` }), p.wheel_genre, p.curator ? ` · picked by ${p.curator}` : ""),
+      el("div", { class: "stats" }, el("span", {}, el("b", {}, p.plays), " plays"), el("span", {}, el("b", {}, rate), " kept"),
+        el("span", {}, el("b", {}, p.avg_listened_ms ? Math.round(p.avg_listened_ms / 1000) + "s" : "–"), " avg listen"),
+        el("span", {}, el("b", {}, p.comments), " public comments"))),
+    el("div", { class: "acts" }, status, genre, note,
+      el("button", { class: "btn admin-only", onclick: async () => { await api(`/api/picks/${p.id}`, { method: "DELETE" }); toast("Pick deleted"); renderPicks(); } }, "Delete pick")),
+    teamThread("pick", p.id, { label: "Comments", publicToo: true }));
+  return card;
+}
+
+function addPickForm() {
+  const box = el("div", { class: "card add-pick" });
+  const artistIn = el("input", { class: "input", list: "pick-artists", placeholder: "Artist in AR Scout", id: "pick-artist" });
+  const list = el("datalist", { id: "pick-artists" });
+  const genre = el("select", { class: "input", id: "pick-genre" });
+  const curator = el("input", { class: "input", placeholder: "Picked by (your name)", maxlength: 60, id: "pick-curator" });
+  const note = el("textarea", { class: "input", placeholder: "Why we picked it: one line listeners will see", maxlength: 300, id: "pick-note", style: "margin-top:0" });
+  const tracks = el("div", { class: "tracks" }, el("span", { class: "dim", style: "font-size:13px" }, "Choose an artist to see their top songs."));
+  const add = el("button", { class: "btn primary", disabled: true }, "Add to the wheel");
+  curator.value = myName();
+  let artists = [], chosen = null, submissionId = null;
+  box.append(el("b", {}, "Add a song to the wheel"),
+    el("span", { class: "dim", style: "font-size:13px" }, "The artist has to be in AR Scout (look them up first if not). Clips come from Deezer's 30-second previews."),
+    el("div", { class: "grid" }, artistIn, genre, curator), list, tracks, note, el("div", {}, add));
+  api("/api/picks").then(d => genre.replaceChildren(...genreOptions(d.wheel))).catch(() => {});
+  api("/api/leaderboard?limit=10000").then(rows => { artists = rows; list.replaceChildren(...rows.map(r => el("option", { value: r.name }))); load(); }).catch(() => {});
+  const load = async () => {
+    const a = artists.find(r => r.name.toLowerCase() === artistIn.value.trim().toLowerCase());
+    chosen = null; add.disabled = true;
+    if (!a) { tracks.replaceChildren(el("span", { class: "dim", style: "font-size:13px" }, artistIn.value.trim() ? "Not in AR Scout yet. Look them up with the search bar, then come back." : "Choose an artist to see their top songs.")); return; }
+    tracks.replaceChildren(el("span", { class: "dim", style: "font-size:13px" }, "Loading songs…"));
+    try {
+      const ts = await api(`/api/artist/${a.id}/tracks`);
+      tracks.replaceChildren(...ts.map(t => {
+        const ok = t.has_preview && !t.already_picked;
+        const radio = el("input", { type: "radio", name: "pick-track", disabled: !ok });
+        radio.onchange = () => { chosen = { artist_id: a.id, deezer_track_id: t.id }; add.disabled = false; };
+        return el("label", { class: ok ? "" : "off" }, radio, t.cover_url ? el("img", { src: t.cover_url, alt: "" }) : null,
+          el("span", {}, el("b", {}, t.title), el("span", { class: "dim" }, ` · ${t.album || ""}`),
+            t.already_picked ? el("span", { class: "dim" }, " · already a pick") : !t.has_preview ? el("span", { class: "dim" }, " · no preview clip") : null));
+      }));
+    } catch (e) { tracks.replaceChildren(el("span", { class: "warn" }, e.message)); }
+  };
+  artistIn.onchange = load;
+  if (pickDraft) { artistIn.value = pickDraft.artist; submissionId = pickDraft.submission_id; pickDraft = null; }
+  add.onclick = async () => {
+    add.disabled = true;
+    try {
+      const p = await post("/api/picks", { ...chosen, wheel_genre: genre.value, curator: curator.value, note: note.value, submission_id: submissionId });
+      try { localStorage.setItem("ars-name", curator.value.trim()); } catch {}
+      toast(`${p.title} is on the wheel`); renderPicks();
+    } catch (e) { toast("Couldn't add: " + e.message); add.disabled = false; }
+  };
+  return box;
+}
+
+function setSubCount(n) { $("#cntSubs").textContent = (n.artist + n.fan) ? `${n.artist + n.fan} new` : ""; }
+async function loadSubCount() {
+  if (DEMO) return;
+  try { setSubCount((await api("/api/submissions?status=new")).new); } catch {}
+  try { $("#cntPicks").textContent = (await api("/api/picks")).rows.filter(p => p.status === "live").length || ""; } catch {}
+}
+
 function reviewBanner(a, s) {
   const toggle = (verified) => async (e) => {
     e.target.disabled = true;
@@ -1937,6 +2233,7 @@ api("/api/status").then(st => {
       st[k] ? null : el("span", { class: "dim", style: "margin-left:auto;font-size:11px" }, "off"))));
 }).catch(() => {});
 loadCounts();
+loadSubCount();
 loadHealth();
 route();
 drawCompareBar();
