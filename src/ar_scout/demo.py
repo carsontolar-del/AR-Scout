@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Callable
 
 from . import db, service
+from .http import SourceError
 
 STATIC = Path(__file__).parent / "web" / "static"
 PRIVATE_ROW_FIELDS = ("status", "tags", "owner", "next_step", "next_date", "status_since")
@@ -42,7 +43,9 @@ def _public_report(rep: dict) -> dict:
 def export(out_dir: Path, include_watchlist: bool = False, repo: str | None = None, credit: str | None = None,
            progress: Callable[[str], None] | None = None) -> dict:
     out_dir = Path(out_dir)
-    data_dir = out_dir / "demo-data"
+    final_dir = out_dir / "demo-data"
+    # Build beside the published copy and swap at the end, so a failed export never leaves a half-written demo.
+    data_dir = out_dir / "demo-data.new"
     if data_dir.exists():
         shutil.rmtree(data_dir)
     (data_dir / "artists").mkdir(parents=True)
@@ -50,14 +53,25 @@ def export(out_dir: Path, include_watchlist: bool = False, repo: str | None = No
     watched = {a["id"] for a in db.all_artists(watchlist_only=True)}
     scored = [(r, m, g) for r, m, g in service._scored(False, 30, False) if include_watchlist or r["id"] not in watched]
     rows = [_public_row(r, m, g) for r, m, g in scored]
-    ids = {r["id"] for r in rows}
 
+    failed = []
     for r in rows:
         if progress:
             progress(r["name"])
-        rep = service.report(r["name"], refresh=False)
+        try:
+            rep = service.report(r["name"], refresh=False)  # still reads releases and similar artists from Deezer
+        except SourceError as exc:
+            failed.append(f"{r['name']}: {exc}")
+            continue
         rep["history"] = db.history(r["id"])
         (data_dir / "artists" / f"{r['id']}.json").write_text(json.dumps(_public_report(rep), default=str))
+    if len(failed) > max(3, len(rows) // 20):  # more than a blip (e.g. offline): keep the published demo as it is
+        shutil.rmtree(data_dir)
+        raise SourceError(f"{len(failed)} of {len(rows)} artists failed; the published demo was left unchanged. "
+                          f"First error: {failed[0]}")
+    skipped = {r["id"] for r in rows} - {int(f.stem) for f in (data_dir / "artists").glob("*.json")}
+    rows = [r for r in rows if r["id"] not in skipped]
+    ids = {r["id"] for r in rows}
 
     health = service.data_health() | {"daily_job": False, "last_backup": None, "unlinked": 0, "artists": len(rows),
                                        "with_growth": sum(1 for r in rows if r["components"]["momentum"] is not None)}
@@ -76,6 +90,9 @@ def export(out_dir: Path, include_watchlist: bool = False, repo: str | None = No
         "review": [r for r in rows if r["review"] and not r["verified"]],
     }
     (data_dir / "board.json").write_text(json.dumps(board, default=str))
+    if final_dir.exists():
+        shutil.rmtree(final_dir)
+    data_dir.rename(final_dir)
 
     page = (STATIC / "index.html").read_text()
     page = page.replace('href="/favicon.svg"', 'href="favicon.svg"').replace(
@@ -85,4 +102,4 @@ def export(out_dir: Path, include_watchlist: bool = False, repo: str | None = No
     (out_dir / ".nojekyll").write_text("")  # serve files as they are on GitHub Pages
     size = sum(f.stat().st_size for f in out_dir.rglob("*") if f.is_file())
     return {"artists": len(rows), "left_out_watchlist": 0 if include_watchlist else len(watched & set(service._all_ids())),
-            "path": str(out_dir), "size_mb": round(size / 1e6, 1)}
+            "path": str(out_dir), "size_mb": round(size / 1e6, 1), "failed": failed}

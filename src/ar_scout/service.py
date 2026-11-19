@@ -732,7 +732,8 @@ def review_queue() -> list[dict]:
 
 
 def report(name: str, refresh: bool = True) -> dict:
-    artist = resolve(name, deep=True)
+    # refresh=False (the demo export) reads what's stored: no cross-source lookup for artists never linked.
+    artist = resolve(name, deep=refresh)
     errors = artist.pop("_errors", [])
     just_linked = artist.pop("_deep_resolved", False)  # new IDs (e.g. YouTube) aren't in the last snapshot yet
     snap = None

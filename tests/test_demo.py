@@ -28,3 +28,33 @@ def test_demo_export_leaves_out_team_information(tmp_path, monkeypatch):
     page = (tmp_path / "docs/index.html").read_text()
     assert "window.AR_DEMO = true" in page and 'href="favicon.svg"' in page
     assert "met them at a show" not in json.dumps(board) + json.dumps(artist)
+
+
+def test_failed_export_keeps_the_published_demo(tmp_path, monkeypatch):
+    from ar_scout.http import SourceError
+    import pytest
+
+    published = tmp_path / "docs/demo-data"
+    published.mkdir(parents=True)
+    (published / "board.json").write_text('{"old": true}')
+    for i in range(5):
+        db.add_snapshot(db.upsert_artist({"name": f"Act {i}", "deezer_id": i + 1}), {"deezer.fans": 500})
+
+    def offline(name, refresh=True):
+        raise SourceError("api.deezer.com: nodename nor servname provided")
+
+    monkeypatch.setattr(service, "report", offline)
+    with pytest.raises(SourceError, match="left unchanged"):
+        demo.export(tmp_path / "docs")
+    assert json.loads((published / "board.json").read_text()) == {"old": True}
+    assert not (tmp_path / "docs/demo-data.new").exists()
+
+
+def test_report_without_refresh_does_no_cross_source_lookup(monkeypatch):
+    import pytest
+
+    artist_id = db.upsert_artist({"name": "Never Linked"})
+    monkeypatch.setattr(service.musicbrainz, "search", lambda name: pytest.fail("looked up MusicBrainz"))
+    monkeypatch.setattr(service.youtube, "search_channel", lambda name: pytest.fail("searched YouTube"))
+    rep = service.report("Never Linked", refresh=False)
+    assert rep["artist"]["id"] == artist_id and rep["artist"]["resolved_at"] is None

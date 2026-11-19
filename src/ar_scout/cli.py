@@ -142,6 +142,8 @@ def export_demo(out: str = typer.Option("docs", help="Folder to write the demo s
     res = demo.export(Path(out), include_watchlist, repo, credit, progress=_progress)
     console.print(f"Demo with {res['artists']} artists written to {res['path']} ({res['size_mb']} MB); "
                   f"{res['left_out_watchlist']} watchlist artists left out")
+    for e in res["failed"]:
+        console.print(f"[yellow]Left out after an error: {e}[/]")
 
 
 @app.command("upload-db")
