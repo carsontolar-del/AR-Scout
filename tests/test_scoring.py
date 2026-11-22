@@ -114,6 +114,13 @@ def test_steady_growth_is_not_acceleration():
     assert not scoring.acceleration(steady)["accelerating"]
 
 
+
+def test_tiny_counts_cant_accelerate():
+    # Crosby Woods, Nov 2026: 24 -> 25 YouTube subscribers and 3 -> 8 Last.fm listeners read as "accelerating"
+    tiny = {"youtube.subscribers": _daily("2026-11-14", [22, 22, 22, 23, 23, 23, 24, 25]),
+            "lastfm.listeners": _daily("2026-11-14", [1, 1, 2, 2, 3, 4, 6, 8])}
+    assert not scoring.acceleration(tiny)["accelerating"]
+
 def test_window_change_is_actual_not_projected():
     pts = _daily("2026-10-13", [5390, 5410, 5440, 5490, 5710, 5830, 5900, 5970])
     c = scoring.window_change(pts, 7)

@@ -63,6 +63,7 @@ ACCEL_MIN_HALF_DAYS = 3      # each window needs at least this many days
 ACCEL_RATIO = 1.5            # recent daily gains this many times the earlier ones
 ACCEL_MIN_RECENT_PCT = 0.01  # and a real gain (1%+) in the recent window, so rounding can't fake it
 ACCEL_MIN_PLATFORMS = 2
+ACCEL_MIN_BASE = 200          # tiny counts (24 subscribers gaining 1) swing too much to mean anything
 
 
 def _value_at(pts: list[tuple[datetime, float]], t: datetime) -> tuple[datetime, float]:
@@ -99,10 +100,10 @@ def acceleration(history: dict[str, list[tuple[str, float]]]) -> dict:
             "platform": name, "days": round(d_recent, 1),
             "earlier_per_day": round(earlier, 2), "recent_per_day": round(recent, 2),
             "ratio": round(recent / earlier, 2) if earlier > 0 else None,
-            "recent_pct": round((end_v - mid_v) / mid_v, 4),
+            "recent_pct": round((end_v - mid_v) / mid_v, 4), "base": mid_v,
         }
     faster = [m for m, a in per.items()
-              if a["recent_pct"] >= ACCEL_MIN_RECENT_PCT and (a["ratio"] is None or a["ratio"] >= ACCEL_RATIO)]
+              if a["base"] >= ACCEL_MIN_BASE and a["recent_pct"] >= ACCEL_MIN_RECENT_PCT and (a["ratio"] is None or a["ratio"] >= ACCEL_RATIO)]
     return {"platforms": per, "faster": faster, "accelerating": len(faster) >= ACCEL_MIN_PLATFORMS}
 
 
