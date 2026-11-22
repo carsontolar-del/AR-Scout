@@ -253,6 +253,12 @@ body.demo .demo-hide, body.demo .admin-toggle, body.demo .admin-only, body.demo 
 .nav .count.warn-count { color: var(--warn); font-weight: 600; }
 .nav .overdue { margin-left: auto; font-size: 11px; font-weight: 600; color: var(--bad); background: var(--bad-soft); padding: 1px 6px; border-radius: 999px; }
 .nav .overdue + .count { margin-left: 8px; }
+.modal-back { position: fixed; inset: 0; z-index: 1000; background: rgba(0, 0, 0, .45); display: flex; align-items: center; justify-content: center; padding: 16px; }
+.modal { width: min(480px, 100%); max-height: calc(100vh - 32px); overflow: auto; padding: 18px 20px; display: grid; gap: 10px; }
+.modal h3 { margin: 0; font-size: 16px; }
+.modal p { margin: 0; color: var(--text-2); font-size: 13.5px; white-space: pre-line; overflow-wrap: anywhere; }
+.modal .input { width: 100%; }
+.modal-acts { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
 .review-list { display: grid; gap: 10px; }
 .bulk-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 10px 14px; margin-bottom: 10px; }
 .pickcell { display: flex; gap: 10px; align-items: center; }
@@ -641,6 +647,30 @@ let savedTheme = "auto"; try { savedTheme = localStorage.getItem("ars-theme") ||
 applyTheme(savedTheme);
 document.querySelectorAll("[data-theme-set]").forEach(b => b.onclick = () => applyTheme(b.dataset.themeSet));
 
+// ============================================================ dialogs
+// In-page dialogs instead of the browser's confirm()/prompt(): some embedded browsers (in-app panes, webviews)
+// close those instantly as if Cancel was pressed, which made buttons look dead.
+function uiDialog(message, { input = false, okLabel = "OK" } = {}) {
+  return new Promise(resolve => {
+    const [title, ...rest] = String(message).split("\n\n");
+    const field = input ? el("input", { class: "input", type: "text", autocomplete: "off" }) : null;
+    const back = el("div", { class: "modal-back" });
+    const done = v => { back.remove(); document.removeEventListener("keydown", onKey); resolve(v); };
+    const ok = () => done(input ? field.value : true);
+    const onKey = e => { if (e.key === "Escape") done(null); else if (e.key === "Enter" && (input || e.target === okBtn)) { e.preventDefault(); ok(); } };
+    const okBtn = el("button", { class: "btn primary", onclick: ok }, okLabel);
+    back.append(el("div", { class: "card modal", role: "dialog", "aria-modal": "true" },
+      el("h3", {}, title), ...rest.map(t => el("p", {}, t)), field,
+      el("div", { class: "modal-acts" }, el("button", { class: "btn ghost", onclick: () => done(null) }, "Cancel"), okBtn)));
+    back.onclick = e => { if (e.target === back) done(null); };
+    document.body.append(back);
+    document.addEventListener("keydown", onKey);
+    (field || okBtn).focus();
+  });
+}
+const uiConfirm = async (message, okLabel = "OK") => (await uiDialog(message, { okLabel })) === true;
+const uiPrompt = (message, okLabel = "Save") => uiDialog(message, { input: true, okLabel });
+
 // ============================================================ routing
 const view = $("#view");
 function route() {
@@ -909,7 +939,7 @@ async function renderLeaderboard() {
 function relinkBanner(n, ytFilter, after) {
   const b = el("button", { class: "btn" }, "Link missing data");
   b.onclick = async () => {
-    if (!confirm(`Look up MusicBrainz, YouTube and Wikipedia for ${n} artist${n === 1 ? "" : "s"}?\n\nArtists without a MusicBrainz YouTube link cost 100 YouTube quota units each (10,000/day), so this can use up to ${(n * 100).toLocaleString()} units. It takes a few seconds per artist.`)) return;
+    if (!await uiConfirm(`Look up MusicBrainz, YouTube and Wikipedia for ${n} artist${n === 1 ? "" : "s"}?\n\nArtists without a MusicBrainz YouTube link cost 100 YouTube quota units each (10,000/day), so this can use up to ${(n * 100).toLocaleString()} units. It takes a few seconds per artist.`, "Link them")) return;
     b.disabled = true; b.textContent = `Linking ${n}…`;
     try { const r = await post("/api/relink", {}); toast(`Linked ${r.relinked} artist${r.relinked === 1 ? "" : "s"}` + (r.errors.length ? ` · ${r.errors.length} source issues` : "")); after(); loadHealth(); }
     catch (e) { toast("Linking failed: " + e.message); b.disabled = false; b.textContent = "Link missing data"; }
@@ -1365,7 +1395,7 @@ async function renderReview() {
   const pick = test => { picked.clear(); rows.forEach(r => { if (!r.status && test(r)) picked.add(r.id); }); sync(); };
   archBtn.onclick = async () => {
     const names = rows.filter(r => picked.has(r.id)).map(r => r.name);
-    if (!confirm(`Archive ${names.length} artist${names.length === 1 ? "" : "s"}?\n\n${names.join(", ")}\n\nThey disappear from rankings, review and discovery, and stop being snapshotted. History is kept: undo one by finding it with the Leaderboard's "Show only archived" filter.`)) return;
+    if (!await uiConfirm(`Archive ${names.length} artist${names.length === 1 ? "" : "s"}?\n\n${names.join(", ")}\n\nThey disappear from rankings, review and discovery, and stop being snapshotted. History is kept: undo one by finding it with the Leaderboard's "Show only archived" filter.`, "Archive")) return;
     archBtn.disabled = true;
     try {
       const res = await post("/api/review/archive", { ids: [...picked] });
@@ -1814,7 +1844,7 @@ const YT_SOURCE = { musicbrainz: "via MusicBrainz", search: "via search", manual
 function ytChannelLine(a) {
   const change = el("button", { class: "linkish" }, a.youtube_channel ? "Change" : "Set channel");
   change.onclick = async () => {
-    const url = prompt(`YouTube channel for ${a.name}\n\nPaste a youtube.com/@handle or youtube.com/channel/UC… link. Old YouTube history for this artist is deleted so the switch doesn't read as growth.`);
+    const url = await uiPrompt(`YouTube channel for ${a.name}\n\nPaste a youtube.com/@handle or youtube.com/channel/UC… link. Old YouTube history for this artist is deleted so the switch doesn't read as growth.`);
     if (!url || !url.trim()) return;
     change.disabled = true; change.textContent = "Saving…";
     try {
@@ -1841,7 +1871,7 @@ function parseCount(text) {
 function manualButton(a, metric, label, where) {
   const b = el("button", { class: "linkish demo-hide" }, "Update");
   b.onclick = async () => {
-    const text = prompt(`${label} for ${a.name}\n\n${where}\nType the number shown, e.g. 12,500 or 12.5K. It's saved with today's date.`);
+    const text = await uiPrompt(`${label} for ${a.name}\n\n${where}\nType the number shown, e.g. 12,500 or 12.5K. It's saved with today's date.`);
     if (text == null || !text.trim()) return;
     const value = parseCount(text);
     if (value == null) { toast(`“${text}” isn't a number. Try something like 12,500 or 12.5K`); return; }
@@ -1858,7 +1888,7 @@ function igKpi(a, m) {
     el("div", { class: "d" }, m["instagram.followers"] != null ? `${fmt(m["instagram.media_count"])} posts` : sub));
   const change = el("button", { class: "linkish" }, a.instagram_username ? "Change" : "Set account");
   change.onclick = async () => {
-    const h = prompt(`Instagram account for ${a.name}\n\nPaste an instagram.com link or @username. Counts only work for public professional (Business/Creator) accounts.`);
+    const h = await uiPrompt(`Instagram account for ${a.name}\n\nPaste an instagram.com link or @username. Counts only work for public professional (Business/Creator) accounts.`);
     if (!h || !h.trim()) return;
     change.disabled = true; change.textContent = "Saving…";
     try {
@@ -1988,7 +2018,7 @@ function accountLine(a, kind) {
   const k = ACCOUNTS[kind], href = k.href(a);
   const change = el("button", { class: "linkish" }, "Change");
   change.onclick = async () => {
-    const link = prompt(k.ask(a));
+    const link = await uiPrompt(k.ask(a));
     if (!link || !link.trim()) return;
     change.disabled = true; change.textContent = "Saving…";
     try { await post(`/api/artist/${a.id}/${kind}`, { link: link.trim() }); toast(`${k.label} updated`); renderArtist(a.name); }
