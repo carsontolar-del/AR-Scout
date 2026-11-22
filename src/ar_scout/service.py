@@ -10,7 +10,7 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Callable
 
-from . import db, labels, management, scoring
+from . import db, labels, management, scoring, tags
 from .config import settings
 from .http import SourceError, TransientSourceError
 from .sources import deezer, instagram, lastfm, musicbrainz, spotify, wikipedia, youtube
@@ -831,6 +831,7 @@ def _scored(watchlist_only: bool, window_days: int, archived: bool) -> list[tupl
         cov = coverage.get(a["id"], {})
         out.append(({
             "id": a["id"], "name": a["name"], "status": a.get("status"), "genres": (a.get("genres") or [])[:3],
+            "electronic": tags.is_electronic(a.get("genres")),
             "country": a.get("country"), "score": s["score"], "confidence": s["confidence"],
             "components": s["components"], "deezer_fans": s["metrics"].get("deezer.fans"),
             "lastfm_listeners": s["metrics"].get("lastfm.listeners"),
@@ -876,7 +877,7 @@ def best_gain(row: dict) -> dict | None:
     return best
 
 
-def weekly_digest(days: int = 7, today: date | None = None) -> dict:
+def weekly_digest(days: int = 7, today: date | None = None, hide_electronic: bool = False) -> dict:
     """What changed in the last `days` days, in the order a scout acts on it: accelerating artists, top movers,
     new releases, pipeline steps due, new artists, accounts to check. Accounts under review stay out of the
     rankings, as on the dashboard."""
@@ -884,6 +885,8 @@ def weekly_digest(days: int = 7, today: date | None = None) -> dict:
     since = (today - timedelta(days=days)).isoformat()
     soon = (today + timedelta(days=days)).isoformat()
     rows = leaderboard(limit=100_000)
+    if hide_electronic:  # the team's own watchlist always shows
+        rows = [r for r in rows if r["status"] or not r["electronic"]]
     trusted = [r for r in rows if not (r["review"] and not r["verified"])]
     movers = sorted(((r, g) for r in trusted if (g := best_gain(r))), key=lambda x: -x[1]["pct"])
     released = [r for r in rows if r.get("latest_release") and since < r["latest_release"] <= today.isoformat()]

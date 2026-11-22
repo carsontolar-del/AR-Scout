@@ -29,3 +29,17 @@ def test_digest_collects_the_week_in_order():
     assert [r["latest_title"] for r in d["releases"]] == ["New Album"]
     assert [r["name"] for r in d["due"]] == ["Flat"] and d["overdue"] == 1
     assert d["review_count"] == 1
+
+
+def test_digest_can_hide_electronic_but_not_the_watchlist():
+    today = date(2026, 10, 26)
+    dub = db.upsert_artist({"name": "Dub Act", "genres": ["dubstep", "riddim"]})
+    kept = db.upsert_artist({"name": "Kept Dub", "genres": ["drum and bass"]})
+    band = db.upsert_artist({"name": "Band", "genres": ["indie rock"]})
+    for a in (dub, kept, band):
+        _daily(a, "deezer.fans", [700, 710, 720, 730, 760, 790, 820, 850])
+    db.watch(kept)
+
+    names = lambda d: {r["name"] for r in d["movers"]}
+    assert names(service.weekly_digest(today=today)) == {"Dub Act", "Kept Dub", "Band"}
+    assert names(service.weekly_digest(today=today, hide_electronic=True)) == {"Kept Dub", "Band"}

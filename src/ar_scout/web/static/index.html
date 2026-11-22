@@ -846,12 +846,16 @@ function remembered(name, defaults, skip = []) {
 const resetTo = (state, defaults) => Object.assign(state, structuredClone(defaults));
 
 // First visit opens on small acts by YouTube size, the view scouting starts from.
-const LB_DEFAULTS = { genre: "", max: "20000", platform: "youtube", mgmt: "", archived: false, hideReview: true, window: "30", sort: { key: "score", dir: -1 } };
+const LB_DEFAULTS = { genre: "", max: "20000", platform: "youtube", mgmt: "", archived: false, hideReview: true, hideElectronic: true, window: "30", sort: { key: "score", dir: -1 } };
 // Artists whose linked accounts are under review don't lead rankings until someone checks them.
 const underReview = r => r.review?.length && !r.verified;
 const lb = remembered("leaderboard", LB_DEFAULTS);
 let lbRows = null, mvRows = [], wlRows = [];
 // Management filter shared by the leaderboard and Movers. "Unknown" counts as possibly unmanaged.
+// Electronic acts (by top tags, decided on the server) are hidden by default; the team's watchlist always shows.
+const electronicPass = (r, hide) => !hide || !r.electronic || !!r.status;
+const electronicBox = (state, id, onchange) => el("label", { class: "field check" }, el("span", {}, "Electronic"), el("span", { class: "check-row" },
+  el("input", { type: "checkbox", id, checked: state.hideElectronic, onchange: e => { state.hideElectronic = e.target.checked; onchange(); } }), " Hide"));
 const MGMT_FILTERS = [["", "Any"], ["open", "No manager known"], ["none", "No management (confirmed)"], ["has", "Has management"]];
 const mgmtPass = (r, f) => {
   const st = r.management?.status;
@@ -884,7 +888,7 @@ async function renderLeaderboard() {
       el("div", {}, el("h1", {}, "Leaderboard"), el("p", {}, "Every tracked artist, ranked by breakout score.")),
       el("div", { class: "head-actions" },
         el("button", { class: "btn ghost", onclick: () => { resetTo(lb, LB_DEFAULTS); renderLeaderboard(); } }, "Reset filters"),
-        csvBtn(() => (lbRows || []).filter(r => mgmtPass(r, lb.mgmt) && !(lb.hideReview && underReview(r))), "leaderboard"),
+        csvBtn(() => (lbRows || []).filter(r => mgmtPass(r, lb.mgmt) && !(lb.hideReview && underReview(r)) && electronicPass(r, lb.hideElectronic)), "leaderboard"),
         await refreshBtn("all", () => load()))),
     bannerSlot, statsSlot,
     el("div", { class: "toolbar" },
@@ -894,6 +898,7 @@ async function renderLeaderboard() {
       mgmtSelect(lb, () => draw && draw()),
       el("label", { class: "field check" }, el("span", {}, "Accounts under review"), el("span", { class: "check-row" },
         el("input", { type: "checkbox", id: "lb-hide-review", checked: lb.hideReview, onchange: e => { lb.hideReview = e.target.checked; draw && draw(); } }), " Hide")),
+      electronicBox(lb, "lb-hide-electronic", () => draw && draw()),
       el("label", { class: "field check" }, el("span", {}, "Archived"), el("span", { class: "check-row" },
         el("input", { type: "checkbox", id: "lb-archived", checked: lb.archived, onchange: e => { lb.archived = e.target.checked; load(); } }), " Show only archived")),
       el("div", { class: "field" }, el("span", {}, "Growth window"), win)),
@@ -915,7 +920,7 @@ async function renderLeaderboard() {
       const withGrowth = shown.filter(r => Object.keys(r.monthly_growth || {}).length).length;
       const watched = shown.filter(r => r.status).length;
       const top = shown[0];
-      const filtered = lb.genre || lb.max || lb.mgmt || lb.hideReview;
+      const filtered = lb.genre || lb.max || lb.mgmt || lb.hideReview || lb.hideElectronic;
       statsSlot.replaceChildren(
         stat("Artists", shown.length, filtered ? `matching filters, of ${h.artists}` : "in the database"),
         stat("On watchlist", watched, filtered ? "in this view" : "snapshotted daily"),
@@ -926,7 +931,7 @@ async function renderLeaderboard() {
     bannerSlot.replaceChildren(h.unlinked ? relinkBanner(h.unlinked, ytFilter, load) : "");
     lbRows = rows;
     draw = () => {
-      const shown = rows.filter(r => mgmtPass(r, lb.mgmt) && !(lb.hideReview && underReview(r)));
+      const shown = rows.filter(r => mgmtPass(r, lb.mgmt) && !(lb.hideReview && underReview(r)) && electronicPass(r, lb.hideElectronic));
       drawStats(shown);
       tableSlot.replaceChildren(dataTable(shown, {
         empty: ["No artists match", "Loosen the filters above, or look up an artist with the search bar."], sort: lb.sort, onSort: s => { lb.sort = s; draw(); } }));
@@ -1067,12 +1072,14 @@ const disc = remembered("discover", { mode: "tag", query: "", min: 300, max: 500
 const PLATFORM_LABEL = { youtube: "YouTube subscribers", lastfm: "Last.fm listeners", deezer: "Deezer fans",
   instagram: "Instagram followers", tiktok: "TikTok followers", spotify: "Spotify listeners" };
 const dayLabel = d => new Date(d + "T12:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" });
+const wk = remembered("week", { hideElectronic: true });
 async function renderWeek() {
   const slot = el("div", {}, loadingCard(5));
   view.replaceChildren(el("div", { class: "page-head" }, el("div", {}, el("h1", {}, "This week"),
-    el("p", { id: "week-range" }, "What changed, in the order to act on it."))), slot);
+    el("p", { id: "week-range" }, "What changed, in the order to act on it."))),
+    el("div", { class: "toolbar" }, electronicBox(wk, "wk-hide-electronic", renderWeek)), slot);
   let d;
-  try { d = await api("/api/digest"); } catch (e) { slot.replaceChildren(errorCard(e)); return; }
+  try { d = await api("/api/digest" + (wk.hideElectronic ? "?hide_electronic=true" : "")); } catch (e) { slot.replaceChildren(errorCard(e)); return; }
   $("#week-range").textContent = `${dayLabel(d.from)} – ${dayLabel(d.to)}. What changed, in the order to act on it.`;
   const who = (r, ...extra) => el("div", { class: "wk-who" }, avatar(r.image_url, r.name),
     el("div", { style: "min-width:0" }, el("div", { class: "n", onclick: () => go(r.name) }, r.name), el("div", { class: "g" }, ...extra)));
@@ -1120,7 +1127,7 @@ const MOVER_PLATFORMS = [["best", "Best platform"], ["youtube", "YouTube subscri
 const MOVER_COLS = [["youtube", "YouTube"], ["lastfm", "Last.fm"], ["deezer", "Deezer"], ["instagram", "Instagram"]];
 // A gain counts only from a base of 200+ and by 20+ people, so tiny accounts can't post huge percentages.
 const MOVER_MIN_BASE = 200, MOVER_MIN_GAIN = 20;
-const MV_DEFAULTS = { platform: "best", max: "20000", sizeOn: "youtube", mgmt: "", hideReview: true };
+const MV_DEFAULTS = { platform: "best", max: "20000", sizeOn: "youtube", mgmt: "", hideReview: true, hideElectronic: true };
 const mv = remembered("movers", MV_DEFAULTS);
 const counts = c => c && c.start >= MOVER_MIN_BASE && c.delta >= MOVER_MIN_GAIN && c.pct != null;
 function moverGain(r, platform) {
@@ -1147,12 +1154,13 @@ async function renderMovers() {
       el("label", { class: "field" }, el("span", {}, "Audience"), max),
       el("label", { class: "field" }, el("span", {}, "Measured on"), sizeOn),
       mgmtSelect(mv, () => draw()),
-      el("label", { class: "field check" }, el("span", {}, "Accounts under review"), el("span", { class: "check-row" }, hide, " Hide"))),
+      el("label", { class: "field check" }, el("span", {}, "Accounts under review"), el("span", { class: "check-row" }, hide, " Hide")),
+      electronicBox(mv, "mv-hide-electronic", () => draw())),
     slot);
   let rows;
   try { rows = await api("/api/leaderboard?limit=100000" + (mv.max ? `&max_audience=${mv.max}&platform=${mv.sizeOn}` : "")); } catch (e) { slot.replaceChildren(errorCard(e)); return; }
   const draw = () => {
-    const list = rows.filter(r => !(mv.hideReview && r.review?.length && !r.verified) && mgmtPass(r, mv.mgmt))
+    const list = rows.filter(r => !(mv.hideReview && r.review?.length && !r.verified) && mgmtPass(r, mv.mgmt) && electronicPass(r, mv.hideElectronic))
       .map(r => ({ r, g: moverGain(r, mv.platform) })).filter(x => x.g).sort((a, b) => b.g.pct - a.g.pct);
     mvRows = list.map(x => x.r);
     if (!list.length) { slot.replaceChildren(el("div", { class: "card" }, el("div", { class: "empty" }, el("h4", {}, "No movers yet"), "Movers need a week of daily snapshots on that platform."))); return; }
@@ -1385,7 +1393,7 @@ async function renderReview() {
     return;
   }
   // Admin: archive several at once (e.g. a scene the team doesn't sign). Electronic acts start ticked.
-  const picked = new Set(rows.filter(r => !r.status && isElectronic(r)).map(r => r.id));
+  const picked = new Set(rows.filter(r => !r.status && r.electronic).map(r => r.id));
   const boxes = new Map();
   const archBtn = el("button", { class: "btn" });
   const sync = () => {
@@ -1405,7 +1413,7 @@ async function renderReview() {
   };
   const bulk = adminOnly(el("div", { class: "card bulk-bar demo-hide" },
     el("span", { class: "dim" }, "Select:"),
-    el("button", { class: "btn ghost", onclick: () => pick(isElectronic) }, "Electronic"),
+    el("button", { class: "btn ghost", onclick: () => pick(r => r.electronic) }, "Electronic"),
     el("button", { class: "btn ghost", onclick: () => pick(() => true) }, "All"),
     el("button", { class: "btn ghost", onclick: () => pick(() => false) }, "None"),
     el("span", { style: "flex:1" }), archBtn));
@@ -1430,13 +1438,6 @@ async function renderReview() {
   sync();
 }
 
-// Top tags that mark an electronic act. Only the first three tags count, so one stray tag doesn't decide it.
-const ELECTRONIC = ["electronic", "dubstep", "drum and bass", "drum n bass", "dnb", "jungle", "house", "techno", "trance",
-  "uk garage", "future garage", "2-step", "bass", "hardstyle", "jumpstyle", "riddim", "chillstep", "liquid funk", "edm"];
-function isElectronic(r) {
-  const tags = (r.genres || []).slice(0, 3).map(g => g.toLowerCase());
-  return tags.some(t => ELECTRONIC.some(k => t === k || t.includes(k)) || t === "garage" || t === "electro");
-}
 
 // ============================================================ submissions (from the public /submit links)
 const subs = { kind: "", status: "" };

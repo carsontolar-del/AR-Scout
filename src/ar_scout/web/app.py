@@ -248,8 +248,8 @@ def delete(artist_id: int):
 
 
 @app.get("/api/digest")
-def digest(days: int = 7):
-    return service.weekly_digest(days)
+def digest(days: int = 7, hide_electronic: bool = False):
+    return service.weekly_digest(days, hide_electronic=hide_electronic)
 
 
 @app.get("/api/review", dependencies=[Depends(admin_only)])

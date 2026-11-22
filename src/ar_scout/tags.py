@@ -41,3 +41,17 @@ def clean(tags: list[str] | None, limit: int = 6) -> list[str]:
         if t not in out:
             out.append(t)
     return out[:limit]
+
+
+# Tags that mark an electronic act. Matched against an artist's top three tags only, so one stray tag doesn't
+# decide it. Substrings ("bass" in "uk bass", "house" in "deep house") except the two that would catch rock and
+# pop ("garage rock", "electropop"), which must match exactly.
+_ELECTRONIC = ("electronic", "dubstep", "drum and bass", "drum n bass", "dnb", "jungle", "house", "techno", "trance",
+               "uk garage", "future garage", "2-step", "bass", "hardstyle", "jumpstyle", "riddim", "chillstep",
+               "liquid funk", "edm")
+_ELECTRONIC_EXACT = {"garage", "electro"}
+
+
+def is_electronic(genres: list[str] | None) -> bool:
+    top = [g.lower() for g in (genres or [])[:3]]
+    return any(t in _ELECTRONIC_EXACT or any(k in t for k in _ELECTRONIC) for t in top)
