@@ -44,6 +44,20 @@ def test_team_can_scout_but_not_run_admin_actions(client):
         assert getattr(c, method)(path, **kw).status_code == 403, path
 
 
+def test_review_discovery_app_and_submissions_are_admin_only(client):
+    c = client(team_password="team-pw", admin_password="admin-pw")
+    c.post("/api/login", json={"password": "team-pw"})
+    for path in ("/api/review", "/api/submissions", "/api/picks", "/api/comments/public",
+                 "/api/comments?target=pick&target_id=1", "/api/artist/1/tracks"):
+        assert c.get(path).status_code == 403, path
+    assert c.post("/api/comments", json={"target": "pick", "target_id": 1, "author": "x", "body": "y"}).status_code == 403
+    assert c.get("/app").status_code == 200  # the public discovery app itself stays open
+
+    c.post("/api/login", json={"password": "admin-pw"})
+    for path in ("/api/review", "/api/submissions", "/api/picks", "/api/comments/public"):
+        assert c.get(path).status_code == 200, path
+
+
 def test_admin_can_run_admin_actions(client):
     c = client(team_password="team-pw", admin_password="admin-pw")
     c.post("/api/login", json={"password": "admin-pw"})

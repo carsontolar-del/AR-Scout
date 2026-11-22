@@ -63,12 +63,14 @@ def test_status_and_note_updates():
 
 
 def test_public_links_work_without_sign_in_but_the_inbox_does_not(client):
-    c = client(team_password="team-pw")
+    c = client(team_password="team-pw", admin_password="admin-pw")
     assert c.get("/submit/artist").status_code == 200 and c.get("/submit/fan").status_code == 200
     assert c.post("/api/submit", json=DEMO).json() == {"ok": True}
     assert c.get("/api/submissions").status_code == 401
     assert c.patch("/api/submissions/1", json={"status": "passed"}).status_code == 401
     c.post("/api/login", json={"password": "team-pw"})
+    assert c.get("/api/submissions").status_code == 403  # the inbox is the admin's
+    c.post("/api/login", json={"password": "admin-pw"})
     d = c.get("/api/submissions").json()
     assert d["new"] == {"artist": 1, "fan": 0} and d["rows"][0]["email"] == "sam@example.com"
 

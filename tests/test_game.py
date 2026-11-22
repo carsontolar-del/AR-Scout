@@ -117,13 +117,15 @@ def test_hidden_comments_vanish_from_the_app(artist):
 
 
 def test_app_is_public_but_team_tools_are_not(client, artist):
-    c = client(team_password="team-pw")
+    c = client(team_password="team-pw", admin_password="admin-pw")
     assert c.get("/app").status_code == 200
     assert c.get(f"/api/app/state?listener={ME}").status_code == 200
     for method, path in (("get", "/api/picks"), ("get", "/api/comments/public"), ("post", "/api/comments"),
                          ("patch", "/api/comments/1"), ("get", f"/api/artist/{artist}/tracks")):
         assert getattr(c, method)(path).status_code == 401, path
     c.post("/api/login", json={"password": "team-pw"})
+    assert c.get("/api/picks").status_code == 403  # managing the app is the admin's
+    c.post("/api/login", json={"password": "admin-pw"})
     p = c.post("/api/picks", json={"artist_id": artist, "deezer_track_id": 11, "wheel_genre": "Indie Rock"}).json()
     r = c.post(f"/api/app/picks/{p['id']}/comments", json={"listener": ME, "author": "Ana", "body": "Love it"})
     assert r.status_code == 200

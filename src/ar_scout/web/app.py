@@ -252,7 +252,7 @@ def digest(days: int = 7):
     return service.weekly_digest(days)
 
 
-@app.get("/api/review")
+@app.get("/api/review", dependencies=[Depends(admin_only)])
 def review():
     return service.review_queue()
 
@@ -405,13 +405,13 @@ def submit(body: SubmitIn, request: Request):
     return {"ok": True}  # the stored row stays private to the team
 
 
-@app.get("/api/submissions")
+@app.get("/api/submissions", dependencies=[Depends(admin_only)])
 def list_submissions(kind: str | None = None, status: str | None = None):
     return {"rows": db.submissions(kind or None, status or None), "new": submissions.counts(),
             "statuses": submissions.STATUSES}
 
 
-@app.patch("/api/submissions/{submission_id}")
+@app.patch("/api/submissions/{submission_id}", dependencies=[Depends(admin_only)])
 def update_submission(submission_id: int, body: SubmissionIn):
     try:
         return submissions.update(submission_id, body.status, body.team_note)
@@ -521,13 +521,13 @@ class HideIn(BaseModel):
     hidden: bool = True
 
 
-@app.get("/api/picks")
+@app.get("/api/picks", dependencies=[Depends(admin_only)])
 def list_picks():
     return {"rows": game.picks(), "wheel": [{"name": n, "hue": h, "wheel": w} for w, slices in game.WHEELS.items()
                                             for n, h in slices]}
 
 
-@app.get("/api/artist/{artist_id}/tracks")
+@app.get("/api/artist/{artist_id}/tracks", dependencies=[Depends(admin_only)])
 def artist_tracks(artist_id: int):
     try:
         return game.artist_tracks(artist_id)
@@ -535,7 +535,7 @@ def artist_tracks(artist_id: int):
         raise HTTPException(400, str(exc)) from exc
 
 
-@app.post("/api/picks")
+@app.post("/api/picks", dependencies=[Depends(admin_only)])
 def add_pick(body: PickIn):
     try:
         return game.add_pick(body.artist_id, body.deezer_track_id, body.wheel_genre, body.curator, body.note,
@@ -544,7 +544,7 @@ def add_pick(body: PickIn):
         raise HTTPException(400, str(exc)) from exc
 
 
-@app.patch("/api/picks/{pick_id}")
+@app.patch("/api/picks/{pick_id}", dependencies=[Depends(admin_only)])
 def update_pick(pick_id: int, body: PickUpdateIn):
     return _bad_request(game.update_pick, pick_id, **{k: getattr(body, k) for k in body.model_fields_set})
 
@@ -555,24 +555,24 @@ def delete_pick(pick_id: int):
     return {"ok": True}
 
 
-@app.get("/api/comments")
+@app.get("/api/comments", dependencies=[Depends(admin_only)])
 def list_comments(target: str, target_id: int, scope: str = "team"):
     if scope not in ("team", "public"):
         raise HTTPException(400, "scope must be team or public")
     return db.comments(target, target_id, scope, include_hidden=True)
 
 
-@app.get("/api/comments/public")
+@app.get("/api/comments/public", dependencies=[Depends(admin_only)])
 def public_comment_feed():
     return game.moderation_feed()
 
 
-@app.post("/api/comments")
+@app.post("/api/comments", dependencies=[Depends(admin_only)])
 def add_team_comment(body: TeamCommentIn):
     return _bad_request(game.add_team_comment, body.target, body.target_id, body.author, body.body)
 
 
-@app.patch("/api/comments/{comment_id}")
+@app.patch("/api/comments/{comment_id}", dependencies=[Depends(admin_only)])
 def hide_comment(comment_id: int, body: HideIn):
     if not db.get_comment(comment_id):
         raise HTTPException(404, "That comment no longer exists.")
@@ -580,7 +580,7 @@ def hide_comment(comment_id: int, body: HideIn):
     return db.get_comment(comment_id)
 
 
-@app.delete("/api/comments/{comment_id}")
+@app.delete("/api/comments/{comment_id}", dependencies=[Depends(admin_only)])
 def delete_comment(comment_id: int):
     """Team comments only. Public comments are hidden instead, so there's a record of what was removed."""
     c = db.get_comment(comment_id)

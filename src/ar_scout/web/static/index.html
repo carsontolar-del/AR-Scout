@@ -503,13 +503,13 @@ textarea.input { width: 100%; min-height: 72px; resize: vertical; margin-top: 10
       <a href="#/discover" data-nav="discover">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6.5"/><path d="m10.5 5.5-1.6 3.4-3.4 1.6 1.6-3.4z"/></svg>
         Discover</a>
-      <a href="#/review" data-nav="review">
+      <a href="#/review" data-nav="review" class="admin-only">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 1.5 14.5 13h-13z"/><path d="M8 6v3.2M8 11.2v.3"/></svg>
         Needs review <span class="count warn-count" id="cntReview"></span></a>
-      <a href="#/picks" data-nav="picks" class="demo-hide">
+      <a href="#/picks" data-nav="picks" class="demo-hide admin-only">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6.5"/><circle cx="8" cy="8" r="2"/><path d="M8 1.5v4.5"/></svg>
         Discovery app <span class="count" id="cntPicks"></span></a>
-      <a href="#/submissions" data-nav="submissions" class="demo-hide">
+      <a href="#/submissions" data-nav="submissions" class="demo-hide admin-only">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1.5 9.5h3.5l1 2h4l1-2h3.5"/><path d="M1.5 9.5 3.5 3h9l2 6.5V13a.5.5 0 0 1-.5.5H2a.5.5 0 0 1-.5-.5z"/></svg>
         Submissions <span class="count" id="cntSubs"></span></a>
       <a href="#/help" data-nav="help">
@@ -650,6 +650,8 @@ function route() {
   document.querySelectorAll("[data-nav]").forEach(a => a.classList.toggle("active",
     a.dataset.nav === (page || "leaderboard") || (page === "artist" && a.dataset.nav === lastList)));
   window.scrollTo(0, 0);
+  // The review queue, discovery-app management and submissions are the admin's (the server refuses the rest).
+  if (ADMIN_PAGES.includes(page) && !adminOn) { location.hash = "#/"; return; }
   if (page === "artist" && arg) return renderArtist(arg);
   if (page === "watchlist") { lastList = "watchlist"; return renderWatchlist(); }
   if (page === "discover") { lastList = "discover"; return renderDiscover(); }
@@ -663,6 +665,7 @@ function route() {
   lastList = "leaderboard"; return renderLeaderboard();
 }
 let lastList = "leaderboard";
+const ADMIN_PAGES = ["review", "picks", "submissions"];
 window.addEventListener("hashchange", route);
 const go = name => location.hash = "/artist/" + encodeURIComponent(name);
 
@@ -1641,7 +1644,7 @@ function addPickForm() {
 
 function setSubCount(n) { $("#cntSubs").textContent = (n.artist + n.fan) ? `${n.artist + n.fan} new` : ""; }
 async function loadSubCount() {
-  if (DEMO) return;
+  if (DEMO || !adminOn) return;
   try { setSubCount((await api("/api/submissions?status=new")).new); } catch {}
   try { $("#cntPicks").textContent = (await api("/api/picks")).rows.filter(p => p.status === "live").length || ""; } catch {}
 }
@@ -2209,6 +2212,7 @@ $("#adminToggle").onchange = e => {
   document.body.classList.toggle("admin", adminOn);
   try { localStorage.setItem("ars-admin", adminOn ? "1" : "0"); } catch {}
   toast(adminOn ? "Admin tools shown" : "Admin tools hidden");
+  if (adminOn) loadSubCount(); else if (ADMIN_PAGES.includes(location.hash.split("/")[1])) route();
 };
 
 // ============================================================ demo banner
