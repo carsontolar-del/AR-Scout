@@ -38,8 +38,9 @@ def test_team_can_scout_but_not_run_admin_actions(client):
     assert c.get("/api/leaderboard").status_code == 200
     assert c.get("/api/status").json()["role"] == "team"
     for method, path in (("post", "/api/relink"), ("post", "/api/snapshot"), ("delete", "/api/artist/1"),
-                         ("post", "/api/artist/1/youtube")):
-        kw = {"json": {"url": "UC" + "a" * 22}} if path.endswith("youtube") else {}
+                         ("post", "/api/artist/1/youtube"), ("post", "/api/review/archive")):
+        kw = ({"json": {"url": "UC" + "a" * 22}} if path.endswith("youtube")
+              else {"json": {"ids": [1]}} if path.endswith("archive") else {})
         assert getattr(c, method)(path, **kw).status_code == 403, path
 
 

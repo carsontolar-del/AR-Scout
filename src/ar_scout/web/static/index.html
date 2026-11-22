@@ -254,6 +254,8 @@ body.demo .demo-hide, body.demo .admin-toggle, body.demo .admin-only, body.demo 
 .nav .overdue { margin-left: auto; font-size: 11px; font-weight: 600; color: var(--bad); background: var(--bad-soft); padding: 1px 6px; border-radius: 999px; }
 .nav .overdue + .count { margin-left: 8px; }
 .review-list { display: grid; gap: 10px; }
+.bulk-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 10px 14px; margin-bottom: 10px; }
+.pickcell { display: flex; gap: 10px; align-items: center; }
 .review-item { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 14px; align-items: start; padding: 14px 16px; }
 .review-item .n { font-weight: 600; cursor: pointer; }
 .review-item .n:hover { text-decoration: underline; }
@@ -1349,19 +1351,58 @@ async function renderReview() {
       "Every artist's linked accounts either look right or have been checked.")));
     return;
   }
-  slot.replaceChildren(el("div", { class: "review-list" }, rows.map(r => {
+  // Admin: archive several at once (e.g. a scene the team doesn't sign). Electronic acts start ticked.
+  const picked = new Set(rows.filter(r => !r.status && isElectronic(r)).map(r => r.id));
+  const boxes = new Map();
+  const archBtn = el("button", { class: "btn" });
+  const sync = () => {
+    archBtn.textContent = `Archive selected (${picked.size})`; archBtn.disabled = !picked.size;
+    boxes.forEach((b, id) => { b.checked = picked.has(id); });
+  };
+  const pick = test => { picked.clear(); rows.forEach(r => { if (!r.status && test(r)) picked.add(r.id); }); sync(); };
+  archBtn.onclick = async () => {
+    const names = rows.filter(r => picked.has(r.id)).map(r => r.name);
+    if (!confirm(`Archive ${names.length} artist${names.length === 1 ? "" : "s"}?\n\n${names.join(", ")}\n\nThey disappear from rankings, review and discovery, and stop being snapshotted. History is kept: undo one by finding it with the Leaderboard's "Show only archived" filter.`)) return;
+    archBtn.disabled = true;
+    try {
+      const res = await post("/api/review/archive", { ids: [...picked] });
+      toast(`Archived ${res.archived.length}` + (res.skipped.length ? `, skipped ${res.skipped.length}` : ""));
+      loadCounts(); renderReview();
+    } catch (e) { toast("Couldn't archive: " + e.message); sync(); }
+  };
+  const bulk = adminOnly(el("div", { class: "card bulk-bar demo-hide" },
+    el("span", { class: "dim" }, "Select:"),
+    el("button", { class: "btn ghost", onclick: () => pick(isElectronic) }, "Electronic"),
+    el("button", { class: "btn ghost", onclick: () => pick(() => true) }, "All"),
+    el("button", { class: "btn ghost", onclick: () => pick(() => false) }, "None"),
+    el("span", { style: "flex:1" }), archBtn));
+  slot.replaceChildren(bulk, el("div", { class: "review-list" }, rows.map(r => {
+    const box = adminOnly(el("input", { type: "checkbox", class: "demo-hide", disabled: !!r.status,
+      title: r.status ? "On the watchlist, so it can't be archived from here" : "Include in Archive selected",
+      onchange: e => { e.target.checked ? picked.add(r.id) : picked.delete(r.id); sync(); } }));
+    boxes.set(r.id, box);
     const btn = el("button", { class: "btn demo-hide", title: "Only after you've checked: every linked account is this artist" }, "Links are correct");
     btn.onclick = async () => {
       btn.disabled = true;
       try { await post(`/api/artist/${r.id}/verify`, { verified: true }); toast(`${r.name}: links confirmed`); loadCounts(); renderReview(); }
       catch (e) { toast("Couldn't save: " + e.message); btn.disabled = false; }
     };
-    return el("div", { class: "card review-item" }, avatar(r.image_url, r.name),
+    return el("div", { class: "card review-item" }, el("div", { class: "pickcell" }, box, avatar(r.image_url, r.name)),
       el("div", { style: "min-width:0" },
         el("div", {}, el("span", { class: "n", onclick: () => go(r.name) }, r.name), r.status ? el("span", { class: "pill st-" + r.status, style: "margin-left:8px" }, r.status) : null),
+        (r.genres || []).length ? el("div", { class: "dim", style: "font-size:12.5px;margin-top:2px" }, r.genres.slice(0, 3).join(" · ")) : null,
         el("ul", {}, r.review.map(i => el("li", {}, i)))),
       el("div", { class: "acts" }, el("button", { class: "btn ghost", onclick: () => go(r.name) }, "Open"), btn));
   })));
+  sync();
+}
+
+// Top tags that mark an electronic act. Only the first three tags count, so one stray tag doesn't decide it.
+const ELECTRONIC = ["electronic", "dubstep", "drum and bass", "drum n bass", "dnb", "jungle", "house", "techno", "trance",
+  "uk garage", "future garage", "2-step", "bass", "hardstyle", "jumpstyle", "riddim", "chillstep", "liquid funk", "edm"];
+function isElectronic(r) {
+  const tags = (r.genres || []).slice(0, 3).map(g => g.toLowerCase());
+  return tags.some(t => ELECTRONIC.some(k => t === k || t.includes(k)) || t === "garage" || t === "electro");
 }
 
 // ============================================================ submissions (from the public /submit links)

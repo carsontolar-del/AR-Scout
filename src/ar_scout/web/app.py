@@ -89,6 +89,10 @@ class ArchiveIn(BaseModel):
     archived: bool = True
 
 
+class BulkArchiveIn(BaseModel):
+    ids: list[int]
+
+
 class ManagementIn(BaseModel):
     status: str | None = None
 
@@ -251,6 +255,11 @@ def digest(days: int = 7):
 @app.get("/api/review")
 def review():
     return service.review_queue()
+
+
+@app.post("/api/review/archive", dependencies=[Depends(admin_only)])
+def archive_from_review(body: BulkArchiveIn):
+    return service.archive_from_review(body.ids)
 
 
 @app.post("/api/artist/{artist_id}/verify")

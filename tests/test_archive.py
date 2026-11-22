@@ -33,3 +33,17 @@ def test_delete_removes_everything(tmp_db):
     db.add_note(a, "wrong search")
     assert service.delete_artist(a) == {"deleted": "Mistake"}
     assert db.get_artist(a) is None and db.history(a) == [] and db.watch_entry(a) is None and db.notes(a) == []
+
+
+def test_bulk_archive_from_review_skips_watchlist_and_unflagged(tmp_db, monkeypatch):
+    dub = db.upsert_artist({"name": "Mala", "deezer_id": 10})
+    prospect = db.upsert_artist({"name": "Prospect", "deezer_id": 11})
+    fine = db.upsert_artist({"name": "Fine", "deezer_id": 12})
+    monkeypatch.setattr(service, "review_queue", lambda: [{"id": dub, "name": "Mala", "status": None},
+                                                         {"id": prospect, "name": "Prospect", "status": "watching"}])
+
+    res = service.archive_from_review([dub, prospect, fine, dub])
+    assert res["archived"] == ["Mala"]
+    assert {s["id"]: s["reason"] for s in res["skipped"]} == {prospect: "on the watchlist", fine: "not under review"}
+    assert db.get_artist(dub)["archived_at"] and not db.get_artist(prospect)["archived_at"]
+    assert not db.get_artist(fine)["archived_at"]

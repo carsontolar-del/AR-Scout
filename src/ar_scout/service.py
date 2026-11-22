@@ -693,6 +693,23 @@ def set_archived(artist_id: int, archived: bool = True) -> dict:
     return {"artist_id": artist_id, "archived_at": db.get_artist(artist_id).get("archived_at")}
 
 
+
+def archive_from_review(artist_ids: list[int]) -> dict:
+    """Archive several artists from the review queue at once. Only artists still under review are archived;
+    watchlisted ones are skipped (they're the team's prospects). Undo one at a time with set_archived(id, False)."""
+    queue = {r["id"]: r for r in review_queue()}
+    archived, skipped = [], []
+    for artist_id in dict.fromkeys(artist_ids):
+        r = queue.get(artist_id)
+        if not r:
+            skipped.append({"id": artist_id, "reason": "not under review"})
+        elif r.get("status"):
+            skipped.append({"id": artist_id, "name": r["name"], "reason": "on the watchlist"})
+        else:
+            db.set_archived(artist_id, db.now())
+            archived.append(r["name"])
+    return {"archived": archived, "skipped": skipped}
+
 def delete_artist(artist_id: int) -> dict:
     """Permanently delete an artist and all their history. The nightly backup is the only way back."""
     a = db.get_artist(artist_id)
