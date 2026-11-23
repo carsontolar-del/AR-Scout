@@ -833,6 +833,7 @@ def _scored(watchlist_only: bool, window_days: int, archived: bool) -> list[tupl
             "id": a["id"], "name": a["name"], "status": a.get("status"), "genres": (a.get("genres") or [])[:3],
             "electronic": tags.is_electronic(a.get("genres")),
             "country": a.get("country"), "score": s["score"], "confidence": s["confidence"],
+            "provisional": s["components"]["momentum"] is None,
             "components": s["components"], "deezer_fans": s["metrics"].get("deezer.fans"),
             "lastfm_listeners": s["metrics"].get("lastfm.listeners"),
             "youtube_subscribers": s["metrics"].get("youtube.subscribers"),
@@ -857,7 +858,9 @@ def _scored(watchlist_only: bool, window_days: int, archived: bool) -> list[tupl
             "linked": bool(a.get("resolved_at")), "youtube_linked": bool(a.get("youtube_channel")),
             "snapshot_days": cov.get("days", 0), "last_snapshot": cov.get("last"),
         }, s["metrics"], a.get("genres") or []))
-    out.sort(key=lambda x: x[0]["score"], reverse=True)
+    # No growth history yet means the score was rebuilt without momentum, so it says nothing about breaking out:
+    # those artists rank below everyone with a trend until they have one.
+    out.sort(key=lambda x: (not x[0]["provisional"], x[0]["score"]), reverse=True)
     _score_cache[key] = out
     return out
 

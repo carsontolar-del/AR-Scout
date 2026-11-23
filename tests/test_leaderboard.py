@@ -36,3 +36,22 @@ def test_rows_carry_tags_link_state_and_coverage(tmp_db):
     assert row["linked"] is False and row["youtube_linked"] is False
     assert row["snapshot_days"] == 1 and row["last_snapshot"]
     assert service.data_health()["unlinked"] == 1
+
+
+def test_artists_without_growth_history_rank_below_those_with_it(tmp_db):
+    from datetime import datetime, timedelta, timezone
+    trend = db.upsert_artist({"name": "Has a trend", "deezer_id": 10})
+    t0 = datetime.now(timezone.utc) - timedelta(days=10)
+    for i in range(11):
+        db.add_snapshot(trend, {"deezer.fans": 1_000 + i, "lastfm.listeners": 5_000 + i},
+                        taken_at=(t0 + timedelta(days=i)).isoformat())
+    # Perfect on everything but momentum: self-released, just released, mid-size.
+    new = db.upsert_artist({"name": "Brand new", "deezer_id": 11, "latest_label": "DistroKid",
+                            "latest_release": datetime.now(timezone.utc).date().isoformat()})
+    db.add_snapshot(new, {"deezer.fans": 1_000, "lastfm.listeners": 5_000, "lastfm.playcount": 200_000})
+
+    rows = service.leaderboard(limit=10)
+    by = {r["name"]: r for r in rows}
+    assert by["Brand new"]["provisional"] and not by["Has a trend"]["provisional"]
+    assert by["Brand new"]["score"] > by["Has a trend"]["score"]
+    assert [r["name"] for r in rows] == ["Has a trend", "Brand new"]
