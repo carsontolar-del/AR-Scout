@@ -24,7 +24,7 @@ MOMENTUM_METRICS = {
     "youtube.subscribers": 1.0,
     "lastfm.playcount": 0.7,
     "youtube.views": 0.7,
-    "instagram.followers": 1.0,
+    "instagram.followers": 1.5,  # often moves first (e.g. after a TikTok moment); revisit once there is a month of history
     "tiktok.followers": 1.0,
     "spotify.monthly_listeners": 1.0,
     "spotify.followers": 1.0,

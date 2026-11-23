@@ -24,6 +24,7 @@ free music data APIs and a local SQLite history in `data/ar_scout.db`.
 
 ## Breakout score (0–100)
 momentum 40% · engagement 20% · headroom 20% · activity 10% · signability 10% (see `src/ar_scout/scoring.py`).
+Inside momentum, Instagram follower growth weighs 1.5× a platform (a leading signal; revisit once there is a month of history).
 The total is then multiplied by `0.3 + 0.7 × headroom`, so an act that's already big (on any platform, or with
 heavy Wikipedia traffic) is capped low. Free sources undercount mainstream US acts, so missing YouTube data can hide size.
 `confidence` = share of weights that had data. Momentum needs 7+ days of snapshots, so newly found
